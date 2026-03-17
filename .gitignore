@@ -1,0 +1,8 @@
+node_modules
+.npm-cache
+dist
+build
+.env
+.DS_Store
+server/dist/public
+data
