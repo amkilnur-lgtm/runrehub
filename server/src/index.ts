@@ -56,13 +56,19 @@ if (fs.existsSync(publicDir)) {
     root: publicDir,
     prefix: "/"
   });
-
-  app.get("/*", async (_request, reply) => {
-    return reply.sendFile("index.html");
-  });
 }
 
 app.get("/api/health", async () => ({ ok: true }));
+
+if (fs.existsSync(publicDir)) {
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.raw.url?.startsWith("/api/")) {
+      return reply.code(404).send({ message: "Not found" });
+    }
+
+    return reply.type("text/html").send(fs.readFileSync(path.join(publicDir, "index.html"), "utf8"));
+  });
+}
 
 await app.listen({
   port: config.PORT,
