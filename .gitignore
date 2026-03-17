@@ -6,3 +6,5 @@ build
 .DS_Store
 server/dist/public
 data
+.ssh/
+.ssh_temp_key
