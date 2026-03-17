@@ -42,6 +42,51 @@ function assertStravaConfigured() {
   }
 }
 
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  );
+
+  return asUtc - date.getTime();
+}
+
+function getStartOfTodayInTimeZone(timeZone: string) {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const [year, month, day] = formatter.format(now).split("-").map(Number);
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const offsetMs = getTimeZoneOffsetMs(utcGuess, timeZone);
+  return new Date(utcGuess.getTime() - offsetMs);
+}
+
 export function getStravaAuthUrl() {
   assertStravaConfigured();
   const url = new URL("https://www.strava.com/oauth/authorize");
@@ -161,7 +206,7 @@ export async function syncLatestActivities(userId: number) {
     [userId]
   );
   const connection = rows[0];
-  const afterDate = connection.last_synced_at ?? connection.connected_at;
+  const afterDate = connection.last_synced_at ?? getStartOfTodayInTimeZone(config.APP_TIMEZONE);
   const after = Math.floor(new Date(afterDate).getTime() / 1000);
 
   const activityResponse = await fetch(

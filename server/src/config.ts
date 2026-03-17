@@ -6,6 +6,7 @@ dotenv.config();
 const configSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   APP_URL: z.string().default("http://localhost:3000"),
+  APP_TIMEZONE: z.string().default("Europe/Moscow"),
   PORT: z.coerce.number().default(3000),
   JWT_SECRET: z.string().min(8),
   ADMIN_USERNAME: z.string().default("admin"),
