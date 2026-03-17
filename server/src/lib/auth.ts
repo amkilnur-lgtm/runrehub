@@ -13,6 +13,11 @@ const authCookieOptions = {
   secure: config.NODE_ENV === "production"
 };
 
+const insecureAuthCookieOptions = {
+  ...authCookieOptions,
+  secure: false
+};
+
 declare module "@fastify/jwt" {
   interface FastifyJWT {
     payload: AuthUser;
@@ -35,6 +40,7 @@ export async function setAuthCookie(reply: FastifyReply, user: AuthUser) {
 
 export function clearAuthCookie(reply: FastifyReply) {
   reply.clearCookie(AUTH_COOKIE, authCookieOptions);
+  reply.clearCookie(AUTH_COOKIE, insecureAuthCookieOptions);
 }
 
 export async function requireAuth(request: FastifyRequest) {
