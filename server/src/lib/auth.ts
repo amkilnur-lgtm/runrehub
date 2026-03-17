@@ -2,8 +2,16 @@ import bcrypt from "bcryptjs";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 import { AuthUser, AppRole } from "../types.js";
+import { config } from "../config.js";
 
 const AUTH_COOKIE = "runrehab_token";
+
+const authCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  path: "/",
+  secure: config.NODE_ENV === "production"
+};
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -22,15 +30,11 @@ export async function verifyPassword(password: string, hash: string) {
 
 export async function setAuthCookie(reply: FastifyReply, user: AuthUser) {
   const token = await reply.jwtSign(user, { expiresIn: "14d" });
-  reply.setCookie(AUTH_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/"
-  });
+  reply.setCookie(AUTH_COOKIE, token, authCookieOptions);
 }
 
 export function clearAuthCookie(reply: FastifyReply) {
-  reply.clearCookie(AUTH_COOKIE, { path: "/" });
+  reply.clearCookie(AUTH_COOKIE, authCookieOptions);
 }
 
 export async function requireAuth(request: FastifyRequest) {
