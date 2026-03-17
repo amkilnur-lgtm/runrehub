@@ -36,6 +36,8 @@ type StravaLap = {
   end_index?: number | null;
 };
 
+type StreamPayload = Record<string, { type: string; data: number[] } | undefined>;
+
 function assertStravaConfigured() {
   if (!config.STRAVA_CLIENT_ID || !config.STRAVA_CLIENT_SECRET) {
     throw new Error("STRAVA_NOT_CONFIGURED");
@@ -193,6 +195,33 @@ async function refreshAccessTokenIfNeeded(userId: number) {
   );
 
   return data.access_token;
+}
+
+export async function getActivityStreams(userId: number, activityId: number) {
+  const token = await refreshAccessTokenIfNeeded(userId);
+  if (!token) {
+    return null;
+  }
+
+  const response = await fetch(
+    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,heartrate,velocity_smooth&key_by_type=true`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as StreamPayload;
+  return {
+    distance: payload.distance?.data ?? [],
+    heartrate: payload.heartrate?.data ?? [],
+    velocity_smooth: payload.velocity_smooth?.data ?? []
+  };
 }
 
 export async function syncLatestActivities(userId: number) {

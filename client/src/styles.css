@@ -89,6 +89,10 @@ select {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.four-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .card {
   padding: 24px;
 }
@@ -193,9 +197,86 @@ select {
   color: #8c4a17;
 }
 
+.workout-layout {
+  grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.35fr);
+  align-items: start;
+}
+
+.compact-laps {
+  display: grid;
+  gap: 6px;
+}
+
+.compact-laps-head,
+.compact-lap-row {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 0.8fr 0.65fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.compact-laps-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(24, 21, 16, 0.08);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.compact-lap-row {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(24, 21, 16, 0.08);
+  font-size: 14px;
+}
+
+.lap-name {
+  font-weight: 600;
+}
+
+.chart-column {
+  display: grid;
+  gap: 16px;
+}
+
+.chart-card {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+  border-radius: 18px;
+  background:
+    linear-gradient(to bottom, rgba(17, 17, 17, 0.035) 1px, transparent 1px);
+  background-size: 100% 25%;
+}
+
+.chart-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: #fff9f2;
+}
+
 @media (max-width: 900px) {
   .two-columns,
-  .three-columns {
+  .three-columns,
+  .four-columns,
+  .workout-layout {
     grid-template-columns: 1fr;
   }
 

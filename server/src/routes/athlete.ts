@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
-import { getStravaAuthUrl, syncLatestActivities } from "../lib/strava.js";
+import { getActivityStreams, getStravaAuthUrl, syncLatestActivities } from "../lib/strava.js";
 
 export async function athleteRoutes(app: FastifyInstance) {
   app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request) => {
@@ -66,9 +66,15 @@ export async function athleteRoutes(app: FastifyInstance) {
       [workoutId]
     );
 
+    const streams = await getActivityStreams(
+      request.user.id,
+      workoutResult.rows[0].strava_activity_id as number
+    );
+
     return {
       workout: workoutResult.rows[0],
-      laps: lapsResult.rows
+      laps: lapsResult.rows,
+      streams
     };
   });
 }
