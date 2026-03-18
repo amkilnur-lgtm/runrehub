@@ -101,6 +101,46 @@ function smoothSeries(values: number[], windowSize: number) {
   });
 }
 
+function computeWindowedPace(distance: number[], time: number[], windowSeconds: number) {
+  const size = Math.min(distance.length, time.length);
+  if (size < 3) {
+    return [];
+  }
+
+  const halfWindow = Math.max(2, Math.floor(windowSeconds / 2));
+  const result: number[] = [];
+
+  for (let index = 0; index < size; index += 1) {
+    const centerTime = time[index];
+    if (!Number.isFinite(centerTime)) {
+      result.push(Number.NaN);
+      continue;
+    }
+
+    let left = index;
+    while (left > 0 && centerTime - time[left] < halfWindow) {
+      left -= 1;
+    }
+
+    let right = index;
+    while (right < size - 1 && time[right] - centerTime < halfWindow) {
+      right += 1;
+    }
+
+    const deltaTime = time[right] - time[left];
+    const deltaDistance = distance[right] - distance[left];
+
+    if (!Number.isFinite(deltaTime) || !Number.isFinite(deltaDistance) || deltaTime <= 0 || deltaDistance <= 0.5) {
+      result.push(Number.NaN);
+      continue;
+    }
+
+    result.push((deltaTime / deltaDistance) * 1000);
+  }
+
+  return result;
+}
+
 function formatPaceSeconds(totalSeconds: number) {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
     return "—";
@@ -237,30 +277,30 @@ function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, inver
 }
 
 function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"] | null): ChartModel | null {
-  if (!streams?.distance?.length || !streams?.velocity_smooth?.length) {
+  if (!streams?.distance?.length) {
     return null;
   }
 
   const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
-  const size = Math.min(xAxis.pointsX.length, streams.velocity_smooth.length);
+  const derivedPace = streams.time.length
+    ? computeWindowedPace(streams.distance, streams.time, 10)
+    : streams.velocity_smooth.map((speed) => (Number.isFinite(speed) && speed > 0 ? 1000 / speed : Number.NaN));
+  const size = Math.min(xAxis.pointsX.length, derivedPace.length);
   const validPaces: number[] = [];
   const rawPoints: ChartPoint[] = [];
 
   for (let index = 0; index < size; index += 1) {
     const x = xAxis.pointsX[index];
-    const speed = streams.velocity_smooth[index];
+    const paceValue = derivedPace[index];
 
     if (!Number.isFinite(x) || x < 0) {
       continue;
     }
 
     let paceSeconds: number | null = null;
-    if (Number.isFinite(speed) && speed > 0) {
-      const candidate = 1000 / speed;
-      if (candidate >= 170 && candidate <= 1200) {
-        paceSeconds = candidate;
-        validPaces.push(candidate);
-      }
+    if (Number.isFinite(paceValue) && paceValue >= 170 && paceValue <= 1200) {
+      paceSeconds = paceValue;
+      validPaces.push(paceValue);
     }
 
     rawPoints.push({
@@ -275,13 +315,13 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
-  const fastBound = clamp(Math.floor((Math.min(...validPaces, averagePace) - 10) / 10) * 10, 170, 1200);
-  const slowBound = clamp(Math.ceil((Math.max(...validPaces, averagePace) + 10) / 10) * 10, fastBound + 40, 1200);
+  const fastBound = clamp(Math.floor((Math.min(...validPaces, averagePace) - 20) / 20) * 20, 180, 1200);
+  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.96) + 20) / 20) * 20, fastBound + 60, 1200);
 
   const normalized = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
   );
-  const smoothed = smoothSeries(normalized, 5);
+  const smoothed = smoothSeries(normalized, 3);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
