@@ -67,6 +67,7 @@ export async function ensureSchema() {
       workout_id integer primary key references workouts(id) on delete cascade,
       distance_stream jsonb not null default '[]'::jsonb,
       heartrate_stream jsonb not null default '[]'::jsonb,
+      altitude_stream jsonb not null default '[]'::jsonb,
       velocity_stream jsonb not null default '[]'::jsonb,
       fetched_at timestamptz not null default now()
     );

@@ -40,9 +40,23 @@ type StravaLap = {
 
 type StreamPayload = Record<string, { type: string; data: number[] } | undefined>;
 
+type LapRow = {
+  id: number;
+  strava_lap_id: number;
+  name: string | null;
+  distance_meters: number;
+  elapsed_time_seconds: number;
+  average_speed: number | null;
+  average_heartrate: number | null;
+  elevation_gain: number | null;
+  start_index: number | null;
+  end_index: number | null;
+};
+
 export type ActivityStreams = {
   distance: number[];
   heartrate: number[];
+  altitude: number[];
   velocity_smooth: number[];
 };
 
@@ -97,6 +111,33 @@ function getStartOfTodayInTimeZone(timeZone: string) {
   return new Date(utcGuess.getTime() - offsetMs);
 }
 
+function computeLapNetElevation(
+  altitude: number[],
+  startIndex: number | null,
+  endIndex: number | null
+) {
+  if (
+    !altitude.length ||
+    startIndex === null ||
+    endIndex === null ||
+    !Number.isInteger(startIndex) ||
+    !Number.isInteger(endIndex)
+  ) {
+    return null;
+  }
+
+  const start = Math.max(0, Math.min(startIndex, altitude.length - 1));
+  const end = Math.max(start, Math.min(endIndex, altitude.length - 1));
+  const startAltitude = altitude[start];
+  const endAltitude = altitude[end];
+
+  if (!Number.isFinite(startAltitude) || !Number.isFinite(endAltitude)) {
+    return null;
+  }
+
+  return endAltitude - startAltitude;
+}
+
 async function fetchActivityStreamsFromStrava(userId: number, activityId: number) {
   const token = await refreshAccessTokenIfNeeded(userId);
   if (!token) {
@@ -104,7 +145,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   }
 
   const response = await fetch(
-    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,heartrate,velocity_smooth&key_by_type=true`,
+    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,heartrate,altitude,velocity_smooth&key_by_type=true`,
     {
       headers: {
         Authorization: `Bearer ${token}`
@@ -120,6 +161,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   return {
     distance: payload.distance?.data ?? [],
     heartrate: payload.heartrate?.data ?? [],
+    altitude: payload.altitude?.data ?? [],
     velocity_smooth: payload.velocity_smooth?.data ?? []
   } satisfies ActivityStreams;
 }
@@ -131,13 +173,15 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
         workout_id,
         distance_stream,
         heartrate_stream,
+        altitude_stream,
         velocity_stream,
         fetched_at
       )
-      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, now())
+      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, now())
       on conflict (workout_id) do update
       set distance_stream = excluded.distance_stream,
           heartrate_stream = excluded.heartrate_stream,
+          altitude_stream = excluded.altitude_stream,
           velocity_stream = excluded.velocity_stream,
           fetched_at = now()
     `,
@@ -145,15 +189,41 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
       workoutId,
       JSON.stringify(streams.distance),
       JSON.stringify(streams.heartrate),
+      JSON.stringify(streams.altitude),
       JSON.stringify(streams.velocity_smooth)
     ]
   );
 }
 
+async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
+  const lapsResult = await pool.query(
+    `
+      select id, strava_lap_id, name, distance_meters, elapsed_time_seconds,
+             average_speed, average_heartrate, elevation_gain, start_index, end_index
+      from workout_laps
+      where workout_id = $1
+      order by id asc
+    `,
+    [workoutId]
+  );
+
+  for (const lap of lapsResult.rows as LapRow[]) {
+    const netElevation = computeLapNetElevation(altitude, lap.start_index, lap.end_index);
+    if (netElevation === null) {
+      continue;
+    }
+
+    await pool.query(
+      `update workout_laps set elevation_gain = $2 where id = $1`,
+      [lap.id, netElevation]
+    );
+  }
+}
+
 export async function getStoredActivityStreams(workoutId: number) {
   const { rows } = await pool.query(
     `
-      select distance_stream, heartrate_stream, velocity_stream
+      select distance_stream, heartrate_stream, altitude_stream, velocity_stream
       from workout_streams
       where workout_id = $1
     `,
@@ -168,15 +238,12 @@ export async function getStoredActivityStreams(workoutId: number) {
   return {
     distance: Array.isArray(row.distance_stream) ? row.distance_stream : [],
     heartrate: Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [],
+    altitude: Array.isArray(row.altitude_stream) ? row.altitude_stream : [],
     velocity_smooth: Array.isArray(row.velocity_stream) ? row.velocity_stream : []
   } satisfies ActivityStreams;
 }
 
-async function syncSingleActivity(
-  userId: number,
-  token: string,
-  activity: StravaActivity
-) {
+async function syncSingleActivity(userId: number, token: string, activity: StravaActivity) {
   const workoutResult = await pool.query(
     `
       insert into workouts (
@@ -273,6 +340,7 @@ async function syncSingleActivity(
   const streams = await fetchActivityStreamsFromStrava(userId, activity.id);
   if (streams) {
     await saveActivityStreams(workoutId, streams);
+    await applyLapElevationChanges(workoutId, streams.altitude);
   }
 
   return workoutId;
@@ -398,6 +466,7 @@ export async function ensureActivityStreams(userId: number, workoutId: number, a
   }
 
   await saveActivityStreams(workoutId, fetched);
+  await applyLapElevationChanges(workoutId, fetched.altitude);
   return fetched;
 }
 
