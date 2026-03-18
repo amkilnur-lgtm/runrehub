@@ -22,7 +22,7 @@ export function AppLayout() {
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="ghost-button" onClick={handleLogout}>
+          <button className="ghost-button topbar-logout" onClick={handleLogout}>
             Выйти
           </button>
         </div>
