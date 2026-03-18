@@ -210,8 +210,8 @@ select {
 .compact-laps-head,
 .compact-lap-row {
   display: grid;
-  grid-template-columns: 1.15fr 0.9fr 0.8fr 0.65fr;
-  gap: 12px;
+  grid-template-columns: minmax(88px, 1.1fr) 56px 68px 42px 46px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -221,12 +221,19 @@ select {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  text-align: right;
+}
+
+.compact-laps-head span:first-child,
+.compact-lap-row span:first-child {
+  text-align: left;
 }
 
 .compact-lap-row {
   padding: 10px 0;
   border-bottom: 1px solid rgba(24, 21, 16, 0.08);
   font-size: 14px;
+  text-align: right;
 }
 
 .lap-name {
@@ -242,7 +249,7 @@ select {
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(24, 21, 16, 0.08);
   border-radius: 24px;
-  padding: 20px;
+  padding: 20px 20px 18px;
   box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
 }
 
@@ -258,6 +265,12 @@ select {
   margin-bottom: 14px;
 }
 
+.chart-axis-caption {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .chart-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -268,33 +281,24 @@ select {
 }
 
 .chart-metric-value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
 }
 
 .chart-frame {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
+  display: block;
   margin-bottom: 10px;
-}
-
-.chart-y-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #181510;
 }
 
 .chart-grid-wrap {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
 }
 
 .chart-y-axis {
-  min-height: 230px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -304,12 +308,16 @@ select {
 
 .chart-grid {
   position: relative;
-  min-height: 230px;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(24, 21, 16, 0.03) 0%, rgba(24, 21, 16, 0.01) 100%);
 }
 
 .chart-grid-line {
   height: 1px;
-  background: rgba(24, 21, 16, 0.08);
+  background: rgba(24, 21, 16, 0.07);
 }
 
 .chart-grid {
@@ -340,7 +348,7 @@ select {
 }
 
 .chart-empty {
-  min-height: 230px;
+  min-height: 220px;
   display: grid;
   place-items: center;
   border-radius: 18px;

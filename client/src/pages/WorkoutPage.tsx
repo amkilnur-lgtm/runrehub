@@ -42,12 +42,11 @@ type ChartPoint = {
 };
 
 type ChartModel = {
-  points: ChartPoint[];
   linePath: string;
   areaPath: string;
   yTicks: number[];
   xTicks: number[];
-  yLabel: string;
+  axisCaption: string;
   xLabel: string;
   summaryLeft: string;
   summaryLeftLabel: string;
@@ -56,7 +55,7 @@ type ChartModel = {
 };
 
 const CHART_WIDTH = 620;
-const CHART_HEIGHT = 230;
+const CHART_HEIGHT = 220;
 const Y_TICK_COUNT = 4;
 const X_TICK_COUNT = 5;
 
@@ -81,6 +80,21 @@ function quantile(values: number[], ratio: number) {
   return sorted[lower] * (1 - weight) + sorted[upper] * weight;
 }
 
+function smoothSeries(values: number[], windowSize: number) {
+  if (values.length < 3 || windowSize < 2) {
+    return values;
+  }
+
+  const radius = Math.floor(windowSize / 2);
+  return values.map((_, index) => {
+    const start = Math.max(0, index - radius);
+    const end = Math.min(values.length - 1, index + radius);
+    const slice = values.slice(start, end + 1);
+    const sum = slice.reduce((total, value) => total + value, 0);
+    return sum / slice.length;
+  });
+}
+
 function formatPaceSeconds(totalSeconds: number) {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
     return "—";
@@ -96,37 +110,17 @@ function formatHeartRate(value: number | null | undefined) {
   return value ? `${Math.round(value)} уд/мин` : "—";
 }
 
-function buildChartPaths(
-  points: ChartPoint[],
-  minY: number,
-  maxY: number,
-  invertY: boolean
-) {
-  if (points.length < 2) {
-    return { linePath: "", areaPath: "" };
+function formatElevation(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
   }
 
-  const maxX = points[points.length - 1].x || 1;
-  const yRange = maxY - minY || 1;
+  const rounded = Math.round(value);
+  if (rounded === 0) {
+    return "0";
+  }
 
-  const project = (point: ChartPoint) => {
-    const x = (point.x / maxX) * CHART_WIDTH;
-    const ratio = clamp((point.y - minY) / yRange, 0, 1);
-    const normalized = invertY ? ratio : 1 - ratio;
-    const y = normalized * CHART_HEIGHT;
-    return { x, y };
-  };
-
-  const projected = points.map(project);
-  const linePath = projected
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
-    .join(" ");
-
-  const first = projected[0];
-  const last = projected[projected.length - 1];
-  const areaPath = `${linePath} L ${last.x.toFixed(2)} ${CHART_HEIGHT} L ${first.x.toFixed(2)} ${CHART_HEIGHT} Z`;
-
-  return { linePath, areaPath };
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
 }
 
 function buildTicks(min: number, max: number, count: number) {
@@ -149,6 +143,35 @@ function buildDistanceTicks(maxDistanceMeters: number) {
   return Array.from({ length: X_TICK_COUNT }, (_, index) => (maxDistanceMeters * index) / (X_TICK_COUNT - 1));
 }
 
+function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, invertY: boolean) {
+  if (points.length < 2) {
+    return { linePath: "", areaPath: "" };
+  }
+
+  const maxX = points[points.length - 1].x || 1;
+  const yRange = maxY - minY || 1;
+
+  const projected = points.map((point) => {
+    const x = (point.x / maxX) * CHART_WIDTH;
+    const yRatio = clamp((point.y - minY) / yRange, 0, 1);
+    const normalized = invertY ? yRatio : 1 - yRatio;
+    return {
+      x,
+      y: normalized * CHART_HEIGHT
+    };
+  });
+
+  const linePath = projected
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+    .join(" ");
+
+  const first = projected[0];
+  const last = projected[projected.length - 1];
+  const areaPath = `${linePath} L ${last.x.toFixed(2)} ${CHART_HEIGHT} L ${first.x.toFixed(2)} ${CHART_HEIGHT} Z`;
+
+  return { linePath, areaPath };
+}
+
 function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"] | null): ChartModel | null {
   if (!streams?.distance?.length || !streams?.velocity_smooth?.length) {
     return null;
@@ -161,6 +184,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
   for (let index = 0; index < size; index += 1) {
     const distance = streams.distance[index];
     const speed = streams.velocity_smooth[index];
+
     if (!Number.isFinite(distance) || distance < 0) {
       continue;
     }
@@ -168,7 +192,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     let paceSeconds: number | null = null;
     if (Number.isFinite(speed) && speed > 0) {
       const candidate = 1000 / speed;
-      if (candidate >= 150 && candidate <= 900) {
+      if (candidate >= 160 && candidate <= 720) {
         paceSeconds = candidate;
         validPaces.push(candidate);
       }
@@ -186,23 +210,26 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
-  const fastBound = clamp(Math.floor((quantile(validPaces, 0.05) - 20) / 10) * 10, 150, averagePace);
-  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.95) + 30) / 10) * 10, averagePace + 30, 900);
+  const fastBound = clamp(Math.floor((quantile(validPaces, 0.05) - 15) / 10) * 10, 160, averagePace);
+  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.95) + 20) / 10) * 10, averagePace + 20, 720);
 
-  const points = rawPoints.map((point) => ({
+  const normalized = rawPoints.map((point) =>
+    Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
+  );
+  const smoothed = smoothSeries(normalized, 11);
+  const points = rawPoints.map((point, index) => ({
     x: point.x,
-    y: Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
+    y: smoothed[index]
   }));
 
   const { linePath, areaPath } = buildChartPaths(points, fastBound, slowBound, true);
 
   return {
-    points,
     linePath,
     areaPath,
     yTicks: buildTicks(fastBound, slowBound, Y_TICK_COUNT),
     xTicks: buildDistanceTicks(points[points.length - 1].x),
-    yLabel: "Темп",
+    axisCaption: "Мин/км",
     xLabel: "Дистанция (км)",
     summaryLeft: formatPace(workout?.average_speed),
     summaryLeftLabel: "Средний",
@@ -217,35 +244,43 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
   }
 
   const size = Math.min(streams.distance.length, streams.heartrate.length);
-  const points: ChartPoint[] = [];
+  const rawPoints: ChartPoint[] = [];
   const validHr: number[] = [];
 
   for (let index = 0; index < size; index += 1) {
     const distance = streams.distance[index];
     const hr = streams.heartrate[index];
+
     if (!Number.isFinite(distance) || distance < 0 || !Number.isFinite(hr) || hr <= 0) {
       continue;
     }
 
-    points.push({ x: distance, y: hr });
+    rawPoints.push({ x: distance, y: hr });
     validHr.push(hr);
   }
 
-  if (points.length < 2 || validHr.length < 2) {
+  if (rawPoints.length < 2 || validHr.length < 2) {
     return null;
   }
 
-  const minHr = Math.max(60, Math.floor((Math.min(...validHr) - 8) / 5) * 5);
-  const maxHr = Math.ceil((Math.max(...validHr) + 8) / 5) * 5;
+  const minHr = Math.max(60, Math.floor((Math.min(...validHr) - 6) / 5) * 5);
+  const maxHr = Math.ceil((Math.max(...validHr) + 6) / 5) * 5;
+  const smoothed = smoothSeries(
+    rawPoints.map((point) => point.y),
+    7
+  );
+  const points = rawPoints.map((point, index) => ({
+    x: point.x,
+    y: smoothed[index]
+  }));
   const { linePath, areaPath } = buildChartPaths(points, minHr, maxHr, false);
 
   return {
-    points,
     linePath,
     areaPath,
     yTicks: buildTicks(minHr, maxHr, Y_TICK_COUNT),
     xTicks: buildDistanceTicks(points[points.length - 1].x),
-    yLabel: "Пульс",
+    axisCaption: "Уд/мин",
     xLabel: "Дистанция (км)",
     summaryLeft: formatHeartRate(workout?.average_heartrate),
     summaryLeftLabel: "Средний",
@@ -260,21 +295,21 @@ function xTickLabel(value: number) {
 
 function StreamChart({
   title,
+  model,
   color,
   fill,
-  model,
   formatter
 }: {
   title: string;
+  model: ChartModel | null;
   color: string;
   fill: string;
-  model: ChartModel | null;
   formatter: (value: number) => string;
 }) {
-  if (!model || !model.linePath) {
+  if (!model) {
     return (
       <div className="chart-card">
-        <div className="chart-header">
+        <div className="chart-title-row">
           <strong>{title}</strong>
         </div>
         <div className="chart-empty muted">Нет данных Strava для этого графика.</div>
@@ -286,6 +321,7 @@ function StreamChart({
     <div className="chart-card">
       <div className="chart-title-row">
         <strong>{title}</strong>
+        <span className="muted chart-axis-caption">{model.axisCaption}</span>
       </div>
       <div className="chart-metrics">
         <div>
@@ -298,7 +334,6 @@ function StreamChart({
         </div>
       </div>
       <div className="chart-frame">
-        <div className="chart-y-label">{model.yLabel}</div>
         <div className="chart-grid-wrap">
           <div className="chart-y-axis">
             {model.yTicks.map((tick) => (
@@ -310,8 +345,21 @@ function StreamChart({
               <div key={tick} className="chart-grid-line" />
             ))}
             <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
-              <path d={model.areaPath} fill={fill} />
-              <path d={model.linePath} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+              <defs>
+                <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={fill} />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.04)" />
+                </linearGradient>
+              </defs>
+              <path d={model.areaPath} fill={`url(#${title}-gradient)`} />
+              <path
+                d={model.linePath}
+                fill="none"
+                stroke={color}
+                strokeWidth="3"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
             </svg>
           </div>
         </div>
@@ -384,9 +432,10 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             <div className="compact-laps">
               <div className="compact-laps-head muted">
                 <span>Отрезок</span>
-                <span>Дистанция</span>
+                <span>Км</span>
                 <span>Темп</span>
-                <span>Пульс</span>
+                <span title="Пульс">♥</span>
+                <span title="Набор/сброс">↕</span>
               </div>
               {data.laps.map((lap, index) => (
                 <div key={lap.id} className="compact-lap-row">
@@ -394,6 +443,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   <span>{formatDistance(lap.distance_meters)}</span>
                   <span>{formatPace(lap.average_speed)}</span>
                   <span>{lap.average_heartrate ? `${Math.round(lap.average_heartrate)}` : "—"}</span>
+                  <span>{formatElevation(lap.elevation_gain)}</span>
                 </div>
               ))}
             </div>
@@ -406,15 +456,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           <StreamChart
             title="Темп"
             model={paceChart}
-            color="#2f7de1"
-            fill="rgba(47, 125, 225, 0.30)"
+            color="#2476e5"
+            fill="rgba(36, 118, 229, 0.42)"
             formatter={formatPaceSeconds}
           />
           <StreamChart
             title="Пульс"
             model={heartRateChart}
-            color="#d63b3b"
-            fill="rgba(214, 59, 59, 0.25)"
+            color="#d53a3a"
+            fill="rgba(213, 58, 58, 0.34)"
             formatter={(value) => `${Math.round(value)}`}
           />
         </div>
