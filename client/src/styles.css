@@ -98,6 +98,12 @@ select {
   min-height: 44px;
 }
 
+.topbar-name-box h1 {
+  margin: 0;
+  line-height: 1;
+  display: block;
+}
+
 .topbar-actions {
   display: inline-flex;
   align-items: center;
@@ -191,6 +197,9 @@ select {
 }
 
 .role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 8px 12px;
   border-radius: 999px;
   background: #fff2de;
@@ -200,6 +209,7 @@ select {
 }
 
 .topbar-logout {
+  min-height: 44px;
   background: #f6f0e7;
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
 }
