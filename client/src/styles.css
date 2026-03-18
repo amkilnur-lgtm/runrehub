@@ -77,7 +77,8 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .topbar h1,
@@ -467,16 +468,22 @@ select {
     justify-content: flex-end;
   }
 
-  .role-badge,
   .ghost-button,
   .primary-button {
     min-height: 44px;
   }
 
   .role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: auto;
     white-space: nowrap;
-    padding-inline: 12px;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1;
+    flex: 0 0 auto;
   }
 
   .content,
@@ -517,22 +524,34 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .compact-laps {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .compact-lap-row {
-    grid-template-columns: minmax(74px, 1.1fr) repeat(4, minmax(44px, 0.7fr));
-    gap: 8px;
-    padding: 10px 12px;
-    font-size: 12px;
+    grid-template-columns: minmax(58px, 1fr) repeat(4, minmax(0, 0.62fr));
+    gap: 6px;
+    padding: 10px;
+    font-size: 11px;
     text-align: right;
   }
 
   .compact-laps-head {
     display: grid;
-    padding: 0 12px 6px;
-    font-size: 10px;
+    grid-template-columns: minmax(58px, 1fr) repeat(4, minmax(0, 0.62fr));
+    gap: 6px;
+    padding: 0 10px 6px;
+    font-size: 9px;
   }
 
   .compact-lap-row > span::before {
     content: none;
+  }
+
+  .compact-laps-head span,
+  .compact-lap-row span {
+    min-width: 0;
   }
 
   .compact-lap-row > span:first-child {
