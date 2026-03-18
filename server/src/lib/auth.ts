@@ -5,7 +5,7 @@ import { AuthUser, AppRole } from "../types.js";
 import { config } from "../config.js";
 
 const AUTH_COOKIE = "runrehab_token";
-const AUTH_COOKIE_TTL_SECONDS = 14 * 24 * 60 * 60;
+const AUTH_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const authCookieOptions = {
   httpOnly: true,
@@ -36,7 +36,7 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export async function setAuthCookie(reply: FastifyReply, user: AuthUser) {
-  const token = await reply.jwtSign(user, { expiresIn: "14d" });
+  const token = await reply.jwtSign(user, { expiresIn: "30d" });
   reply.setCookie(AUTH_COOKIE, token, authCookieOptions);
 }
 
