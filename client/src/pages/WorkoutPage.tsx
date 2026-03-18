@@ -56,6 +56,9 @@ type ChartModel = {
 
 const CHART_WIDTH = 620;
 const CHART_HEIGHT = 220;
+const CHART_INSET_X = 10;
+const CHART_INSET_TOP = 10;
+const CHART_INSET_BOTTOM = 10;
 const Y_TICK_COUNT = 4;
 const X_TICK_COUNT = 5;
 
@@ -123,16 +126,17 @@ function formatElevation(value: number | null | undefined) {
   return rounded > 0 ? `+${rounded}` : `${rounded}`;
 }
 
-function buildTicks(min: number, max: number, count: number) {
+function buildTicks(min: number, max: number, count: number, descending = false) {
   if (!Number.isFinite(min) || !Number.isFinite(max)) {
     return [];
   }
 
-  if (min === max) {
-    return [min];
-  }
+  const ticks =
+    min === max
+      ? [min]
+      : Array.from({ length: count + 1 }, (_, index) => min + ((max - min) * index) / count);
 
-  return Array.from({ length: count + 1 }, (_, index) => min + ((max - min) * index) / count);
+  return descending ? ticks.reverse() : ticks;
 }
 
 function buildDistanceTicks(maxDistanceMeters: number) {
@@ -150,15 +154,16 @@ function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, inver
 
   const maxX = points[points.length - 1].x || 1;
   const yRange = maxY - minY || 1;
+  const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
+  const drawableHeight = CHART_HEIGHT - CHART_INSET_TOP - CHART_INSET_BOTTOM;
 
   const projected = points.map((point) => {
-    const x = (point.x / maxX) * CHART_WIDTH;
+    const xRatio = clamp(point.x / maxX, 0, 1);
+    const x = CHART_INSET_X + xRatio * drawableWidth;
     const yRatio = clamp((point.y - minY) / yRange, 0, 1);
     const normalized = invertY ? yRatio : 1 - yRatio;
-    return {
-      x,
-      y: normalized * CHART_HEIGHT
-    };
+    const y = CHART_INSET_TOP + normalized * drawableHeight;
+    return { x, y };
   });
 
   const linePath = projected
@@ -167,7 +172,8 @@ function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, inver
 
   const first = projected[0];
   const last = projected[projected.length - 1];
-  const areaPath = `${linePath} L ${last.x.toFixed(2)} ${CHART_HEIGHT} L ${first.x.toFixed(2)} ${CHART_HEIGHT} Z`;
+  const baseY = CHART_HEIGHT - CHART_INSET_BOTTOM;
+  const areaPath = `${linePath} L ${last.x.toFixed(2)} ${baseY.toFixed(2)} L ${first.x.toFixed(2)} ${baseY.toFixed(2)} Z`;
 
   return { linePath, areaPath };
 }
@@ -192,7 +198,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     let paceSeconds: number | null = null;
     if (Number.isFinite(speed) && speed > 0) {
       const candidate = 1000 / speed;
-      if (candidate >= 160 && candidate <= 720) {
+      if (candidate >= 170 && candidate <= 660) {
         paceSeconds = candidate;
         validPaces.push(candidate);
       }
@@ -210,13 +216,13 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
-  const fastBound = clamp(Math.floor((quantile(validPaces, 0.05) - 15) / 10) * 10, 160, averagePace);
-  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.95) + 20) / 10) * 10, averagePace + 20, 720);
+  const fastBound = clamp(Math.floor((quantile(validPaces, 0.08) - 10) / 10) * 10, 170, averagePace);
+  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.92) + 15) / 10) * 10, averagePace + 20, 660);
 
   const normalized = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
   );
-  const smoothed = smoothSeries(normalized, 11);
+  const smoothed = smoothSeries(normalized, 13);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
@@ -263,12 +269,9 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
     return null;
   }
 
-  const minHr = Math.max(60, Math.floor((Math.min(...validHr) - 6) / 5) * 5);
-  const maxHr = Math.ceil((Math.max(...validHr) + 6) / 5) * 5;
-  const smoothed = smoothSeries(
-    rawPoints.map((point) => point.y),
-    7
-  );
+  const minHr = Math.max(60, Math.floor((Math.min(...validHr) - 5) / 5) * 5);
+  const maxHr = Math.ceil((Math.max(...validHr) + 5) / 5) * 5;
+  const smoothed = smoothSeries(rawPoints.map((point) => point.y), 7);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
@@ -278,7 +281,7 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
   return {
     linePath,
     areaPath,
-    yTicks: buildTicks(minHr, maxHr, Y_TICK_COUNT),
+    yTicks: buildTicks(minHr, maxHr, Y_TICK_COUNT, true),
     xTicks: buildDistanceTicks(points[points.length - 1].x),
     axisCaption: "Уд/мин",
     xLabel: "Дистанция (км)",
