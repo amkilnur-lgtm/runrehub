@@ -234,10 +234,12 @@ select {
   text-align: right;
   border-radius: 16px;
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .compact-lap-row:nth-child(even) {
   background: rgba(255, 249, 242, 0.88);
+  font-weight: 650;
 }
 
 .compact-lap-row:nth-child(odd) {
@@ -307,12 +309,17 @@ select {
 
 .chart-y-axis {
   min-height: 220px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  position: relative;
   color: #72685a;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.chart-y-axis span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  line-height: 1;
 }
 
 .chart-grid {
@@ -326,13 +333,12 @@ select {
 }
 
 .chart-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
   height: 1px;
   background: rgba(24, 21, 16, 0.07);
-}
-
-.chart-grid {
-  display: grid;
-  grid-template-rows: repeat(5, 1fr);
+  transform: translateY(-50%);
 }
 
 .chart-svg {

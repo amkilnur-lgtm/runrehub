@@ -45,6 +45,7 @@ type ChartModel = {
   linePath: string;
   areaPath: string;
   yTicks: number[];
+  yTickPositions: string[];
   xTicks: number[];
   axisCaption: string;
   xLabel: string;
@@ -56,9 +57,9 @@ type ChartModel = {
 
 const CHART_WIDTH = 620;
 const CHART_HEIGHT = 220;
-const CHART_INSET_X = 10;
-const CHART_INSET_TOP = 10;
-const CHART_INSET_BOTTOM = 10;
+const CHART_INSET_X = 12;
+const CHART_INSET_TOP = 12;
+const CHART_INSET_BOTTOM = 12;
 const Y_TICK_COUNT = 4;
 const X_TICK_COUNT = 5;
 
@@ -145,6 +146,18 @@ function buildDistanceTicks(maxDistanceMeters: number) {
   }
 
   return Array.from({ length: X_TICK_COUNT }, (_, index) => (maxDistanceMeters * index) / (X_TICK_COUNT - 1));
+}
+
+function buildTickPositions(count: number) {
+  if (count <= 1) {
+    return ["50%"];
+  }
+
+  const drawableHeight = CHART_HEIGHT - CHART_INSET_TOP - CHART_INSET_BOTTOM;
+  return Array.from({ length: count }, (_, index) => {
+    const y = CHART_INSET_TOP + (drawableHeight * index) / (count - 1);
+    return `${(y / CHART_HEIGHT) * 100}%`;
+  });
 }
 
 function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, invertY: boolean) {
@@ -234,6 +247,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     linePath,
     areaPath,
     yTicks: buildTicks(fastBound, slowBound, Y_TICK_COUNT),
+    yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: buildDistanceTicks(points[points.length - 1].x),
     axisCaption: "Мин/км",
     xLabel: "Дистанция (км)",
@@ -282,6 +296,7 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
     linePath,
     areaPath,
     yTicks: buildTicks(minHr, maxHr, Y_TICK_COUNT, true),
+    yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: buildDistanceTicks(points[points.length - 1].x),
     axisCaption: "Уд/мин",
     xLabel: "Дистанция (км)",
@@ -339,13 +354,19 @@ function StreamChart({
       <div className="chart-frame">
         <div className="chart-grid-wrap">
           <div className="chart-y-axis">
-            {model.yTicks.map((tick) => (
-              <span key={tick}>{formatter(tick)}</span>
+            {model.yTicks.map((tick, index) => (
+              <span key={`${tick}-${index}`} style={{ top: model.yTickPositions[index] }}>
+                {formatter(tick)}
+              </span>
             ))}
           </div>
           <div className="chart-grid">
-            {model.yTicks.map((tick) => (
-              <div key={tick} className="chart-grid-line" />
+            {model.yTicks.map((tick, index) => (
+              <div
+                key={`${tick}-${index}`}
+                className="chart-grid-line"
+                style={{ top: model.yTickPositions[index] }}
+              />
             ))}
             <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
               <defs>
@@ -359,7 +380,7 @@ function StreamChart({
                 d={model.linePath}
                 fill="none"
                 stroke={color}
-                strokeWidth="3"
+                strokeWidth="1.75"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
