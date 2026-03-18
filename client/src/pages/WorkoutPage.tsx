@@ -549,11 +549,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </div>
               {data.laps.map((lap, index) => (
                 <div key={lap.id} className="compact-lap-row">
-                  <span className="lap-name">{lap.name || `Lap ${index + 1}`}</span>
-                  <span>{formatDistance(lap.distance_meters)}</span>
-                  <span>{formatPace(lap.average_speed)}</span>
+                  <span className="lap-name" data-label="Lap">{lap.name || `Lap ${index + 1}`}</span>
+                  <span data-label="Км">{formatDistance(lap.distance_meters)}</span>
+                  <span data-label="Темп">{formatPace(lap.average_speed)}</span>
                   <span>{lap.average_heartrate ? `${Math.round(lap.average_heartrate)}` : "—"}</span>
-                  <span>{formatElevation(lap.elevation_gain)}</span>
+                  <span data-label="Высота">{formatElevation(lap.elevation_gain)}</span>
                 </div>
               ))}
             </div>
