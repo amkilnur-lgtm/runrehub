@@ -301,7 +301,7 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -352,7 +352,7 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding-left: 146px;
+  padding-left: 126px;
   color: #72685a;
   font-size: 12px;
   margin-bottom: 6px;
@@ -360,7 +360,7 @@ select {
 }
 
 .chart-x-label {
-  padding-left: 146px;
+  padding-left: 126px;
   font-size: 12px;
 }
 
