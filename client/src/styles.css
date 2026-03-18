@@ -67,11 +67,12 @@ select {
 
 .topbar {
   margin-bottom: 24px;
+  align-items: flex-end;
 }
 
 .topbar-identity {
   min-width: 0;
-  width: 100%;
+  flex: 1 1 auto;
 }
 
 .topbar-title-row {
@@ -81,6 +82,11 @@ select {
   gap: 10px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.topbar-actions {
+  flex: 0 0 auto;
+  align-self: flex-end;
 }
 
 .topbar h1,
@@ -462,6 +468,7 @@ select {
   .topbar {
     gap: 12px;
     margin-bottom: 16px;
+    align-items: flex-end;
   }
 
   .topbar h1 {
