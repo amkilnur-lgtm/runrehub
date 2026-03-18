@@ -348,15 +348,34 @@ select {
   height: 100%;
 }
 
+.chart-x-wrap {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+}
+
 .chart-x-axis {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding-left: 108px;
+  position: relative;
+  height: 18px;
   color: #72685a;
   font-size: 12px;
   margin-bottom: 6px;
   font-variant-numeric: tabular-nums;
+}
+
+.chart-x-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.chart-x-tick-start {
+  transform: translateX(0);
+}
+
+.chart-x-tick-end {
+  transform: translateX(-100%);
 }
 
 .chart-x-label {

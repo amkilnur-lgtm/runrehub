@@ -49,6 +49,7 @@ type ChartModel = {
   yTickPositions: string[];
   xTicks: number[];
   xTickLabels: string[];
+  xTickPositions: string[];
   axisCaption: string;
   xLabel: string;
   summaryLeft: string;
@@ -59,7 +60,7 @@ type ChartModel = {
 
 const CHART_WIDTH = 620;
 const CHART_HEIGHT = 220;
-const CHART_INSET_X = 8;
+const CHART_INSET_X = 2;
 const CHART_INSET_TOP = 12;
 const CHART_INSET_BOTTOM = 12;
 const Y_TICK_COUNT = 4;
@@ -217,6 +218,18 @@ function buildTickPositions(count: number) {
   });
 }
 
+function buildXAxisPositions(count: number) {
+  if (count <= 1) {
+    return ["0%"];
+  }
+
+  const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
+  return Array.from({ length: count }, (_, index) => {
+    const x = CHART_INSET_X + (drawableWidth * index) / (count - 1);
+    return `${(x / CHART_WIDTH) * 100}%`;
+  });
+}
+
 function buildChartPaths(points: ChartPoint[], minY: number, maxY: number, invertY: boolean) {
   if (points.length < 2) {
     return { linePath: "", areaPath: "" };
@@ -308,6 +321,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: xAxis.xTicks,
     xTickLabels: xAxis.xTickLabels,
+    xTickPositions: buildXAxisPositions(xAxis.xTicks.length),
     axisCaption: "МИН/КМ",
     xLabel: xAxis.xLabel,
     summaryLeft: formatPace(workout?.average_speed),
@@ -359,6 +373,7 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: xAxis.xTicks,
     xTickLabels: xAxis.xTickLabels,
+    xTickPositions: buildXAxisPositions(xAxis.xTicks.length),
     axisCaption: "УД/МИН",
     xLabel: xAxis.xLabel,
     summaryLeft: formatHeartRate(workout?.average_heartrate),
@@ -445,12 +460,26 @@ function StreamChart({
           </div>
         </div>
       </div>
-      <div className="chart-x-axis">
-        {model.xTicks.map((tick, index) => (
-          <span key={`${tick}-${index}`}>{model.xTickLabels[index]}</span>
-        ))}
+      <div className="chart-x-wrap">
+        <div />
+        <div className="chart-x-axis">
+          {model.xTicks.map((tick, index) => (
+            <span
+              key={`${tick}-${index}`}
+              className={
+                index === 0 ? "chart-x-tick chart-x-tick-start" : index === model.xTicks.length - 1 ? "chart-x-tick chart-x-tick-end" : "chart-x-tick"
+              }
+              style={{ left: model.xTickPositions[index] }}
+            >
+              {model.xTickLabels[index]}
+            </span>
+          ))}
+        </div>
       </div>
-      <div className="chart-x-label muted">{model.xLabel}</div>
+      <div className="chart-x-wrap">
+        <div />
+        <div className="chart-x-label muted">{model.xLabel}</div>
+      </div>
     </div>
   );
 }
