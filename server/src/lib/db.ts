@@ -63,6 +63,14 @@ export async function ensureSchema() {
       unique (workout_id, strava_lap_id)
     );
 
+    create table if not exists workout_streams (
+      workout_id integer primary key references workouts(id) on delete cascade,
+      distance_stream jsonb not null default '[]'::jsonb,
+      heartrate_stream jsonb not null default '[]'::jsonb,
+      velocity_stream jsonb not null default '[]'::jsonb,
+      fetched_at timestamptz not null default now()
+    );
+
     create index if not exists workouts_user_id_start_date_idx on workouts(user_id, start_date desc);
   `);
 

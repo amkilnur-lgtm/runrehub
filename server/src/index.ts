@@ -15,6 +15,7 @@ import { trainerRoutes } from "./routes/trainer.js";
 import { stravaRoutes } from "./routes/strava.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
+import { syncDueAthletes } from "./lib/strava.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -74,3 +75,8 @@ await app.listen({
   port: config.PORT,
   host: "0.0.0.0"
 });
+
+const syncIntervalMs = config.STRAVA_SYNC_INTERVAL_MINUTES * 60 * 1000;
+setInterval(() => {
+  void syncDueAthletes(app.log);
+}, syncIntervalMs);

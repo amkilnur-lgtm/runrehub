@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
-import { getActivityStreams, syncLatestActivities } from "../lib/strava.js";
+import { ensureActivityStreams } from "../lib/strava.js";
 
 export async function trainerRoutes(app: FastifyInstance) {
   app.get("/api/trainer/dashboard", { preHandler: requireAuth }, async (request) => {
@@ -51,8 +51,6 @@ export async function trainerRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Спортсмен не найден" });
     }
 
-    await syncLatestActivities(athleteId);
-
     const workoutsResult = await pool.query(
       `
         select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
@@ -95,8 +93,9 @@ export async function trainerRoutes(app: FastifyInstance) {
       [workoutId]
     );
 
-    const streams = await getActivityStreams(
+    const streams = await ensureActivityStreams(
       workoutResult.rows[0].user_id as number,
+      workoutId,
       workoutResult.rows[0].strava_activity_id as number
     );
 
