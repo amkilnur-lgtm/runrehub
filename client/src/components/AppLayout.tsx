@@ -14,12 +14,14 @@ export function AppLayout() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div>
+        <div className="topbar-identity">
           <div className="eyebrow">RunRehab</div>
-          <h1>{user?.fullName}</h1>
+          <div className="topbar-title-row">
+            <h1>{user?.fullName}</h1>
+            <span className="role-badge">{user?.role}</span>
+          </div>
         </div>
         <div className="topbar-actions">
-          <span className="role-badge">{user?.role}</span>
           <button className="ghost-button" onClick={handleLogout}>
             Выйти
           </button>

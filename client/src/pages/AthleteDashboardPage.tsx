@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+import { formatDate, formatDistance, formatPace, formatDuration } from "../lib";
 import { StatCard } from "../components/StatCard";
 
 type AthleteDashboardData = {
@@ -57,7 +57,9 @@ export function AthleteDashboardPage() {
         <div className="section-header">
           <div>
             <h2>{data?.athlete.full_name ?? "Спортсмен"}</h2>
-            <p className="muted">Новые тренировки подтягиваются webhook-ом и фоновым sync каждые 15 минут.</p>
+            <p className="muted">
+              Новые тренировки подтягиваются webhook-ом и фоновым sync каждые 15 минут.
+            </p>
           </div>
           <div className="topbar-actions">
             {!loading && data?.athlete.connected_at ? (
@@ -99,14 +101,14 @@ export function AthleteDashboardPage() {
         <div className="list">
           {!loading && !data?.workouts.length ? <div className="muted">Пока нет тренировок.</div> : null}
           {data?.workouts.map((workout) => (
-            <Link key={workout.id} className="list-row link-row" to={`/athlete/workouts/${workout.id}`}>
-              <div>
+            <Link key={workout.id} className="list-row link-row dashboard-workout-row" to={`/athlete/workouts/${workout.id}`}>
+              <div className="dashboard-workout-main">
                 <strong>{workout.name}</strong>
-                <div className="muted">{formatDate(workout.start_date)}</div>
+                <div className="muted dashboard-workout-date">{formatDate(workout.start_date)}</div>
               </div>
-              <div className="align-right">
-                <div>{formatDistance(workout.distance_meters)}</div>
-                <div className="muted">
+              <div className="align-right dashboard-workout-meta">
+                <div className="dashboard-workout-distance">{formatDistance(workout.distance_meters)}</div>
+                <div className="muted dashboard-workout-summary">
                   {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
                 </div>
               </div>

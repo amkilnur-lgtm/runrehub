@@ -69,6 +69,17 @@ select {
   margin-bottom: 24px;
 }
 
+.topbar-identity {
+  min-width: 0;
+}
+
+.topbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .topbar h1,
 .card h2 {
   margin: 6px 0 0;
@@ -259,6 +270,24 @@ select {
   font-weight: 600;
 }
 
+.dashboard-workout-row {
+  align-items: center;
+}
+
+.dashboard-workout-main,
+.dashboard-workout-meta {
+  min-width: 0;
+}
+
+.dashboard-workout-date,
+.dashboard-workout-summary {
+  white-space: nowrap;
+}
+
+.dashboard-workout-distance {
+  white-space: nowrap;
+}
+
 .chart-column {
   display: grid;
   gap: 16px;
@@ -432,16 +461,22 @@ select {
   }
 
   .topbar-actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    width: auto;
+    display: flex;
     align-items: center;
+    justify-content: flex-end;
   }
 
   .role-badge,
   .ghost-button,
   .primary-button {
     min-height: 44px;
+  }
+
+  .role-badge {
+    width: auto;
+    white-space: nowrap;
+    padding-inline: 12px;
   }
 
   .content,
@@ -482,54 +517,26 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .compact-laps-head {
-    display: none;
-  }
-
   .compact-lap-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 14px;
-    padding: 14px;
-    text-align: left;
+    grid-template-columns: minmax(74px, 1.1fr) repeat(4, minmax(44px, 0.7fr));
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    text-align: right;
   }
 
-  .compact-lap-row > span {
+  .compact-laps-head {
     display: grid;
-    gap: 4px;
-    justify-items: start;
+    padding: 0 12px 6px;
+    font-size: 10px;
   }
 
   .compact-lap-row > span::before {
-    content: attr(data-label);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #72685a;
+    content: none;
   }
 
   .compact-lap-row > span:first-child {
-    grid-column: 1 / -1;
-  }
-
-  .compact-lap-row > span:first-child::before {
-    content: "";
-    display: none;
-  }
-
-  .compact-lap-row > span:nth-child(2)::before {
-    content: "Км";
-  }
-
-  .compact-lap-row > span:nth-child(3)::before {
-    content: "Темп";
-  }
-
-  .compact-lap-row > span:nth-child(4)::before {
-    content: "Пульс";
-  }
-
-  .compact-lap-row > span:nth-child(5)::before {
-    content: "Высота";
+    grid-column: auto;
   }
 
   .chart-card {
@@ -573,6 +580,23 @@ select {
   .chart-x-tick:nth-child(even) {
     display: none;
   }
+
+  .dashboard-workout-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .dashboard-workout-date,
+  .dashboard-workout-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dashboard-workout-summary {
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 900px) {
@@ -583,9 +607,7 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .topbar,
-  .section-header,
-  .list-row {
+  .section-header {
     align-items: flex-start;
     flex-direction: column;
   }
