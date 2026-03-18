@@ -67,12 +67,19 @@ select {
 
 .topbar {
   margin-bottom: 24px;
-  align-items: flex-end;
+  display: grid;
+  gap: 8px;
 }
 
 .topbar-identity {
   min-width: 0;
-  flex: 1 1 auto;
+}
+
+.topbar-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .topbar-title-row {
@@ -82,11 +89,11 @@ select {
   gap: 10px;
   min-width: 0;
   flex-wrap: wrap;
+  flex: 1 1 auto;
 }
 
 .topbar-actions {
   flex: 0 0 auto;
-  align-self: flex-end;
 }
 
 .topbar h1,
@@ -466,9 +473,8 @@ select {
   }
 
   .topbar {
-    gap: 12px;
     margin-bottom: 16px;
-    align-items: flex-end;
+    gap: 8px;
   }
 
   .topbar h1 {
