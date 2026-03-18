@@ -190,39 +190,11 @@ function buildLinearTicks(maxValue: number) {
   return Array.from({ length: X_TICK_COUNT }, (_, index) => (maxValue * index) / (X_TICK_COUNT - 1));
 }
 
-function formatElapsedTick(totalSeconds: number) {
-  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) {
-    return "0:00";
-  }
-
-  const rounded = Math.round(totalSeconds);
-  const hours = Math.floor(rounded / 3600);
-  const minutes = Math.floor((rounded % 3600) / 60);
-  const seconds = rounded % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
 function formatDistanceTick(distanceMeters: number) {
   return `${(distanceMeters / 1000).toFixed(1)}`;
 }
 
 function buildXAxis(streams: StreamSeries, fallbackDistance: number) {
-  if (streams?.time?.length) {
-    const maxTime = streams.time[streams.time.length - 1] ?? 0;
-    const xTicks = buildLinearTicks(maxTime);
-    return {
-      pointsX: streams.time,
-      xTicks,
-      xTickLabels: xTicks.map(formatElapsedTick),
-      xLabel: "Время (ч:м:с)"
-    };
-  }
-
   const maxDistance = streams?.distance?.[streams.distance.length - 1] ?? fallbackDistance;
   const xTicks = buildLinearTicks(maxDistance);
   return {
