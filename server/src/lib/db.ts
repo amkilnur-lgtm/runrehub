@@ -75,6 +75,11 @@ export async function ensureSchema() {
     create index if not exists workouts_user_id_start_date_idx on workouts(user_id, start_date desc);
   `);
 
+  await pool.query(`
+    alter table workout_streams
+      add column if not exists altitude_stream jsonb not null default '[]'::jsonb
+  `);
+
   const adminCount = await pool.query(
     `select count(*)::int as count from users where role = 'admin'`
   );
