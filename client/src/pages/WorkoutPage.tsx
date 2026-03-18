@@ -101,6 +101,51 @@ function smoothSeries(values: number[], windowSize: number) {
   });
 }
 
+function medianSeries(values: number[], windowSize: number) {
+  if (values.length < 3 || windowSize < 2) {
+    return values;
+  }
+
+  const radius = Math.floor(windowSize / 2);
+  return values.map((_, index) => {
+    const start = Math.max(0, index - radius);
+    const end = Math.min(values.length - 1, index + radius);
+    const slice = values.slice(start, end + 1).sort((a, b) => a - b);
+    return slice[Math.floor(slice.length / 2)];
+  });
+}
+
+function fillShortGaps(values: number[], maxGapSize: number) {
+  const next = [...values];
+  let index = 0;
+
+  while (index < next.length) {
+    if (Number.isFinite(next[index])) {
+      index += 1;
+      continue;
+    }
+
+    const gapStart = index;
+    while (index < next.length && !Number.isFinite(next[index])) {
+      index += 1;
+    }
+
+    const gapEnd = index - 1;
+    const gapSize = gapEnd - gapStart + 1;
+    const left = gapStart > 0 ? next[gapStart - 1] : Number.NaN;
+    const right = index < next.length ? next[index] : Number.NaN;
+
+    if (gapSize <= maxGapSize && Number.isFinite(left) && Number.isFinite(right)) {
+      for (let fillIndex = gapStart; fillIndex <= gapEnd; fillIndex += 1) {
+        const ratio = (fillIndex - gapStart + 1) / (gapSize + 1);
+        next[fillIndex] = left + (right - left) * ratio;
+      }
+    }
+  }
+
+  return next;
+}
+
 function formatPaceSeconds(totalSeconds: number) {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
     return "—";
@@ -279,9 +324,19 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
   const slowBound = clamp(Math.ceil((Math.max(...validPaces, averagePace) + 10) / 10) * 10, fastBound + 40, 1200);
 
   const normalized = rawPoints.map((point) =>
-    Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
+    Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : Number.NaN
   );
-  const smoothed = smoothSeries(normalized, 5);
+  const gapFilled = fillShortGaps(normalized, 2);
+  const fallbackFilled = gapFilled.map((value, index, series) => {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const previous = index > 0 ? series[index - 1] : slowBound;
+    return Number.isFinite(previous) ? previous : slowBound;
+  });
+  const medianSmoothed = medianSeries(fallbackFilled, 3);
+  const smoothed = smoothSeries(medianSmoothed, 5);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]

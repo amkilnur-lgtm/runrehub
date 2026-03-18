@@ -462,7 +462,7 @@ async function refreshAccessTokenIfNeeded(userId: number) {
 
 export async function ensureActivityStreams(userId: number, workoutId: number, activityId: number) {
   const stored = await getStoredActivityStreams(workoutId);
-  if (stored) {
+  if (stored && stored.time.length && stored.distance.length) {
     return stored;
   }
 
