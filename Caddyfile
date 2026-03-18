@@ -1,4 +1,8 @@
-runrehab.ru, www.runrehab.ru, api.runrehab.ru {
+www.runrehab.ru {
+  redir https://runrehab.ru{uri} permanent
+}
+
+runrehab.ru, api.runrehab.ru {
   encode zstd gzip
   reverse_proxy app:3000
 }

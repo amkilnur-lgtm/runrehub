@@ -5,12 +5,14 @@ import { AuthUser, AppRole } from "../types.js";
 import { config } from "../config.js";
 
 const AUTH_COOKIE = "runrehab_token";
+const AUTH_COOKIE_TTL_SECONDS = 14 * 24 * 60 * 60;
 
 const authCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
   path: "/",
-  secure: config.NODE_ENV === "production"
+  secure: config.NODE_ENV === "production",
+  maxAge: AUTH_COOKIE_TTL_SECONDS
 };
 
 const insecureAuthCookieOptions = {
