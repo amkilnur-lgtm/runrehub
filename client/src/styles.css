@@ -234,12 +234,11 @@ select {
   text-align: right;
   border-radius: 16px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .compact-lap-row:nth-child(even) {
   background: rgba(255, 249, 242, 0.88);
-  font-weight: 650;
 }
 
 .compact-lap-row:nth-child(odd) {
@@ -302,7 +301,7 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -313,6 +312,7 @@ select {
   color: #72685a;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  padding-right: 4px;
 }
 
 .chart-y-axis span {
@@ -352,7 +352,7 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding-left: 130px;
+  padding-left: 146px;
   color: #72685a;
   font-size: 12px;
   margin-bottom: 6px;
@@ -360,7 +360,7 @@ select {
 }
 
 .chart-x-label {
-  padding-left: 130px;
+  padding-left: 146px;
   font-size: 12px;
 }
 

@@ -55,6 +55,7 @@ type LapRow = {
 
 export type ActivityStreams = {
   distance: number[];
+  time: number[];
   heartrate: number[];
   altitude: number[];
   velocity_smooth: number[];
@@ -145,7 +146,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   }
 
   const response = await fetch(
-    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,heartrate,altitude,velocity_smooth&key_by_type=true`,
+    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,time,heartrate,altitude,velocity_smooth&key_by_type=true`,
     {
       headers: {
         Authorization: `Bearer ${token}`
@@ -160,6 +161,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   const payload = (await response.json()) as StreamPayload;
   return {
     distance: payload.distance?.data ?? [],
+    time: payload.time?.data ?? [],
     heartrate: payload.heartrate?.data ?? [],
     altitude: payload.altitude?.data ?? [],
     velocity_smooth: payload.velocity_smooth?.data ?? []
@@ -172,14 +174,16 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
       insert into workout_streams (
         workout_id,
         distance_stream,
+        time_stream,
         heartrate_stream,
         altitude_stream,
         velocity_stream,
         fetched_at
       )
-      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, now())
+      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, now())
       on conflict (workout_id) do update
       set distance_stream = excluded.distance_stream,
+          time_stream = excluded.time_stream,
           heartrate_stream = excluded.heartrate_stream,
           altitude_stream = excluded.altitude_stream,
           velocity_stream = excluded.velocity_stream,
@@ -188,6 +192,7 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
     [
       workoutId,
       JSON.stringify(streams.distance),
+      JSON.stringify(streams.time),
       JSON.stringify(streams.heartrate),
       JSON.stringify(streams.altitude),
       JSON.stringify(streams.velocity_smooth)
@@ -223,7 +228,7 @@ async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
 export async function getStoredActivityStreams(workoutId: number) {
   const { rows } = await pool.query(
     `
-      select distance_stream, heartrate_stream, altitude_stream, velocity_stream
+      select distance_stream, time_stream, heartrate_stream, altitude_stream, velocity_stream
       from workout_streams
       where workout_id = $1
     `,
@@ -237,6 +242,7 @@ export async function getStoredActivityStreams(workoutId: number) {
 
   return {
     distance: Array.isArray(row.distance_stream) ? row.distance_stream : [],
+    time: Array.isArray(row.time_stream) ? row.time_stream : [],
     heartrate: Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [],
     altitude: Array.isArray(row.altitude_stream) ? row.altitude_stream : [],
     velocity_smooth: Array.isArray(row.velocity_stream) ? row.velocity_stream : []

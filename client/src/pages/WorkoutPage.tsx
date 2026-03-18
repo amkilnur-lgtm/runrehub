@@ -6,6 +6,7 @@ import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 
 type StreamSeries = {
   distance: number[];
+  time: number[];
   heartrate: number[];
   velocity_smooth: number[];
 } | null;
@@ -47,6 +48,7 @@ type ChartModel = {
   yTicks: number[];
   yTickPositions: string[];
   xTicks: number[];
+  xTickLabels: string[];
   axisCaption: string;
   xLabel: string;
   summaryLeft: string;
@@ -61,7 +63,7 @@ const CHART_INSET_X = 12;
 const CHART_INSET_TOP = 12;
 const CHART_INSET_BOTTOM = 12;
 const Y_TICK_COUNT = 4;
-const X_TICK_COUNT = 5;
+const X_TICK_COUNT = 6;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -124,7 +126,7 @@ function formatElevation(value: number | null | undefined) {
     return "0";
   }
 
-  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+  return `${rounded}`;
 }
 
 function buildTicks(min: number, max: number, count: number, descending = false) {
@@ -140,12 +142,55 @@ function buildTicks(min: number, max: number, count: number, descending = false)
   return descending ? ticks.reverse() : ticks;
 }
 
-function buildDistanceTicks(maxDistanceMeters: number) {
-  if (!Number.isFinite(maxDistanceMeters) || maxDistanceMeters <= 0) {
+function buildLinearTicks(maxValue: number) {
+  if (!Number.isFinite(maxValue) || maxValue <= 0) {
     return [];
   }
 
-  return Array.from({ length: X_TICK_COUNT }, (_, index) => (maxDistanceMeters * index) / (X_TICK_COUNT - 1));
+  return Array.from({ length: X_TICK_COUNT }, (_, index) => (maxValue * index) / (X_TICK_COUNT - 1));
+}
+
+function formatElapsedTick(totalSeconds: number) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) {
+    return "0:00";
+  }
+
+  const rounded = Math.round(totalSeconds);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatDistanceTick(distanceMeters: number) {
+  return `${(distanceMeters / 1000).toFixed(1)}`;
+}
+
+function buildXAxis(streams: StreamSeries, fallbackDistance: number) {
+  if (streams?.time?.length) {
+    const maxTime = streams.time[streams.time.length - 1] ?? 0;
+    const xTicks = buildLinearTicks(maxTime);
+    return {
+      pointsX: streams.time,
+      xTicks,
+      xTickLabels: xTicks.map(formatElapsedTick),
+      xLabel: "Время (ч:м:с)"
+    };
+  }
+
+  const maxDistance = streams?.distance?.[streams.distance.length - 1] ?? fallbackDistance;
+  const xTicks = buildLinearTicks(maxDistance);
+  return {
+    pointsX: streams?.distance ?? [],
+    xTicks,
+    xTickLabels: xTicks.map(formatDistanceTick),
+    xLabel: "Дистанция (км)"
+  };
 }
 
 function buildTickPositions(count: number) {
@@ -196,29 +241,30 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     return null;
   }
 
-  const size = Math.min(streams.distance.length, streams.velocity_smooth.length);
+  const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
+  const size = Math.min(xAxis.pointsX.length, streams.velocity_smooth.length);
   const validPaces: number[] = [];
   const rawPoints: ChartPoint[] = [];
 
   for (let index = 0; index < size; index += 1) {
-    const distance = streams.distance[index];
+    const x = xAxis.pointsX[index];
     const speed = streams.velocity_smooth[index];
 
-    if (!Number.isFinite(distance) || distance < 0) {
+    if (!Number.isFinite(x) || x < 0) {
       continue;
     }
 
     let paceSeconds: number | null = null;
     if (Number.isFinite(speed) && speed > 0) {
       const candidate = 1000 / speed;
-      if (candidate >= 170 && candidate <= 660) {
+      if (candidate >= 170 && candidate <= 1200) {
         paceSeconds = candidate;
         validPaces.push(candidate);
       }
     }
 
     rawPoints.push({
-      x: distance,
+      x,
       y: paceSeconds ?? Number.NaN
     });
   }
@@ -229,13 +275,13 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
-  const fastBound = clamp(Math.floor((quantile(validPaces, 0.08) - 10) / 10) * 10, 170, averagePace);
-  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.92) + 15) / 10) * 10, averagePace + 20, 660);
+  const fastBound = clamp(Math.floor((Math.min(...validPaces, averagePace) - 10) / 10) * 10, 170, 1200);
+  const slowBound = clamp(Math.ceil((Math.max(...validPaces, averagePace) + 10) / 10) * 10, fastBound + 40, 1200);
 
   const normalized = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
   );
-  const smoothed = smoothSeries(normalized, 13);
+  const smoothed = smoothSeries(normalized, 5);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
@@ -248,9 +294,10 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
     areaPath,
     yTicks: buildTicks(fastBound, slowBound, Y_TICK_COUNT),
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
-    xTicks: buildDistanceTicks(points[points.length - 1].x),
-    axisCaption: "Мин/км",
-    xLabel: "Дистанция (км)",
+    xTicks: xAxis.xTicks,
+    xTickLabels: xAxis.xTickLabels,
+    axisCaption: "МИН/КМ",
+    xLabel: xAxis.xLabel,
     summaryLeft: formatPace(workout?.average_speed),
     summaryLeftLabel: "Средний",
     summaryRight: formatPaceSeconds(bestPace),
@@ -263,19 +310,20 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
     return null;
   }
 
-  const size = Math.min(streams.distance.length, streams.heartrate.length);
+  const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
+  const size = Math.min(xAxis.pointsX.length, streams.heartrate.length);
   const rawPoints: ChartPoint[] = [];
   const validHr: number[] = [];
 
   for (let index = 0; index < size; index += 1) {
-    const distance = streams.distance[index];
+    const x = xAxis.pointsX[index];
     const hr = streams.heartrate[index];
 
-    if (!Number.isFinite(distance) || distance < 0 || !Number.isFinite(hr) || hr <= 0) {
+    if (!Number.isFinite(x) || x < 0 || !Number.isFinite(hr) || hr <= 0) {
       continue;
     }
 
-    rawPoints.push({ x: distance, y: hr });
+    rawPoints.push({ x, y: hr });
     validHr.push(hr);
   }
 
@@ -297,18 +345,15 @@ function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutData["work
     areaPath,
     yTicks: buildTicks(minHr, maxHr, Y_TICK_COUNT, true),
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
-    xTicks: buildDistanceTicks(points[points.length - 1].x),
-    axisCaption: "Уд/мин",
-    xLabel: "Дистанция (км)",
+    xTicks: xAxis.xTicks,
+    xTickLabels: xAxis.xTickLabels,
+    axisCaption: "УД/МИН",
+    xLabel: xAxis.xLabel,
     summaryLeft: formatHeartRate(workout?.average_heartrate),
     summaryLeftLabel: "Средний",
     summaryRight: formatHeartRate(workout?.max_heartrate ?? Math.max(...validHr)),
     summaryRightLabel: "Максимум"
   };
-}
-
-function xTickLabel(value: number) {
-  return `${(value / 1000).toFixed(1)}`;
 }
 
 function StreamChart({
@@ -380,7 +425,7 @@ function StreamChart({
                 d={model.linePath}
                 fill="none"
                 stroke={color}
-                strokeWidth="1.75"
+                strokeWidth="1.35"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -389,8 +434,8 @@ function StreamChart({
         </div>
       </div>
       <div className="chart-x-axis">
-        {model.xTicks.map((tick) => (
-          <span key={tick}>{xTickLabel(tick)}</span>
+        {model.xTicks.map((tick, index) => (
+          <span key={`${tick}-${index}`}>{model.xTickLabels[index]}</span>
         ))}
       </div>
       <div className="chart-x-label muted">{model.xLabel}</div>

@@ -66,6 +66,7 @@ export async function ensureSchema() {
     create table if not exists workout_streams (
       workout_id integer primary key references workouts(id) on delete cascade,
       distance_stream jsonb not null default '[]'::jsonb,
+      time_stream jsonb not null default '[]'::jsonb,
       heartrate_stream jsonb not null default '[]'::jsonb,
       altitude_stream jsonb not null default '[]'::jsonb,
       velocity_stream jsonb not null default '[]'::jsonb,
@@ -73,6 +74,11 @@ export async function ensureSchema() {
     );
 
     create index if not exists workouts_user_id_start_date_idx on workouts(user_id, start_date desc);
+  `);
+
+  await pool.query(`
+    alter table workout_streams
+      add column if not exists time_stream jsonb not null default '[]'::jsonb
   `);
 
   await pool.query(`
