@@ -59,7 +59,7 @@ type ChartModel = {
 
 const CHART_WIDTH = 620;
 const CHART_HEIGHT = 220;
-const CHART_INSET_X = 12;
+const CHART_INSET_X = 8;
 const CHART_INSET_TOP = 12;
 const CHART_INSET_BOTTOM = 12;
 const Y_TICK_COUNT = 4;
@@ -255,7 +255,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
 
   const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
   const derivedPace = streams.time.length
-    ? computeWindowedPace(streams.distance, streams.time, 10)
+    ? computeWindowedPace(streams.distance, streams.time, 12)
     : streams.velocity_smooth.map((speed) => (Number.isFinite(speed) && speed > 0 ? 1000 / speed : Number.NaN));
   const size = Math.min(xAxis.pointsX.length, derivedPace.length);
   const validPaces: number[] = [];
@@ -288,7 +288,7 @@ function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"]
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
   const fastBound = clamp(Math.floor((Math.min(...validPaces, averagePace) - 20) / 20) * 20, 180, 1200);
-  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.96) + 20) / 20) * 20, fastBound + 60, 1200);
+  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.95) + 20) / 20) * 20, fastBound + 60, 1200);
 
   const normalized = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
@@ -437,7 +437,7 @@ function StreamChart({
                 d={model.linePath}
                 fill="none"
                 stroke={color}
-                strokeWidth="1.35"
+                strokeWidth="1.25"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -538,14 +538,14 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             title="Темп"
             model={paceChart}
             color="#2476e5"
-            fill="rgba(36, 118, 229, 0.42)"
+            fill="rgba(36, 118, 229, 0.24)"
             formatter={formatPaceSeconds}
           />
           <StreamChart
             title="Пульс"
             model={heartRateChart}
             color="#d53a3a"
-            fill="rgba(213, 58, 58, 0.34)"
+            fill="rgba(213, 58, 58, 0.20)"
             formatter={(value) => `${Math.round(value)}`}
           />
         </div>
