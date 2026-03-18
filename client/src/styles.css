@@ -82,7 +82,7 @@ select {
   gap: 16px;
 }
 
-.topbar-title-row {
+.topbar-left-group {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -92,7 +92,16 @@ select {
   flex: 1 1 auto;
 }
 
+.topbar-name-box {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 .topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   flex: 0 0 auto;
 }
 
@@ -481,7 +490,7 @@ select {
     font-size: 24px;
   }
 
-  .topbar-title-row {
+  .topbar-left-group {
     align-items: center;
     justify-content: flex-start;
   }

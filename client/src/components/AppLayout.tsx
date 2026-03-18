@@ -18,8 +18,10 @@ export function AppLayout() {
           <div className="eyebrow">RunRehab</div>
         </div>
         <div className="topbar-main-row">
-          <div className="topbar-title-row">
-            <h1>{user?.fullName}</h1>
+          <div className="topbar-left-group">
+            <div className="topbar-name-box">
+              <h1>{user?.fullName}</h1>
+            </div>
             <span className="role-badge">{user?.role}</span>
           </div>
           <div className="topbar-actions">
