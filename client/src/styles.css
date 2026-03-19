@@ -327,6 +327,7 @@ select {
 .compact-laps {
   display: grid;
   gap: 8px;
+  margin-top: 18px;
 }
 
 .compact-laps-head,
