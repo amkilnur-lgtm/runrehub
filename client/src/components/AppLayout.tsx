@@ -14,11 +14,11 @@ export function AppLayout() {
   return (
     <div className="shell">
       <header className="topbar">
+        <div className="topbar-identity">
+          <div className="eyebrow">RunningRehab</div>
+        </div>
         <div className="topbar-main-row">
           <div className="topbar-left-group">
-            <div className="topbar-identity">
-              <div className="eyebrow">RunningRehab</div>
-            </div>
             <div className="topbar-name-box">
               <h1>{user?.fullName}</h1>
             </div>
