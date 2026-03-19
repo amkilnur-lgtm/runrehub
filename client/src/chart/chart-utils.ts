@@ -94,6 +94,40 @@ export function suppressTransientSpikes(values: number[], threshold: number) {
   return result;
 }
 
+export function blendExtremesTowardRaw(
+  rawValues: number[],
+  smoothedValues: number[],
+  {
+    preserveHighThreshold,
+    preserveHighFactor,
+    preserveLowThreshold,
+    preserveLowFactor
+  }: {
+    preserveHighThreshold: number;
+    preserveHighFactor: number;
+    preserveLowThreshold: number;
+    preserveLowFactor: number;
+  }
+) {
+  return smoothedValues.map((smoothed, index) => {
+    const raw = rawValues[index];
+    if (!Number.isFinite(raw) || !Number.isFinite(smoothed)) {
+      return smoothed;
+    }
+
+    const delta = raw - smoothed;
+    if (delta >= preserveHighThreshold) {
+      return smoothed + delta * preserveHighFactor;
+    }
+
+    if (delta <= -preserveLowThreshold) {
+      return smoothed + delta * preserveLowFactor;
+    }
+
+    return smoothed;
+  });
+}
+
 export function buildTicks(min: number, max: number, count: number, descending = false) {
   if (!Number.isFinite(min) || !Number.isFinite(max)) {
     return [];

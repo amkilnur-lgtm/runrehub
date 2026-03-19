@@ -1,6 +1,7 @@
 import { ChartModel, ChartPoint, StreamSeries, WorkoutData } from "../types/workout";
 import {
   Y_TICK_COUNT,
+  blendExtremesTowardRaw,
   buildChartPaths,
   buildTickPositions,
   buildTicks,
@@ -113,26 +114,34 @@ export function preparePaceChart(
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
+  const coreFastPace = quantile(validPaces, 0.03);
+  const coreSlowPace = quantile(validPaces, 0.97);
   const fastBound = clamp(
-    Math.floor((Math.min(...validPaces, averagePace) - 20) / 20) * 20,
+    Math.floor((Math.min(coreFastPace, averagePace - 10, bestPace) - 15) / 20) * 20,
     180,
     1200
   );
   const slowBound = clamp(
-    Math.ceil((quantile(validPaces, 0.95) + 20) / 20) * 20,
-    fastBound + 60,
+    Math.ceil((Math.max(coreSlowPace, averagePace + 45) + 15) / 20) * 20,
+    fastBound + 80,
     1200
   );
 
-  const normalized = rawPoints.map((point) =>
+  const displayBase = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
   );
-  const deSpiked = suppressTransientSpikes(normalized, 45);
+  const deSpiked = suppressTransientSpikes(displayBase, 65);
   const medianSmoothed = medianFilter(deSpiked, 5);
-  const smoothed = smoothSeries(medianSmoothed, 5);
+  const lightlySmoothed = smoothSeries(medianSmoothed, 5);
+  const displaySeries = blendExtremesTowardRaw(displayBase, lightlySmoothed, {
+    preserveHighThreshold: 32,
+    preserveHighFactor: 0.72,
+    preserveLowThreshold: 20,
+    preserveLowFactor: 0.45
+  });
   const points = rawPoints.map((point, index) => ({
     x: point.x,
-    y: smoothed[index]
+    y: displaySeries[index]
   }));
 
   const { linePath, areaPath } = buildChartPaths(points, fastBound, slowBound, true);

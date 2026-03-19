@@ -1,6 +1,7 @@
 import { ChartModel, ChartPoint, StreamSeries, WorkoutData } from "../types/workout";
 import {
   Y_TICK_COUNT,
+  blendExtremesTowardRaw,
   buildChartPaths,
   buildTickPositions,
   buildTicks,
@@ -43,15 +44,22 @@ export function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutDat
     return null;
   }
 
-  const minHr = Math.max(60, Math.floor((quantile(validHr, 0.05) - 5) / 5) * 5);
-  const maxHr = Math.ceil((quantile(validHr, 0.98) + 5) / 5) * 5;
-  const normalized = rawPoints.map((point) => clamp(point.y, minHr, maxHr));
-  const deSpiked = suppressTransientSpikes(normalized, 10);
-  const medianSmoothed = medianFilter(deSpiked, 5);
-  const smoothed = smoothSeries(medianSmoothed, 7);
+  const coreLowHr = quantile(validHr, 0.04);
+  const coreHighHr = quantile(validHr, 0.97);
+  const minHr = Math.max(60, Math.floor((coreLowHr - 4) / 5) * 5);
+  const maxHr = Math.ceil((Math.max(coreHighHr, (workout?.average_heartrate ?? coreHighHr) + 8) + 4) / 5) * 5;
+  const displayBase = rawPoints.map((point) => clamp(point.y, minHr, maxHr));
+  const deSpiked = suppressTransientSpikes(displayBase, 14);
+  const lightlySmoothed = smoothSeries(deSpiked, 5);
+  const displaySeries = blendExtremesTowardRaw(displayBase, lightlySmoothed, {
+    preserveHighThreshold: 7,
+    preserveHighFactor: 0.5,
+    preserveLowThreshold: 7,
+    preserveLowFactor: 0.55
+  });
   const points = rawPoints.map((point, index) => ({
     x: point.x,
-    y: smoothed[index]
+    y: displaySeries[index]
   }));
   const { linePath, areaPath } = buildChartPaths(points, minHr, maxHr, false);
 
