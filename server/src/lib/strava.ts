@@ -61,6 +61,8 @@ export type ActivityStreams = {
   velocity_smooth: number[];
 };
 
+const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
+
 function assertStravaConfigured() {
   if (!config.STRAVA_CLIENT_ID || !config.STRAVA_CLIENT_SECRET) {
     throw new Error("STRAVA_NOT_CONFIGURED");
@@ -487,7 +489,9 @@ export async function syncLatestActivities(userId: number) {
     [userId]
   );
   const connection = rows[0];
-  const afterDate = connection.last_synced_at ?? getStartOfTodayInTimeZone(config.APP_TIMEZONE);
+  const afterDate = connection.last_synced_at
+    ? new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS)
+    : getStartOfTodayInTimeZone(config.APP_TIMEZONE);
   const after = Math.floor(new Date(afterDate).getTime() / 1000);
 
   const activityResponse = await fetch(
