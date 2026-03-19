@@ -20,5 +20,6 @@ RUN npm install --omit=dev --workspaces
 
 COPY --from=builder /app/server/dist server/dist
 COPY --from=builder /app/client/dist server/dist/public
+COPY server/migrations server/migrations
 
 CMD ["node", "server/dist/index.js"]
