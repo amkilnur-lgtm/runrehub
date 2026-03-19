@@ -7,7 +7,7 @@ import { config } from "../config.js";
 import { hashPassword } from "./auth.js";
 
 const require = createRequire(import.meta.url);
-const runMigrations = require("node-pg-migrate").default || require("node-pg-migrate");
+const { runner: runMigrations } = require("node-pg-migrate");
 
 const { Pool } = pg;
 
