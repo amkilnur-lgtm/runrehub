@@ -330,8 +330,8 @@ select {
 
 .compact-laps {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .compact-laps-head,
@@ -343,7 +343,7 @@ select {
 }
 
 .compact-laps-head {
-  padding: 0 14px 8px;
+  padding: 0 14px 4px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -735,7 +735,7 @@ select {
     display: grid;
     grid-template-columns: minmax(58px, 1fr) repeat(4, minmax(0, 0.62fr));
     gap: 6px;
-    padding: 0 10px 6px;
+    padding: 0 10px 3px;
     font-size: 9px;
   }
 
