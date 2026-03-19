@@ -116,7 +116,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   return (
     <div className="stack">
       <section className="card">
-        <div className="section-header">
+        <div className="section-header workout-header">
           <Link to={backHref} className="inline-link">
             Назад
           </Link>
