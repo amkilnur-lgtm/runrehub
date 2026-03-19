@@ -5,13 +5,11 @@ export function StreamChart({
   title,
   model,
   color,
-  fill,
   formatter
 }: {
   title: string;
   model: ChartModel | null;
   color: string;
-  fill: string;
   formatter: (value: number) => string;
 }) {
   if (!model) {
@@ -61,8 +59,8 @@ export function StreamChart({
             <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
               <defs>
                 <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={fill} />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0.04)" />
+                  <stop offset="0%" stopColor={color} stopOpacity="0.34" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.04" />
                 </linearGradient>
               </defs>
               <path d={model.areaPath} fill={`url(#${title}-gradient)`} />

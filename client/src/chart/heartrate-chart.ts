@@ -6,7 +6,11 @@ import {
   buildTicks,
   buildXAxis,
   buildXAxisPositions,
-  smoothSeries
+  clamp,
+  medianFilter,
+  quantile,
+  smoothSeries,
+  suppressTransientSpikes
 } from "./chart-utils";
 
 export function formatHeartRate(value: number | null | undefined) {
@@ -39,9 +43,12 @@ export function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutDat
     return null;
   }
 
-  const minHr = Math.max(60, Math.floor((Math.min(...validHr) - 5) / 5) * 5);
-  const maxHr = Math.ceil((Math.max(...validHr) + 5) / 5) * 5;
-  const smoothed = smoothSeries(rawPoints.map((point) => point.y), 7);
+  const minHr = Math.max(60, Math.floor((quantile(validHr, 0.05) - 5) / 5) * 5);
+  const maxHr = Math.ceil((quantile(validHr, 0.98) + 5) / 5) * 5;
+  const normalized = rawPoints.map((point) => clamp(point.y, minHr, maxHr));
+  const deSpiked = suppressTransientSpikes(normalized, 10);
+  const medianSmoothed = medianFilter(deSpiked, 5);
+  const smoothed = smoothSeries(medianSmoothed, 7);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
