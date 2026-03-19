@@ -237,6 +237,43 @@ select {
   min-height: 44px;
 }
 
+.admin-diagnostic-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.admin-log-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #fff9f2;
+}
+
+.admin-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-log-clear {
+  padding: 8px 12px;
+}
+
+.admin-log-output {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #181510;
+  color: #f7f2eb;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+ }
+
 .align-right {
   text-align: right;
 }
@@ -525,6 +562,10 @@ select {
   .ghost-button,
   .primary-button {
     min-height: 44px;
+  }
+
+  .admin-diagnostic-form {
+    grid-template-columns: 1fr;
   }
 
   .role-badge {
