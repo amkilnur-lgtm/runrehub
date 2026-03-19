@@ -44,6 +44,56 @@ export function smoothSeries(values: number[], windowSize: number) {
   });
 }
 
+export function median(values: number[]) {
+  if (!values.length) {
+    return Number.NaN;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+export function medianFilter(values: number[], windowSize: number) {
+  if (values.length < 3 || windowSize < 2) {
+    return values;
+  }
+
+  const radius = Math.floor(windowSize / 2);
+  return values.map((_, index) => {
+    const start = Math.max(0, index - radius);
+    const end = Math.min(values.length - 1, index + radius);
+    return median(values.slice(start, end + 1));
+  });
+}
+
+export function suppressTransientSpikes(values: number[], threshold: number) {
+  if (values.length < 3 || threshold <= 0) {
+    return values;
+  }
+
+  const result = [...values];
+
+  for (let index = 1; index < values.length - 1; index += 1) {
+    const previous = result[index - 1];
+    const current = result[index];
+    const next = values[index + 1];
+
+    if (![previous, current, next].every(Number.isFinite)) {
+      continue;
+    }
+
+    const neighborMean = (previous + next) / 2;
+    if (Math.abs(current - neighborMean) > threshold) {
+      result[index] = neighborMean;
+    }
+  }
+
+  return result;
+}
+
 export function buildTicks(min: number, max: number, count: number, descending = false) {
   if (!Number.isFinite(min) || !Number.isFinite(max)) {
     return [];

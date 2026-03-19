@@ -162,14 +162,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             title="Темп"
             model={paceChart}
             color="#2476e5"
-            fill="rgba(36, 118, 229, 0.24)"
             formatter={formatPaceSeconds}
           />
           <StreamChart
             title="Пульс"
             model={heartRateChart}
             color="#d53a3a"
-            fill="rgba(213, 58, 58, 0.20)"
             formatter={(value) => `${Math.round(value)}`}
           />
         </div>

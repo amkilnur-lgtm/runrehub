@@ -1,4 +1,3 @@
-import { formatPace } from "../lib";
 import { ChartModel, ChartPoint, StreamSeries, WorkoutData } from "../types/workout";
 import {
   Y_TICK_COUNT,
@@ -8,8 +7,10 @@ import {
   buildXAxis,
   buildXAxisPositions,
   clamp,
+  medianFilter,
   quantile,
-  smoothSeries
+  smoothSeries,
+  suppressTransientSpikes
 } from "./chart-utils";
 
 export function computeWindowedPace(distance: number[], time: number[], windowSeconds: number) {
@@ -41,7 +42,12 @@ export function computeWindowedPace(distance: number[], time: number[], windowSe
     const deltaTime = time[right] - time[left];
     const deltaDistance = distance[right] - distance[left];
 
-    if (!Number.isFinite(deltaTime) || !Number.isFinite(deltaDistance) || deltaTime <= 0 || deltaDistance <= 0.5) {
+    if (
+      !Number.isFinite(deltaTime) ||
+      !Number.isFinite(deltaDistance) ||
+      deltaTime <= 0 ||
+      deltaDistance <= 0.5
+    ) {
       result.push(Number.NaN);
       continue;
     }
@@ -60,18 +66,23 @@ export function formatPaceSeconds(totalSeconds: number) {
   const rounded = Math.round(totalSeconds);
   const minutes = Math.floor(rounded / 60);
   const seconds = rounded % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}/км`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function preparePaceChart(streams: StreamSeries, workout: WorkoutData["workout"] | null): ChartModel | null {
+export function preparePaceChart(
+  streams: StreamSeries,
+  workout: WorkoutData["workout"] | null
+): ChartModel | null {
   if (!streams?.distance?.length) {
     return null;
   }
 
   const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
   const derivedPace = streams.time.length
-    ? computeWindowedPace(streams.distance, streams.time, 12)
-    : streams.velocity_smooth.map((speed) => (Number.isFinite(speed) && speed > 0 ? 1000 / speed : Number.NaN));
+    ? computeWindowedPace(streams.distance, streams.time, 18)
+    : streams.velocity_smooth.map((speed) =>
+        Number.isFinite(speed) && speed > 0 ? 1000 / speed : Number.NaN
+      );
   const size = Math.min(xAxis.pointsX.length, derivedPace.length);
   const validPaces: number[] = [];
   const rawPoints: ChartPoint[] = [];
@@ -102,13 +113,23 @@ export function preparePaceChart(streams: StreamSeries, workout: WorkoutData["wo
 
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
-  const fastBound = clamp(Math.floor((Math.min(...validPaces, averagePace) - 20) / 20) * 20, 180, 1200);
-  const slowBound = clamp(Math.ceil((quantile(validPaces, 0.95) + 20) / 20) * 20, fastBound + 60, 1200);
+  const fastBound = clamp(
+    Math.floor((Math.min(...validPaces, averagePace) - 20) / 20) * 20,
+    180,
+    1200
+  );
+  const slowBound = clamp(
+    Math.ceil((quantile(validPaces, 0.95) + 20) / 20) * 20,
+    fastBound + 60,
+    1200
+  );
 
   const normalized = rawPoints.map((point) =>
     Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
   );
-  const smoothed = smoothSeries(normalized, 3);
+  const deSpiked = suppressTransientSpikes(normalized, 45);
+  const medianSmoothed = medianFilter(deSpiked, 5);
+  const smoothed = smoothSeries(medianSmoothed, 5);
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: smoothed[index]
@@ -126,7 +147,7 @@ export function preparePaceChart(streams: StreamSeries, workout: WorkoutData["wo
     xTickPositions: buildXAxisPositions(xAxis.xTicks.length),
     axisCaption: "МИН/КМ",
     xLabel: xAxis.xLabel,
-    summaryLeft: formatPace(workout?.average_speed),
+    summaryLeft: workout?.average_speed ? formatPaceSeconds(1000 / workout.average_speed) : "—",
     summaryLeftLabel: "Средний",
     summaryRight: formatPaceSeconds(bestPace),
     summaryRightLabel: "Лучший"
