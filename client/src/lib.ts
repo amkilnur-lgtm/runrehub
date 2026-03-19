@@ -16,9 +16,9 @@ export function formatPace(averageSpeed: number | null | undefined) {
   if (!averageSpeed || averageSpeed <= 0) {
     return "—";
   }
-  const secPerKm = 1000 / averageSpeed;
-  const minutes = Math.floor(secPerKm / 60);
-  const seconds = Math.round(secPerKm % 60);
+  const roundedSeconds = Math.round(1000 / averageSpeed);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}/км`;
 }
 
