@@ -1,6 +1,7 @@
 import { FastifyBaseLogger } from "fastify";
 
 import { pool } from "./db.js";
+import { addStravaEvent } from "./strava-events.js";
 import { config } from "../config.js";
 
 type TokenResponse = {
@@ -567,14 +568,35 @@ export async function syncDueAthletes(logger?: FastifyBaseLogger) {
   );
 
   logger?.info({ dueAthletes: rows.length, intervalMinutes }, "strava cron tick");
+  addStravaEvent({
+    source: "cron",
+    level: "info",
+    message: "strava cron tick",
+    details: { dueAthletes: rows.length, intervalMinutes }
+  });
 
   for (const row of rows) {
     const userId = row.user_id as number;
     try {
       const result = await syncLatestActivities(userId);
       logger?.info({ userId, result }, "strava cron sync completed");
+      addStravaEvent({
+        source: "cron",
+        level: "info",
+        message: "strava cron sync completed",
+        details: { userId, result }
+      });
     } catch (error) {
       logger?.error({ error, userId }, "strava cron sync failed");
+      addStravaEvent({
+        source: "cron",
+        level: "error",
+        message: "strava cron sync failed",
+        details: {
+          userId,
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      });
     }
   }
 

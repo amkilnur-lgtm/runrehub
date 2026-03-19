@@ -237,11 +237,6 @@ select {
   min-height: 44px;
 }
 
-.admin-diagnostic-form {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-}
-
 .admin-log-card {
   display: grid;
   gap: 12px;
@@ -250,29 +245,91 @@ select {
   background: #fff9f2;
 }
 
-.admin-log-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.admin-events-list {
+  display: grid;
+  gap: 10px;
 }
 
-.admin-log-clear {
-  padding: 8px 12px;
-}
-
-.admin-log-output {
+.admin-event-row {
   display: grid;
   gap: 8px;
   padding: 14px;
   border-radius: 14px;
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.admin-event-info {
+  border-left: 4px solid #2476e5;
+}
+
+.admin-event-warn {
+  border-left: 4px solid #d48a22;
+}
+
+.admin-event-error {
+  border-left: 4px solid #d53a3a;
+}
+
+.admin-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #72685a;
+  font-size: 12px;
+}
+
+.admin-event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-event-badge,
+.admin-event-level {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+.admin-event-badge {
+  background: #f0ece4;
+  color: #5d5448;
+}
+
+.admin-event-level-info {
+  background: #e7f0ff;
+  color: #245ca8;
+}
+
+.admin-event-level-warn {
+  background: #fff1dc;
+  color: #9f5c14;
+}
+
+.admin-event-level-error {
+  background: #ffe3de;
+  color: #9a2f13;
+}
+
+.admin-event-message {
+  font-weight: 600;
+}
+
+.admin-event-details {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: #181510;
   color: #f7f2eb;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 13px;
+  font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
- }
+}
 
 .align-right {
   text-align: right;
@@ -562,10 +619,6 @@ select {
   .ghost-button,
   .primary-button {
     min-height: 44px;
-  }
-
-  .admin-diagnostic-form {
-    grid-template-columns: 1fr;
   }
 
   .role-badge {
