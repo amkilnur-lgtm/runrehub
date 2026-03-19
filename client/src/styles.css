@@ -147,6 +147,10 @@ select {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.workout-stats-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .card {
   padding: 24px;
 }
@@ -685,6 +689,10 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .workout-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .stat-card,
   .inset-card {
     padding: 14px;
@@ -808,6 +816,7 @@ select {
   .two-columns,
   .three-columns,
   .four-columns,
+  .workout-stats-grid,
   .workout-layout {
     grid-template-columns: 1fr;
   }

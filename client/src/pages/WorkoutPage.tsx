@@ -149,7 +149,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
           {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
         </p>
-        <div className="grid four-columns">
+        <div className="grid workout-stats-grid">
           <div className="card inset-card">
             <div className="muted">Километраж</div>
             <div className="stat-value">{formatDistance(data.workout.distance_meters)}</div>
