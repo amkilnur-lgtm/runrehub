@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import { StreamChart } from "../components/StreamChart";
+import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
+import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
+import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
-import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
-import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
-import { StreamChart } from "../components/StreamChart";
-import { useApi } from "../hooks/useApi";
 
 function formatElevation(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -28,6 +28,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const prefix = mode === "trainer" ? "/api/trainer/workouts/" : "/api/athlete/workouts/";
   const { data, loading, error } = useApi<WorkoutData>(`${prefix}${params.id}`);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
     mode === "trainer" && data?.workout.athlete_id
@@ -45,13 +47,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
 
     setIsDeleting(true);
+    setIsMenuOpen(false);
     try {
       await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
       navigate(backHref);
     } catch (deleteError) {
-      window.alert(
-        deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
-      );
+      window.alert(deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку");
       setIsDeleting(false);
     }
   }
@@ -61,6 +62,32 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     () => prepareHeartRateChart(data?.streams ?? null, data?.workout ?? null),
     [data]
   );
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isMenuOpen]);
 
   if (loading) {
     return (
@@ -93,15 +120,29 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           <Link to={backHref} className="inline-link">
             Назад
           </Link>
-          <button
-            type="button"
-            className="ghost-button"
-            style={{ color: "#9a2f13" }}
-            disabled={isDeleting}
-            onClick={handleDelete}
-          >
-            {isDeleting ? "Удаляем..." : "Удалить тренировку"}
-          </button>
+          <div className="workout-menu" ref={menuRef}>
+            <button
+              type="button"
+              className="ghost-button workout-menu-trigger"
+              aria-label="Действия"
+              aria-expanded={isMenuOpen}
+              onClick={() => setIsMenuOpen((open) => !open)}
+            >
+              ...
+            </button>
+            {isMenuOpen ? (
+              <div className="workout-menu-popover">
+                <button
+                  type="button"
+                  className="workout-menu-item"
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                >
+                  {isDeleting ? "Удаляем..." : "Удалить тренировку"}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
         <h2>{data.workout.name}</h2>
         <p className="muted">
