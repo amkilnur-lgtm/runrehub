@@ -139,6 +139,10 @@ process.on("SIGINT", shutdown);
 
 // --- Фоновая синхронизация Strava ---
 const syncIntervalMs = config.STRAVA_SYNC_INTERVAL_MINUTES * 60 * 1000;
+app.log.info(
+  { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES },
+  "strava cron scheduler started"
+);
 setInterval(() => {
   void syncDueAthletes(app.log);
 }, syncIntervalMs);

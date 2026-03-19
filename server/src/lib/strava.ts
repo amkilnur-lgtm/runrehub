@@ -566,10 +566,13 @@ export async function syncDueAthletes(logger?: FastifyBaseLogger) {
     [intervalMinutes]
   );
 
+  logger?.info({ dueAthletes: rows.length, intervalMinutes }, "strava cron tick");
+
   for (const row of rows) {
     const userId = row.user_id as number;
     try {
-      await syncLatestActivities(userId);
+      const result = await syncLatestActivities(userId);
+      logger?.info({ userId, result }, "strava cron sync completed");
     } catch (error) {
       logger?.error({ error, userId }, "strava cron sync failed");
     }
