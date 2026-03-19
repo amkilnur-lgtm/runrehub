@@ -442,22 +442,21 @@ select {
 .chart-frame {
   display: block;
   margin-bottom: 10px;
+  padding-left: 34px;
 }
 
 .chart-grid-wrap {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 6px;
-  align-items: stretch;
+  position: relative;
 }
 
 .chart-y-axis {
-  min-height: 220px;
-  position: relative;
+  position: absolute;
+  inset: 0 auto 0 -34px;
+  width: 28px;
   color: #72685a;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding-right: 2px;
+  pointer-events: none;
 }
 
 .chart-y-axis span {
@@ -493,12 +492,6 @@ select {
   height: 100%;
 }
 
-.chart-x-wrap {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 6px;
-}
-
 .chart-x-axis {
   position: relative;
   height: 18px;
@@ -506,6 +499,7 @@ select {
   font-size: 12px;
   margin-bottom: 6px;
   font-variant-numeric: tabular-nums;
+  margin-left: 34px;
 }
 
 .chart-x-tick {
@@ -526,6 +520,7 @@ select {
 .chart-x-label {
   text-align: center;
   font-size: 12px;
+  margin-left: 34px;
 }
 
 .chart-empty {
@@ -767,11 +762,6 @@ select {
   }
 
   .chart-grid-wrap,
-  .chart-x-wrap {
-    grid-template-columns: 48px minmax(0, 1fr);
-    gap: 8px;
-  }
-
   .chart-y-axis,
   .chart-grid,
   .chart-empty {
@@ -837,11 +827,17 @@ select {
     text-align: left;
   }
 
-  .chart-x-wrap {
-    grid-template-columns: 1fr;
+  .chart-frame {
+    padding-left: 28px;
   }
 
-  .chart-x-wrap > div:first-child {
-    display: none;
+  .chart-y-axis {
+    inset: 0 auto 0 -28px;
+    width: 24px;
+  }
+
+  .chart-x-axis,
+  .chart-x-label {
+    margin-left: 28px;
   }
 }
