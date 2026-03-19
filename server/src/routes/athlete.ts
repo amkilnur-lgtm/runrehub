@@ -110,4 +110,21 @@ export async function athleteRoutes(app: FastifyInstance) {
       streams
     };
   });
+
+  app.delete("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const params = request.params as { id: string };
+    const workoutId = Number(params.id);
+
+    const { rowCount } = await pool.query(
+      `delete from workouts where id = $1 and user_id = $2`,
+      [workoutId, request.user.id]
+    );
+
+    if (rowCount === 0) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    return { ok: true };
+  });
 }

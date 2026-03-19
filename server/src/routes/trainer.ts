@@ -123,4 +123,27 @@ export async function trainerRoutes(app: FastifyInstance) {
       streams
     };
   });
+
+  app.delete("/api/trainer/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const workoutId = Number(params.id);
+
+    const { rowCount } = await pool.query(
+      `
+        delete from workouts w
+        using users u
+        where w.id = $1
+          and w.user_id = u.id
+          and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    if (rowCount === 0) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    return { ok: true };
+  });
 }
