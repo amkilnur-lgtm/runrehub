@@ -36,6 +36,14 @@ function formatEventTime(value: string) {
   });
 }
 
+function formatLogLine(entry: StravaEvent) {
+  const prefix = `[${formatEventTime(entry.timestamp)}] [${entry.source.toUpperCase()}] [${entry.level.toUpperCase()}]`;
+  const details = entry.details && Object.keys(entry.details).length > 0
+    ? ` ${JSON.stringify(entry.details)}`
+    : "";
+  return `${prefix} ${entry.message}${details}`;
+}
+
 export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
@@ -88,6 +96,7 @@ export function AdminPage() {
   const users = usersApi.data?.users ?? [];
   const trainers = trainersApi.data?.trainers ?? [];
   const events = eventsApi.data?.events ?? [];
+  const logText = events.map(formatLogLine).join("\n");
 
   return (
     <div className="stack">
@@ -111,25 +120,7 @@ export function AdminPage() {
             <div className="muted">Пока нет событий. Логи начнут появляться после webhook или cron-тиков.</div>
           ) : null}
           {!eventsApi.loading && !eventsApi.error && events.length > 0 ? (
-            <div className="admin-events-list">
-              {events.map((entry) => (
-                <div key={entry.id} className={`admin-event-row admin-event-${entry.level}`}>
-                  <div className="admin-event-meta">
-                    <span className="admin-event-time">{formatEventTime(entry.timestamp)}</span>
-                    <span className="admin-event-badge">{entry.source}</span>
-                    <span className={`admin-event-level admin-event-level-${entry.level}`}>
-                      {entry.level}
-                    </span>
-                  </div>
-                  <div className="admin-event-message">{entry.message}</div>
-                  {entry.details && Object.keys(entry.details).length > 0 ? (
-                    <pre className="admin-event-details">
-                      {JSON.stringify(entry.details, null, 2)}
-                    </pre>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+            <textarea className="admin-log-output" value={logText} readOnly spellCheck={false} />
           ) : null}
         </div>
       </section>
