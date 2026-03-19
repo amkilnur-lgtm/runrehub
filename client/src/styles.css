@@ -67,7 +67,8 @@ select {
 
 .topbar {
   margin-bottom: 24px;
-  display: block;
+  display: grid;
+  gap: 8px;
 }
 
 .topbar-identity {
@@ -90,7 +91,7 @@ select {
   justify-content: flex-start;
   gap: 12px;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   flex: 1 1 auto;
 }
 
@@ -551,6 +552,7 @@ select {
 
   .topbar {
     margin-bottom: 16px;
+    gap: 8px;
   }
 
   .topbar h1 {
