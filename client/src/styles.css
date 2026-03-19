@@ -67,28 +67,30 @@ select {
 
 .topbar {
   margin-bottom: 24px;
-  display: grid;
-  gap: 8px;
+  display: block;
 }
 
 .topbar-identity {
   min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .topbar-main-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
+  min-height: 52px;
 }
 
 .topbar-left-group {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex: 1 1 auto;
 }
 
@@ -96,12 +98,14 @@ select {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  min-width: 0;
 }
 
 .topbar-name-box h1 {
   margin: 0;
   line-height: 1;
   display: block;
+  white-space: nowrap;
 }
 
 .topbar-actions {
@@ -109,6 +113,7 @@ select {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .topbar h1,
@@ -546,16 +551,21 @@ select {
 
   .topbar {
     margin-bottom: 16px;
-    gap: 8px;
   }
 
   .topbar h1 {
     font-size: 24px;
   }
 
+  .topbar-main-row {
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+  }
+
   .topbar-left-group {
     align-items: center;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .ghost-button,
