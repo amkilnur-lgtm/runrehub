@@ -16,6 +16,7 @@ export type WorkoutData = {
     average_speed: number | null;
     average_heartrate: number | null;
     max_heartrate?: number | null;
+    coach_comment?: string | null;
     athlete_name?: string;
     athlete_id?: number;
   };

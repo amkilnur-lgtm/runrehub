@@ -583,6 +583,37 @@ select {
   align-items: flex-start;
 }
 
+.workout-comment-card {
+  padding: 20px 22px;
+}
+
+.workout-comment-field textarea {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid rgba(24, 21, 16, 0.12);
+  border-radius: 16px;
+  background: #fff9f2;
+  color: #181510;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.workout-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workout-comment-text {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #fff9f2;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 640px) {
   .login-screen,
   .center-screen {
