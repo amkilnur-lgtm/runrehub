@@ -41,14 +41,14 @@ export function StreamChart({
       </div>
       <div className="chart-frame">
         <div className="chart-grid-wrap">
-          <div className="chart-y-axis">
-            {model.yTicks.map((tick, index) => (
-              <span key={`${tick}-${index}`} style={{ top: model.yTickPositions[index] }}>
-                {formatter(tick)}
-              </span>
-            ))}
-          </div>
           <div className="chart-grid">
+            <div className="chart-y-axis">
+              {model.yTicks.map((tick, index) => (
+                <span key={`${tick}-${index}`} style={{ top: model.yTickPositions[index] }}>
+                  {formatter(tick)}
+                </span>
+              ))}
+            </div>
             {model.yTicks.map((tick, index) => (
               <div
                 key={`${tick}-${index}`}
@@ -76,26 +76,20 @@ export function StreamChart({
           </div>
         </div>
       </div>
-      <div className="chart-x-wrap">
-        <div />
-        <div className="chart-x-axis">
-          {model.xTicks.map((tick, index) => (
-            <span
-              key={`${tick}-${index}`}
-              className={
-                index === 0 ? "chart-x-tick chart-x-tick-start" : index === model.xTicks.length - 1 ? "chart-x-tick chart-x-tick-end" : "chart-x-tick"
-              }
-              style={{ left: model.xTickPositions[index] }}
-            >
-              {model.xTickLabels[index]}
-            </span>
-          ))}
-        </div>
+      <div className="chart-x-axis">
+        {model.xTicks.map((tick, index) => (
+          <span
+            key={`${tick}-${index}`}
+            className={
+              index === 0 ? "chart-x-tick chart-x-tick-start" : index === model.xTicks.length - 1 ? "chart-x-tick chart-x-tick-end" : "chart-x-tick"
+            }
+            style={{ left: model.xTickPositions[index] }}
+          >
+            {model.xTickLabels[index]}
+          </span>
+        ))}
       </div>
-      <div className="chart-x-wrap">
-        <div />
-        <div className="chart-x-label muted">{model.xLabel}</div>
-      </div>
+      <div className="chart-x-label muted">{model.xLabel}</div>
     </div>
   );
 }
