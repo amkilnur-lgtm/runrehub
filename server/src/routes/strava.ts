@@ -30,9 +30,11 @@ export async function stravaRoutes(app: FastifyInstance) {
       query["hub.mode"] === "subscribe" &&
       query["hub.verify_token"] === config.STRAVA_WEBHOOK_VERIFY_TOKEN
     ) {
+      app.log.info({ mode: query["hub.mode"] }, "strava webhook verified");
       return { "hub.challenge": query["hub.challenge"] };
     }
 
+    app.log.warn({ mode: query["hub.mode"] }, "strava webhook verification rejected");
     return reply.code(403).send({ message: "forbidden" });
   });
 
@@ -40,6 +42,7 @@ export async function stravaRoutes(app: FastifyInstance) {
   // Это критично: Strava ждёт ответ не более 2 секунд, иначе отключает подписку.
   app.post("/api/strava/webhook", async (request) => {
     const body = request.body as { owner_id?: number };
+    app.log.info({ owner_id: body.owner_id ?? null }, "strava webhook received");
 
     if (typeof body.owner_id === "number") {
       const ownerId = body.owner_id;
@@ -51,9 +54,13 @@ export async function stravaRoutes(app: FastifyInstance) {
             [ownerId]
           );
           const userId = athleteResult.rows[0]?.user_id as number | undefined;
-          if (userId) {
-            await syncLatestActivities(userId);
+          if (!userId) {
+            app.log.info({ owner_id: ownerId }, "strava webhook skipped: athlete not connected");
+            return;
           }
+
+          const result = await syncLatestActivities(userId);
+          app.log.info({ owner_id: ownerId, userId, result }, "strava webhook sync completed");
         } catch (err) {
           app.log.error({ err, owner_id: ownerId }, "webhook background sync failed");
         }
