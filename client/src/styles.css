@@ -446,8 +446,8 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px;
   align-items: stretch;
 }
 
@@ -457,7 +457,7 @@ select {
   color: #72685a;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .chart-y-axis span {
@@ -495,8 +495,8 @@ select {
 
 .chart-x-wrap {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px;
 }
 
 .chart-x-axis {
