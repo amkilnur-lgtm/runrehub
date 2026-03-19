@@ -1,8 +1,10 @@
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 
 DEFAULT_HOST = "150.241.98.5"
@@ -11,6 +13,16 @@ DEFAULT_HOSTKEY = "ssh-ed25519 255 SHA256:/fzdD/7oR90d0y5F3BxIXD8NMwMlRcrgu9//5/
 DEFAULT_REMOTE_DIR = "/opt/runrehab"
 DEFAULT_CONTAINER = "runrehab-app-1"
 DEFAULT_HEALTH_URL = "http://127.0.0.1:3000/api/health"
+
+def load_config() -> dict[str, str]:
+    config_path = Path("deploy.json")
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load deploy.json: {e}", file=sys.stderr)
+    return {}
 
 
 def build_plink_command(password: str, host: str, user: str, hostkey: str, remote_command: str) -> list[str]:
@@ -114,17 +126,19 @@ def deploy(args: argparse.Namespace) -> int:
 
 
 def parse_args() -> argparse.Namespace:
+    config_data = load_config()
+
     parser = argparse.ArgumentParser(description="Deploy RunRehab to the production server.")
-    parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--user", default=DEFAULT_USER)
-    parser.add_argument("--password")
-    parser.add_argument("--hostkey", default=DEFAULT_HOSTKEY)
-    parser.add_argument("--remote-dir", default=DEFAULT_REMOTE_DIR)
-    parser.add_argument("--container", default=DEFAULT_CONTAINER)
-    parser.add_argument("--health-url", default=DEFAULT_HEALTH_URL)
-    parser.add_argument("--health-attempts", type=int, default=8)
-    parser.add_argument("--health-wait", type=int, default=3)
-    parser.add_argument("--ssh-retries", type=int, default=2)
+    parser.add_argument("--host", default=config_data.get("host", DEFAULT_HOST))
+    parser.add_argument("--user", default=config_data.get("user", DEFAULT_USER))
+    parser.add_argument("--password", default=config_data.get("password"))
+    parser.add_argument("--hostkey", default=config_data.get("hostkey", DEFAULT_HOSTKEY))
+    parser.add_argument("--remote-dir", default=config_data.get("remote_dir", DEFAULT_REMOTE_DIR))
+    parser.add_argument("--container", default=config_data.get("container", DEFAULT_CONTAINER))
+    parser.add_argument("--health-url", default=config_data.get("health_url", DEFAULT_HEALTH_URL))
+    parser.add_argument("--health-attempts", type=int, default=config_data.get("health_attempts", 8))
+    parser.add_argument("--health-wait", type=int, default=config_data.get("health_wait", 3))
+    parser.add_argument("--ssh-retries", type=int, default=config_data.get("ssh_retries", 2))
     return parser.parse_args()
 
 
