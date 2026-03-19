@@ -17,14 +17,29 @@ type Trainer = {
   full_name: string;
 };
 
-type StravaDiagnosticResponse = {
-  ok: boolean;
-  log: string[];
+type StravaEvent = {
+  id: string;
+  timestamp: string;
+  source: "webhook" | "cron" | "system";
+  level: "info" | "warn" | "error";
+  message: string;
+  details?: Record<string, unknown>;
 };
+
+function formatEventTime(value: string) {
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
 
 export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
+  const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/strava/events?limit=80");
 
   const [form, setForm] = useState({
     fullName: "",
@@ -33,9 +48,6 @@ export function AdminPage() {
     role: "trainer",
     coachId: ""
   });
-  const [ownerId, setOwnerId] = useState("");
-  const [diagnosticLog, setDiagnosticLog] = useState<string[]>([]);
-  const [diagnosticPending, setDiagnosticPending] = useState<"webhook" | "cron" | null>(null);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -73,101 +85,52 @@ export function AdminPage() {
     }
   }
 
-  async function runWebhookTest(event: FormEvent) {
-    event.preventDefault();
-    setDiagnosticPending("webhook");
-    setDiagnosticLog(["Running webhook test..."]);
-
-    try {
-      const data = await api<StravaDiagnosticResponse>("/api/admin/strava/webhook-test", {
-        method: "POST",
-        body: JSON.stringify({ ownerId: Number(ownerId) })
-      });
-      setDiagnosticLog(data.log);
-    } catch (err: any) {
-      setDiagnosticLog([`Error: ${err.message}`]);
-    } finally {
-      setDiagnosticPending(null);
-    }
-  }
-
-  async function runCronTest() {
-    setDiagnosticPending("cron");
-    setDiagnosticLog(["Running cron test..."]);
-
-    try {
-      const data = await api<StravaDiagnosticResponse>("/api/admin/strava/cron-run", {
-        method: "POST"
-      });
-      setDiagnosticLog(data.log);
-    } catch (err: any) {
-      setDiagnosticLog([`Error: ${err.message}`]);
-    } finally {
-      setDiagnosticPending(null);
-    }
-  }
-
   const users = usersApi.data?.users ?? [];
   const trainers = trainersApi.data?.trainers ?? [];
+  const events = eventsApi.data?.events ?? [];
 
   return (
     <div className="stack">
       <section className="card">
         <div className="section-header">
           <div>
-            <h2>Strava Диагностика</h2>
+            <h2>Strava Логи</h2>
             <p className="muted">
-              Проверка webhook по `owner_id` и ручной запуск cron с видимым логом.
+              Последние серверные события webhook и cron. Используй обновление, чтобы увидеть новые срабатывания.
             </p>
           </div>
-          <button
-            type="button"
-            className="ghost-button"
-            disabled={diagnosticPending !== null}
-            onClick={runCronTest}
-          >
-            {diagnosticPending === "cron" ? "Запуск..." : "Запустить cron"}
+          <button type="button" className="ghost-button" onClick={eventsApi.refresh}>
+            Обновить
           </button>
         </div>
 
-        <form className="form admin-diagnostic-form" onSubmit={runWebhookTest}>
-          <label>
-            Strava owner_id
-            <input
-              required
-              inputMode="numeric"
-              value={ownerId}
-              onChange={(e) => setOwnerId(e.target.value)}
-              placeholder="Например, 12345678"
-            />
-          </label>
-          <button className="primary-button" disabled={diagnosticPending !== null}>
-            {diagnosticPending === "webhook" ? "Проверяем..." : "Проверить webhook"}
-          </button>
-        </form>
-
         <div className="admin-log-card">
-          <div className="admin-log-header">
-            <strong>Лог</strong>
-            {diagnosticLog.length ? (
-              <button
-                type="button"
-                className="ghost-button admin-log-clear"
-                onClick={() => setDiagnosticLog([])}
-              >
-                Очистить
-              </button>
-            ) : null}
-          </div>
-          {diagnosticLog.length ? (
-            <div className="admin-log-output">
-              {diagnosticLog.map((line, index) => (
-                <div key={`${index}-${line}`}>{line}</div>
+          {eventsApi.loading ? <div className="muted">Загрузка логов...</div> : null}
+          {eventsApi.error ? <div className="error-box">{eventsApi.error}</div> : null}
+          {!eventsApi.loading && !eventsApi.error && events.length === 0 ? (
+            <div className="muted">Пока нет событий. Логи начнут появляться после webhook или cron-тиков.</div>
+          ) : null}
+          {!eventsApi.loading && !eventsApi.error && events.length > 0 ? (
+            <div className="admin-events-list">
+              {events.map((entry) => (
+                <div key={entry.id} className={`admin-event-row admin-event-${entry.level}`}>
+                  <div className="admin-event-meta">
+                    <span className="admin-event-time">{formatEventTime(entry.timestamp)}</span>
+                    <span className="admin-event-badge">{entry.source}</span>
+                    <span className={`admin-event-level admin-event-level-${entry.level}`}>
+                      {entry.level}
+                    </span>
+                  </div>
+                  <div className="admin-event-message">{entry.message}</div>
+                  {entry.details && Object.keys(entry.details).length > 0 ? (
+                    <pre className="admin-event-details">
+                      {JSON.stringify(entry.details, null, 2)}
+                    </pre>
+                  ) : null}
+                </div>
               ))}
             </div>
-          ) : (
-            <div className="muted">Здесь появится результат диагностики.</div>
-          )}
+          ) : null}
         </div>
       </section>
 

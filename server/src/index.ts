@@ -16,6 +16,7 @@ import { trainerRoutes } from "./routes/trainer.js";
 import { stravaRoutes } from "./routes/strava.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
+import { addStravaEvent } from "./lib/strava-events.js";
 import { syncDueAthletes } from "./lib/strava.js";
 
 declare module "fastify" {
@@ -143,6 +144,12 @@ app.log.info(
   { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES },
   "strava cron scheduler started"
 );
+addStravaEvent({
+  source: "system",
+  level: "info",
+  message: "strava cron scheduler started",
+  details: { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES }
+});
 setInterval(() => {
   void syncDueAthletes(app.log);
 }, syncIntervalMs);

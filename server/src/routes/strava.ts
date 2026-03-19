@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
+import { addStravaEvent } from "../lib/strava-events.js";
 import { config } from "../config.js";
 import { exchangeCodeForToken, syncLatestActivities } from "../lib/strava.js";
 
@@ -31,10 +32,22 @@ export async function stravaRoutes(app: FastifyInstance) {
       query["hub.verify_token"] === config.STRAVA_WEBHOOK_VERIFY_TOKEN
     ) {
       app.log.info({ mode: query["hub.mode"] }, "strava webhook verified");
+      addStravaEvent({
+        source: "webhook",
+        level: "info",
+        message: "strava webhook verified",
+        details: { mode: query["hub.mode"] ?? null }
+      });
       return { "hub.challenge": query["hub.challenge"] };
     }
 
     app.log.warn({ mode: query["hub.mode"] }, "strava webhook verification rejected");
+    addStravaEvent({
+      source: "webhook",
+      level: "warn",
+      message: "strava webhook verification rejected",
+      details: { mode: query["hub.mode"] ?? null }
+    });
     return reply.code(403).send({ message: "forbidden" });
   });
 
@@ -43,6 +56,12 @@ export async function stravaRoutes(app: FastifyInstance) {
   app.post("/api/strava/webhook", async (request) => {
     const body = request.body as { owner_id?: number };
     app.log.info({ owner_id: body.owner_id ?? null }, "strava webhook received");
+    addStravaEvent({
+      source: "webhook",
+      level: "info",
+      message: "strava webhook received",
+      details: { ownerId: body.owner_id ?? null }
+    });
 
     if (typeof body.owner_id === "number") {
       const ownerId = body.owner_id;
@@ -56,13 +75,34 @@ export async function stravaRoutes(app: FastifyInstance) {
           const userId = athleteResult.rows[0]?.user_id as number | undefined;
           if (!userId) {
             app.log.info({ owner_id: ownerId }, "strava webhook skipped: athlete not connected");
+            addStravaEvent({
+              source: "webhook",
+              level: "info",
+              message: "strava webhook skipped: athlete not connected",
+              details: { ownerId }
+            });
             return;
           }
 
           const result = await syncLatestActivities(userId);
           app.log.info({ owner_id: ownerId, userId, result }, "strava webhook sync completed");
+          addStravaEvent({
+            source: "webhook",
+            level: "info",
+            message: "strava webhook sync completed",
+            details: { ownerId, userId, result }
+          });
         } catch (err) {
           app.log.error({ err, owner_id: ownerId }, "webhook background sync failed");
+          addStravaEvent({
+            source: "webhook",
+            level: "error",
+            message: "webhook background sync failed",
+            details: {
+              ownerId,
+              error: err instanceof Error ? err.message : "Unknown error"
+            }
+          });
         }
       })();
     }
