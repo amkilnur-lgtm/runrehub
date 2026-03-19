@@ -29,6 +29,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const { data, loading, error } = useApi<WorkoutData>(`${prefix}${params.id}`);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [coachComment, setCoachComment] = useState("");
+  const [isSavingComment, setIsSavingComment] = useState(false);
+  const [commentStatus, setCommentStatus] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
@@ -64,6 +67,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   );
 
   useEffect(() => {
+    setCoachComment(data?.workout.coach_comment ?? "");
+    setCommentStatus(null);
+  }, [data?.workout.coach_comment, data?.workout.id]);
+
+  useEffect(() => {
     if (!isMenuOpen) {
       return undefined;
     }
@@ -88,6 +96,31 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isMenuOpen]);
+
+  async function handleSaveComment() {
+    if (!data?.workout.id || mode !== "trainer" || isSavingComment) {
+      return;
+    }
+
+    setIsSavingComment(true);
+    setCommentStatus(null);
+
+    try {
+      const result = await api<{ ok: true; coachComment: string | null }>(
+        `/api/trainer/workouts/${data.workout.id}/comment`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ coachComment })
+        }
+      );
+      setCoachComment(result.coachComment ?? "");
+      setCommentStatus("Сохранено");
+    } catch (saveError) {
+      setCommentStatus(saveError instanceof Error ? saveError.message : "Не удалось сохранить комментарий");
+    } finally {
+      setIsSavingComment(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -215,6 +248,38 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             color="#d53a3a"
             formatter={(value) => `${Math.round(value)}`}
           />
+          <section className="card workout-comment-card">
+            <div className="chart-title-row">
+              <strong>Комментарий тренера</strong>
+            </div>
+            {mode === "trainer" ? (
+              <div className="stack">
+                <label className="workout-comment-field">
+                  <textarea
+                    value={coachComment}
+                    onChange={(event) => setCoachComment(event.target.value)}
+                    placeholder="Добавь комментарий к тренировке"
+                    rows={5}
+                  />
+                </label>
+                <div className="workout-comment-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={isSavingComment}
+                    onClick={handleSaveComment}
+                  >
+                    {isSavingComment ? "Сохраняем..." : "Сохранить"}
+                  </button>
+                  {commentStatus ? <span className="muted">{commentStatus}</span> : null}
+                </div>
+              </div>
+            ) : (
+              <div className="workout-comment-text">
+                {data.workout.coach_comment?.trim() || "Тренер пока не оставил комментарий к этой тренировке."}
+              </div>
+            )}
+          </section>
         </div>
       </section>
     </div>

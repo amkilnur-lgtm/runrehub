@@ -146,4 +146,32 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     return { ok: true };
   });
+
+  app.put("/api/trainer/workouts/:id/comment", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const body = request.body as { coachComment?: unknown };
+    const workoutId = Number(params.id);
+    const coachComment =
+      typeof body?.coachComment === "string" ? body.coachComment.trim().slice(0, 4000) : "";
+
+    const result = await pool.query(
+      `
+        update workouts w
+        set coach_comment = $3
+        from users u
+        where w.id = $1
+          and w.user_id = u.id
+          and u.coach_id = $2
+        returning w.coach_comment
+      `,
+      [workoutId, request.user.id, coachComment || null]
+    );
+
+    if (!result.rows[0]) {
+      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+    }
+
+    return { ok: true, coachComment: result.rows[0].coach_comment ?? null };
+  });
 }
