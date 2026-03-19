@@ -214,12 +214,14 @@ select {
   text-transform: uppercase;
   font-size: 12px;
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  transform: translateY(3px);
 }
 
 .topbar-logout {
   min-height: 44px;
   background: #f6f0e7;
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  transform: translateY(3px);
 }
 
 .topbar .topbar-name-box h1 {
@@ -527,6 +529,49 @@ select {
   place-items: center;
   border-radius: 18px;
   background: #fff9f2;
+}
+
+.workout-menu {
+  position: relative;
+}
+
+.workout-menu-trigger {
+  min-width: 44px;
+  padding-inline: 16px;
+  letter-spacing: 0.1em;
+}
+
+.workout-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  z-index: 20;
+}
+
+.workout-menu-item {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: transparent;
+  color: #9a2f13;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workout-menu-item:hover:enabled {
+  background: #fff1ec;
+}
+
+.workout-menu-item:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 @media (max-width: 640px) {
