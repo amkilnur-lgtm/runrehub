@@ -403,7 +403,7 @@ select {
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(24, 21, 16, 0.08);
   border-radius: 24px;
-  padding: 20px 22px 18px;
+  padding: 20px 22px 18px 16px;
   box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
 }
 
@@ -446,8 +446,8 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 4px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 1px;
   align-items: stretch;
 }
 
@@ -455,15 +455,15 @@ select {
   min-height: 220px;
   position: relative;
   color: #72685a;
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  padding-right: 2px;
+  padding-right: 0;
 }
 
 .chart-y-axis span {
   position: absolute;
   right: 0;
-  transform: translateY(-50%);
+  transform: translate(-3px, -50%);
   line-height: 1;
 }
 
@@ -495,8 +495,8 @@ select {
 
 .chart-x-wrap {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 4px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 1px;
 }
 
 .chart-x-axis {
@@ -598,6 +598,10 @@ select {
   .card,
   .chart-card {
     padding: 18px;
+  }
+
+  .chart-card {
+    padding-left: 14px;
   }
 
   .shell {
@@ -769,8 +773,8 @@ select {
   .chart-grid-wrap,
   .chart-grid-wrap,
   .chart-x-wrap {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 1px;
   }
 
   .chart-y-axis,
