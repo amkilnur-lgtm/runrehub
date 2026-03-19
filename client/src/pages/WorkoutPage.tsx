@@ -159,6 +159,10 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             <div className="stat-value">{formatDuration(data.workout.moving_time_seconds)}</div>
           </div>
           <div className="card inset-card">
+            <div className="muted">Средний темп</div>
+            <div className="stat-value">{formatPace(data.workout.average_speed)}</div>
+          </div>
+          <div className="card inset-card">
             <div className="muted">Средний пульс</div>
             <div className="stat-value">{formatHeartRate(data.workout.average_heartrate)}</div>
           </div>
