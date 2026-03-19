@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../api";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+import { useApi } from "../hooks/useApi";
 
 type DashboardData = {
   athletes: Array<{
@@ -24,18 +23,38 @@ type DashboardData = {
 };
 
 export function TrainerDashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const { data, loading, error } = useApi<DashboardData>("/api/trainer/dashboard");
 
-  useEffect(() => {
-    void api<DashboardData>("/api/trainer/dashboard").then(setData);
-  }, []);
+  if (loading) {
+    return (
+      <div className="grid two-columns">
+        <section className="card skeleton-card">
+          <h2>Спортсмены</h2>
+          <p className="muted">Загрузка...</p>
+        </section>
+        <section className="card skeleton-card">
+          <h2>Последние пробежки</h2>
+          <p className="muted">Загрузка...</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="card">
+        <h2>Ошибка</h2>
+        <p className="muted">{error || "Не удалось загрузить данные"}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid two-columns">
       <section className="card">
         <h2>Спортсмены</h2>
         <div className="list">
-          {data?.athletes.map((athlete) => (
+          {data.athletes.map((athlete) => (
             <Link key={athlete.id} className="list-row link-row" to={`/trainer/athletes/${athlete.id}`}>
               <div>
                 <strong>{athlete.full_name}</strong>
@@ -52,7 +71,7 @@ export function TrainerDashboardPage() {
       <section className="card">
         <h2>Последние пробежки</h2>
         <div className="list">
-          {data?.recentWorkouts.map((workout) => (
+          {data.recentWorkouts.map((workout) => (
             <Link key={workout.id} className="list-row link-row" to={`/trainer/workouts/${workout.id}`}>
               <div>
                 <strong>{workout.athlete_name}</strong>

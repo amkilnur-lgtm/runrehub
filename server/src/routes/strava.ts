@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../lib/auth.js";
+import { pool } from "../lib/db.js";
 import { config } from "../config.js";
 import { exchangeCodeForToken, syncLatestActivities } from "../lib/strava.js";
 
@@ -35,18 +36,30 @@ export async function stravaRoutes(app: FastifyInstance) {
     return reply.code(403).send({ message: "forbidden" });
   });
 
+  // Webhook POST: отвечаем Strava немедленно, sync выполняется в фоне (fire-and-forget).
+  // Это критично: Strava ждёт ответ не более 2 секунд, иначе отключает подписку.
   app.post("/api/strava/webhook", async (request) => {
     const body = request.body as { owner_id?: number };
+
     if (typeof body.owner_id === "number") {
-      const athleteResult = await app.pg.query(
-        `select user_id from strava_connections where strava_athlete_id = $1`,
-        [body.owner_id]
-      );
-      const userId = athleteResult.rows[0]?.user_id as number | undefined;
-      if (userId) {
-        await syncLatestActivities(userId);
-      }
+      const ownerId = body.owner_id;
+      // Не используем await — ответ возвращается до завершения sync
+      void (async () => {
+        try {
+          const athleteResult = await pool.query(
+            `select user_id from strava_connections where strava_athlete_id = $1`,
+            [ownerId]
+          );
+          const userId = athleteResult.rows[0]?.user_id as number | undefined;
+          if (userId) {
+            await syncLatestActivities(userId);
+          }
+        } catch (err) {
+          app.log.error({ err, owner_id: ownerId }, "webhook background sync failed");
+        }
+      })();
     }
+
     return { ok: true };
   });
 }

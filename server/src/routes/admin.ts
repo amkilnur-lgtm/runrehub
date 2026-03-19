@@ -54,4 +54,25 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.code(400).send({ message: "Не удалось создать пользователя" });
     }
   });
+
+  app.delete("/api/admin/users/:id", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    const targetUserId = parseInt(params.id, 10);
+
+    if (targetUserId === request.user.id) {
+      return reply.code(400).send({ message: "Нельзя удалить самого себя" });
+    }
+
+    const { rowCount } = await pool.query(
+      `delete from users where id = $1 and role != 'admin'`,
+      [targetUserId]
+    );
+
+    if (rowCount === 0) {
+      return reply.code(404).send({ message: "Пользователь не найден или его нельзя удалить" });
+    }
+
+    return { ok: true };
+  });
 }

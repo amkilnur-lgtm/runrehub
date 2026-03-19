@@ -3,8 +3,12 @@ node_modules
 dist
 build
 .env
+*.env.snapshot
+production.env.snapshot
 .DS_Store
 server/dist/public
 data
 .ssh/
 .ssh_temp_key
+repomix-output.xml
+runrehab-repomix.xml

@@ -8,6 +8,9 @@ export async function athleteRoutes(app: FastifyInstance) {
   app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["athlete"]);
 
+    const queryInfo = request.query as { before?: string };
+    const beforeDate = queryInfo.before ? new Date(queryInfo.before) : null;
+
     const [profileResult, workoutsResult] = await Promise.all([
       pool.query(
         `
@@ -18,17 +21,29 @@ export async function athleteRoutes(app: FastifyInstance) {
         `,
         [request.user.id]
       ),
-      pool.query(
-        `
-          select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
-                 elevation_gain, average_speed, average_heartrate
-          from workouts
-          where user_id = $1
-          order by start_date desc
-          limit 10
-        `,
-        [request.user.id]
-      )
+      beforeDate 
+        ? pool.query(
+            `
+              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
+                     elevation_gain, average_speed, average_heartrate
+              from workouts
+              where user_id = $1 and start_date < $2::timestamptz
+              order by start_date desc
+              limit 10
+            `,
+            [request.user.id, beforeDate]
+          )
+        : pool.query(
+            `
+              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
+                     elevation_gain, average_speed, average_heartrate
+              from workouts
+              where user_id = $1
+              order by start_date desc
+              limit 10
+            `,
+            [request.user.id]
+          )
     ]);
 
     return {
@@ -42,9 +57,27 @@ export async function athleteRoutes(app: FastifyInstance) {
     return { url: getStravaAuthUrl() };
   });
 
-  app.post("/api/athlete/strava/sync", { preHandler: requireAuth }, async (request) => {
+  app.post(
+    "/api/athlete/strava/sync",
+    {
+      preHandler: requireAuth,
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: "1 minute"
+        }
+      }
+    },
+    async (request) => {
+      requireRole(request, ["athlete"]);
+      return syncLatestActivities(request.user.id);
+    }
+  );
+
+  app.delete("/api/athlete/strava/disconnect", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["athlete"]);
-    return syncLatestActivities(request.user.id);
+    await pool.query(`delete from strava_connections where user_id = $1`, [request.user.id]);
+    return { ok: true };
   });
 
   app.get("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {

@@ -11,7 +11,17 @@ const loginSchema = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post("/api/auth/login", async (request, reply) => {
+  app.post(
+    "/api/auth/login",
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 minute"
+        }
+      }
+    },
+    async (request, reply) => {
     const body = loginSchema.parse(request.body);
     const { rows } = await pool.query(
       `select id, username, full_name, role, coach_id, password_hash from users where username = $1`,

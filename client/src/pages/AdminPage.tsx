@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { api } from "../api";
+import { useApi } from "../hooks/useApi";
 
 type AdminUser = {
   id: number;
@@ -17,8 +18,9 @@ type Trainer = {
 };
 
 export function AdminPage() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
+  const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
+  
   const [form, setForm] = useState({
     fullName: "",
     username: "",
@@ -27,34 +29,44 @@ export function AdminPage() {
     coachId: ""
   });
 
-  async function load() {
-    const [usersData, trainersData] = await Promise.all([
-      api<{ users: AdminUser[] }>("/api/admin/users"),
-      api<{ trainers: Trainer[] }>("/api/admin/trainers")
-    ]);
-    setUsers(usersData.users);
-    setTrainers(trainersData.trainers);
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    await api("/api/admin/users", {
-      method: "POST",
-      body: JSON.stringify({
-        fullName: form.fullName,
-        username: form.username,
-        password: form.password,
-        role: form.role,
-        coachId: form.role === "athlete" && form.coachId ? Number(form.coachId) : null
-      })
-    });
-    setForm({ fullName: "", username: "", password: "", role: "trainer", coachId: "" });
-    await load();
+    try {
+      await api("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          fullName: form.fullName,
+          username: form.username,
+          password: form.password,
+          role: form.role,
+          coachId: form.role === "athlete" && form.coachId ? Number(form.coachId) : null
+        })
+      });
+      setForm({ fullName: "", username: "", password: "", role: "trainer", coachId: "" });
+      usersApi.refresh();
+      if (form.role === "trainer") {
+        trainersApi.refresh();
+      }
+    } catch (err: any) {
+      alert(`Ошибка: ${err.message}`);
+    }
   }
+
+  async function deleteUser(id: number, username: string) {
+    if (!window.confirm(`Вы уверены, что хотите удалить пользователя @${username}? Это необратимо.`)) {
+      return;
+    }
+    try {
+      await api(`/api/admin/users/${id}`, { method: "DELETE" });
+      usersApi.refresh();
+      trainersApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка удаления: ${err.message}`);
+    }
+  }
+
+  const users = usersApi.data?.users ?? [];
+  const trainers = trainersApi.data?.trainers ?? [];
 
   return (
     <div className="grid two-columns">
@@ -64,6 +76,7 @@ export function AdminPage() {
           <label>
             Имя
             <input
+              required
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
             />
@@ -71,6 +84,7 @@ export function AdminPage() {
           <label>
             Логин
             <input
+              required
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
@@ -78,6 +92,7 @@ export function AdminPage() {
           <label>
             Пароль
             <input
+              required
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
@@ -112,8 +127,9 @@ export function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
-        <h2>Пользователи</h2>
+      <section className={usersApi.loading ? "card skeleton-card" : "card"}>
+        <h2>Пользователи {usersApi.loading ? "(Загрузка...)" : ""}</h2>
+        {usersApi.error && <p className="muted" style={{ color: "red" }}>{usersApi.error}</p>}
         <div className="list">
           {users.map((user) => (
             <div key={user.id} className="list-row">
@@ -122,7 +138,14 @@ export function AdminPage() {
                 <div className="muted">@{user.username}</div>
               </div>
               <div className="align-right">
-                <div className="role-badge">{user.role}</div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end", marginBottom: "4px" }}>
+                  <div className="role-badge">{user.role}</div>
+                  {user.role !== "admin" && (
+                     <button className="ghost-button" style={{ padding: "4px 8px", fontSize: "12px", minHeight: "auto", color: "red" }} onClick={() => deleteUser(user.id, user.username)}>
+                       Удалить
+                     </button>
+                  )}
+                </div>
                 {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
               </div>
             </div>

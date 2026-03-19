@@ -202,11 +202,11 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
   );
 }
 
+// Обновляем net elevation для всех лапов одним запросом вместо цикла UPDATE
 async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
   const lapsResult = await pool.query(
     `
-      select id, strava_lap_id, name, distance_meters, elapsed_time_seconds,
-             average_speed, average_heartrate, elevation_gain, start_index, end_index
+      select id, start_index, end_index
       from workout_laps
       where workout_id = $1
       order by id asc
@@ -214,17 +214,30 @@ async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
     [workoutId]
   );
 
-  for (const lap of lapsResult.rows as LapRow[]) {
-    const netElevation = computeLapNetElevation(altitude, lap.start_index, lap.end_index);
-    if (netElevation === null) {
-      continue;
-    }
+  const ids: number[] = [];
+  const elevations: number[] = [];
 
-    await pool.query(
-      `update workout_laps set elevation_gain = $2 where id = $1`,
-      [lap.id, netElevation]
-    );
+  for (const lap of lapsResult.rows as Pick<LapRow, "id" | "start_index" | "end_index">[]) {
+    const netElevation = computeLapNetElevation(altitude, lap.start_index, lap.end_index);
+    if (netElevation === null) continue;
+    ids.push(lap.id);
+    elevations.push(netElevation);
   }
+
+  if (ids.length === 0) return;
+
+  // Один UPDATE для всех лапов через unnest
+  await pool.query(
+    `
+      update workout_laps as wl
+      set elevation_gain = updates.elevation
+      from (
+        select unnest($1::int[]) as id, unnest($2::float8[]) as elevation
+      ) as updates
+      where wl.id = updates.id
+    `,
+    [ids, elevations]
+  );
 }
 
 export async function getStoredActivityStreams(workoutId: number) {
@@ -251,104 +264,124 @@ export async function getStoredActivityStreams(workoutId: number) {
   } satisfies ActivityStreams;
 }
 
+// Вся синхронизация одной активности выполняется в транзакции.
+// При ошибке на любом шаге данные откатываются — нет частичных записей.
 async function syncSingleActivity(userId: number, token: string, activity: StravaActivity) {
-  const workoutResult = await pool.query(
-    `
-      insert into workouts (
-        user_id,
-        strava_activity_id,
-        name,
-        sport_type,
-        start_date,
-        distance_meters,
-        moving_time_seconds,
-        elapsed_time_seconds,
-        elevation_gain,
-        average_speed,
-        average_heartrate,
-        max_heartrate
-      )
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-      on conflict (strava_activity_id) do update
-      set name = excluded.name,
-          sport_type = excluded.sport_type,
-          start_date = excluded.start_date,
-          distance_meters = excluded.distance_meters,
-          moving_time_seconds = excluded.moving_time_seconds,
-          elapsed_time_seconds = excluded.elapsed_time_seconds,
-          elevation_gain = excluded.elevation_gain,
-          average_speed = excluded.average_speed,
-          average_heartrate = excluded.average_heartrate,
-          max_heartrate = excluded.max_heartrate
-      returning id
-    `,
-    [
-      userId,
-      activity.id,
-      activity.name,
-      activity.sport_type,
-      activity.start_date,
-      activity.distance,
-      activity.moving_time,
-      activity.elapsed_time,
-      activity.total_elevation_gain,
-      activity.average_speed,
-      activity.average_heartrate ?? null,
-      activity.max_heartrate ?? null
-    ]
-  );
+  const client = await pool.connect();
+  let workoutId: number;
 
-  const workoutId = workoutResult.rows[0].id as number;
+  try {
+    await client.query("BEGIN");
 
-  const lapResponse = await fetch(
-    `https://www.strava.com/api/v3/activities/${activity.id}/laps`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
+    const workoutResult = await client.query(
+      `
+        insert into workouts (
+          user_id,
+          strava_activity_id,
+          name,
+          sport_type,
+          start_date,
+          distance_meters,
+          moving_time_seconds,
+          elapsed_time_seconds,
+          elevation_gain,
+          average_speed,
+          average_heartrate,
+          max_heartrate
+        )
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        on conflict (strava_activity_id) do update
+        set name = excluded.name,
+            sport_type = excluded.sport_type,
+            start_date = excluded.start_date,
+            distance_meters = excluded.distance_meters,
+            moving_time_seconds = excluded.moving_time_seconds,
+            elapsed_time_seconds = excluded.elapsed_time_seconds,
+            elevation_gain = excluded.elevation_gain,
+            average_speed = excluded.average_speed,
+            average_heartrate = excluded.average_heartrate,
+            max_heartrate = excluded.max_heartrate
+        returning id
+      `,
+      [
+        userId,
+        activity.id,
+        activity.name,
+        activity.sport_type,
+        activity.start_date,
+        activity.distance,
+        activity.moving_time,
+        activity.elapsed_time,
+        activity.total_elevation_gain,
+        activity.average_speed,
+        activity.average_heartrate ?? null,
+        activity.max_heartrate ?? null
+      ]
+    );
+
+    workoutId = workoutResult.rows[0].id as number;
+
+    // Загружаем laps параллельно со streams
+    const [lapResponse, streamsData] = await Promise.all([
+      fetch(`https://www.strava.com/api/v3/activities/${activity.id}/laps`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }),
+      fetchActivityStreamsFromStrava(userId, activity.id)
+    ]);
+
+    // Batch-вставка лапов: один DELETE + один INSERT вместо N INSERT
+    if (lapResponse.ok) {
+      const laps = (await lapResponse.json()) as StravaLap[];
+      await client.query(`delete from workout_laps where workout_id = $1`, [workoutId]);
+
+      if (laps.length > 0) {
+        await client.query(
+          `
+            insert into workout_laps (
+              workout_id, strava_lap_id, name, distance_meters,
+              elapsed_time_seconds, average_speed, average_heartrate,
+              elevation_gain, start_index, end_index
+            )
+            select
+              $1,
+              unnest($2::bigint[]),
+              unnest($3::text[]),
+              unnest($4::float8[]),
+              unnest($5::int[]),
+              unnest($6::float8[]),
+              unnest($7::float8[]),
+              unnest($8::float8[]),
+              unnest($9::int[]),
+              unnest($10::int[])
+          `,
+          [
+            workoutId,
+            laps.map((l) => l.id),
+            laps.map((l) => l.name ?? null),
+            laps.map((l) => l.distance),
+            laps.map((l) => l.elapsed_time),
+            laps.map((l) => l.average_speed ?? null),
+            laps.map((l) => l.average_heartrate ?? null),
+            laps.map((l) => l.total_elevation_gain ?? null),
+            laps.map((l) => l.start_index ?? null),
+            laps.map((l) => l.end_index ?? null)
+          ]
+        );
       }
     }
-  );
 
-  if (lapResponse.ok) {
-    const laps = (await lapResponse.json()) as StravaLap[];
-    await pool.query(`delete from workout_laps where workout_id = $1`, [workoutId]);
-    for (const lap of laps) {
-      await pool.query(
-        `
-          insert into workout_laps (
-            workout_id,
-            strava_lap_id,
-            name,
-            distance_meters,
-            elapsed_time_seconds,
-            average_speed,
-            average_heartrate,
-            elevation_gain,
-            start_index,
-            end_index
-          )
-          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        `,
-        [
-          workoutId,
-          lap.id,
-          lap.name,
-          lap.distance,
-          lap.elapsed_time,
-          lap.average_speed ?? null,
-          lap.average_heartrate ?? null,
-          lap.total_elevation_gain ?? null,
-          lap.start_index ?? null,
-          lap.end_index ?? null
-        ]
-      );
+    await client.query("COMMIT");
+
+    // Streams и elevation update — после коммита (не критично для консистентности workout)
+    if (streamsData) {
+      await saveActivityStreams(workoutId, streamsData);
+      await applyLapElevationChanges(workoutId, streamsData.altitude);
     }
-  }
-
-  const streams = await fetchActivityStreamsFromStrava(userId, activity.id);
-  if (streams) {
-    await saveActivityStreams(workoutId, streams);
-    await applyLapElevationChanges(workoutId, streams.altitude);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
   return workoutId;

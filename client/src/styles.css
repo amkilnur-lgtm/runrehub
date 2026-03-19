@@ -253,6 +253,17 @@ select {
   margin-top: 6px;
 }
 
+.skeleton-card {
+  animation: pulse 1.5s infinite ease-in-out;
+  opacity: 0.6;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.6; }
+}
+
 .error-box {
   background: #ffe3de;
   color: #9a2f13;
