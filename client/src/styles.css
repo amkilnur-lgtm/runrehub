@@ -574,6 +574,10 @@ select {
   cursor: default;
 }
 
+.workout-header {
+  align-items: flex-start;
+}
+
 @media (max-width: 640px) {
   .login-screen,
   .center-screen {
@@ -658,6 +662,13 @@ select {
   .workout-menu-popover {
     top: calc(100% + 10px);
     min-width: 200px;
+  }
+
+  .workout-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
   }
 
   .content,
@@ -803,6 +814,13 @@ select {
   .section-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .workout-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
   }
 
   .align-right {
