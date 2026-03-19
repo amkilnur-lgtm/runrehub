@@ -637,6 +637,29 @@ select {
     padding-inline: 14px;
   }
 
+  .workout-menu-trigger {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    letter-spacing: 0.18em;
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .workout-menu-trigger:hover,
+  .workout-menu-trigger:focus-visible {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .workout-menu-popover {
+    top: calc(100% + 10px);
+    min-width: 200px;
+  }
+
   .content,
   .stack,
   .list,
