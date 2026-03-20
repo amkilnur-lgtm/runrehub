@@ -227,6 +227,15 @@ select {
   background: #f6f0e7;
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
   transform: translateY(3px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-logout-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
 }
 
 .topbar .topbar-name-box h1 {
@@ -807,6 +816,11 @@ select {
 
   .topbar-logout {
     padding-inline: 14px;
+  }
+
+  .topbar-logout-icon {
+    width: 17px;
+    height: 17px;
   }
 
   .workout-menu-trigger {
