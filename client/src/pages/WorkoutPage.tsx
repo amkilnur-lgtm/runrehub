@@ -225,36 +225,49 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         <div className="card">
           <h2>Отрезки</h2>
           {data.laps.length ? (
-            <div className="lap-report-table" role="table" aria-label="Статистика по кругам">
-              <div className="lap-report-head muted" role="row">
-                <span>КРУГ</span>
-                <span>КМ</span>
-                <span>ТЕМП</span>
-                <span>ЧСС</span>
-                <span>М</span>
-              </div>
-              {data.laps.map((lap, index) => (
-                <div key={lap.id} className="lap-report-row" role="row">
-                  <span className="lap-report-index lap-col-lap">{index + 1}</span>
-                  <span className="lap-report-distance lap-col-distance">
-                    {formatLapDistanceKilometers(lap.distance_meters)}
-                  </span>
-                  <span className="lap-report-pace-cell lap-col-pace">
-                    <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
-                  </span>
-                  <span className="lap-report-heart lap-col-heart">
-                    <span className="lap-report-heart-icon" aria-hidden="true">
-                      ♥
-                    </span>
-                    <span className="lap-report-heart-value">
-                      {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
-                    </span>
-                  </span>
-                  <span className="lap-report-elevation lap-col-elevation">
-                    {formatLapElevation(lap.elevation_gain)}
-                  </span>
-                </div>
-              ))}
+            <div className="lap-report-wrap">
+              <table className="lap-report-table" aria-label="Статистика по кругам">
+                <colgroup>
+                  <col className="lap-col-lap" />
+                  <col className="lap-col-distance" />
+                  <col className="lap-col-pace" />
+                  <col className="lap-col-heart" />
+                  <col className="lap-col-elevation" />
+                </colgroup>
+                <thead>
+                  <tr className="lap-report-head muted">
+                    <th scope="col">КРУГ</th>
+                    <th scope="col">КМ</th>
+                    <th scope="col">ТЕМП</th>
+                    <th scope="col">ЧСС</th>
+                    <th scope="col">М</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.laps.map((lap, index) => (
+                    <tr key={lap.id} className="lap-report-row">
+                      <td className="lap-report-index">{index + 1}</td>
+                      <td className="lap-report-distance">
+                        {formatLapDistanceKilometers(lap.distance_meters)}
+                      </td>
+                      <td className="lap-report-pace-cell">
+                        <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
+                      </td>
+                      <td className="lap-report-heart">
+                        <span className="lap-report-heart-icon" aria-hidden="true">
+                          ♥
+                        </span>
+                        <span className="lap-report-heart-value">
+                          {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
+                        </span>
+                      </td>
+                      <td className="lap-report-elevation">
+                        {formatLapElevation(lap.elevation_gain)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="muted">Strava не вернула отдельные отрезки для этой тренировки.</div>
