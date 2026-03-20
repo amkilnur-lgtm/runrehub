@@ -78,8 +78,7 @@ select {
 }
 
 .topbar-main-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 16px;
   min-height: 52px;
@@ -116,7 +115,6 @@ select {
   justify-content: flex-end;
   flex: 0 0 auto;
   margin-left: auto;
-  justify-self: end;
 }
 
 .topbar h1,
