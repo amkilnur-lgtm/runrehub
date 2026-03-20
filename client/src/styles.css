@@ -344,7 +344,7 @@ select {
 
 .compact-laps-head {
   padding: 0 14px 4px;
-  font-size: 12px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-align: right;
@@ -357,7 +357,7 @@ select {
 
 .compact-lap-row {
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 15px;
   text-align: right;
   border-radius: 16px;
   font-variant-numeric: tabular-nums;
@@ -771,7 +771,7 @@ select {
     grid-template-columns: minmax(58px, 1fr) repeat(4, minmax(0, 0.62fr));
     gap: 6px;
     padding: 0 10px 3px;
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .compact-lap-row > span::before {
