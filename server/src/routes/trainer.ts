@@ -21,7 +21,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     const [athletesResult, workoutsResult] = await Promise.all([
       pool.query(
         `
-          select u.id, u.full_name, u.username,
+          select u.id, u.full_name, u.username, u.avatar_url,
                  (select max(start_date) from workouts w where w.user_id = u.id) as last_workout_at
           from users u
           where u.role = 'athlete' and u.coach_id = $1
