@@ -17,10 +17,12 @@ function getInitials(fullName: string | null | undefined) {
 
 export function UserAvatar({
   fullName,
+  avatarUrl,
   className = "",
   ariaHidden = false
 }: {
   fullName: string | null | undefined;
+  avatarUrl?: string | null;
   className?: string;
   ariaHidden?: boolean;
 }) {
@@ -29,7 +31,11 @@ export function UserAvatar({
 
   return (
     <span className={classes} aria-hidden={ariaHidden}>
-      {initials}
+      {avatarUrl ? (
+        <img className="user-avatar-image" src={avatarUrl} alt="" />
+      ) : (
+        initials
+      )}
     </span>
   );
 }

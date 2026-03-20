@@ -129,10 +129,83 @@ select {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.user-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .topbar-avatar {
+  width: 58px;
+  height: 58px;
+  font-size: 20px;
   transform: translateY(2px);
+}
+
+.avatar-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.avatar-menu-trigger {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.avatar-menu-trigger:focus-visible {
+  outline: 2px solid rgba(0, 102, 255, 0.35);
+  outline-offset: 4px;
+}
+
+.avatar-file-input {
+  display: none;
+}
+
+.avatar-menu-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  z-index: 20;
+}
+
+.avatar-menu-item {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: transparent;
+  color: #181510;
+  text-align: left;
+  cursor: pointer;
+}
+
+.avatar-menu-item:hover:enabled {
+  background: #fff4e7;
+}
+
+.avatar-menu-item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.avatar-menu-item-danger {
+  color: #9a2f13;
+}
+
+.avatar-menu-item-danger:hover:enabled {
+  background: #fff1ec;
 }
 
 .topbar-actions {
@@ -825,6 +898,16 @@ select {
     width: 38px;
     height: 38px;
     font-size: 13px;
+  }
+
+  .topbar-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 16px;
+  }
+
+  .avatar-menu-popover {
+    min-width: 170px;
   }
 
   .topbar-identity {
