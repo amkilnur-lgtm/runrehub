@@ -183,6 +183,14 @@ export function buildXAxisPositions(count: number) {
 
   const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
   return Array.from({ length: count }, (_, index) => {
+    if (index === 0) {
+      return "0%";
+    }
+
+    if (index === count - 1) {
+      return "100%";
+    }
+
     const x = CHART_INSET_X + (drawableWidth * index) / (count - 1);
     return `${(x / CHART_WIDTH) * 100}%`;
   });
