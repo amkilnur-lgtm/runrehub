@@ -83,6 +83,7 @@ select {
   align-items: center;
   gap: 16px;
   min-height: 52px;
+  width: 100%;
 }
 
 .topbar-left-group {
@@ -115,6 +116,7 @@ select {
   justify-content: flex-end;
   flex: 0 0 auto;
   margin-left: auto;
+  justify-self: end;
 }
 
 .topbar h1,
