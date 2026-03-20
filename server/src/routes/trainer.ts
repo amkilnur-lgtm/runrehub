@@ -13,6 +13,21 @@ const workoutCursorQuerySchema = z.object({
 
 const ATHLETE_WORKOUTS_PAGE_SIZE = 20;
 
+type AthleteStatsRow = {
+  week_distance_meters: number | string | null;
+  week_moving_time_seconds: number | string | null;
+  week_elevation_gain: number | string | null;
+  week_workout_count: number | string | null;
+  year_distance_meters: number | string | null;
+  year_moving_time_seconds: number | string | null;
+  year_elevation_gain: number | string | null;
+  year_workout_count: number | string | null;
+  all_time_distance_meters: number | string | null;
+  all_time_moving_time_seconds: number | string | null;
+  all_time_elevation_gain: number | string | null;
+  all_time_workout_count: number | string | null;
+};
+
 export async function trainerRoutes(app: FastifyInstance) {
   // Оба запроса независимы — запускаем параллельно через Promise.all
   app.get("/api/trainer/dashboard", { preHandler: requireAuth }, async (request) => {
@@ -70,37 +85,80 @@ export async function trainerRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Спортсмен не найден" });
     }
 
-    const workoutsResult = hasCursor
-      ? await pool.query(
-          `
-            select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
-                   elevation_gain, average_speed, average_heartrate
-            from workouts
-            where user_id = $1
-              and (
-                start_date < $2::timestamptz
-                or (start_date = $2::timestamptz and id < $3)
-              )
-            order by start_date desc, id desc
-            limit $4
-          `,
-          [athleteId, beforeDate, beforeId, ATHLETE_WORKOUTS_PAGE_SIZE]
-        )
-      : await pool.query(
-          `
-            select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
-                   elevation_gain, average_speed, average_heartrate
-            from workouts
-            where user_id = $1
-            order by start_date desc, id desc
-            limit $2
-          `,
-          [athleteId, ATHLETE_WORKOUTS_PAGE_SIZE]
-        );
+    const [workoutsResult, statsResult] = await Promise.all([
+      hasCursor
+        ? pool.query(
+            `
+              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
+                     elevation_gain, average_speed, average_heartrate
+              from workouts
+              where user_id = $1
+                and (
+                  start_date < $2::timestamptz
+                  or (start_date = $2::timestamptz and id < $3)
+                )
+              order by start_date desc, id desc
+              limit $4
+            `,
+            [athleteId, beforeDate, beforeId, ATHLETE_WORKOUTS_PAGE_SIZE]
+          )
+        : pool.query(
+            `
+              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
+                     elevation_gain, average_speed, average_heartrate
+              from workouts
+              where user_id = $1
+              order by start_date desc, id desc
+              limit $2
+            `,
+            [athleteId, ATHLETE_WORKOUTS_PAGE_SIZE]
+          ),
+      pool.query<AthleteStatsRow>(
+        `
+          select
+            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('week', now())), 0) as week_distance_meters,
+            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
+            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('week', now())), 0) as week_elevation_gain,
+            count(*) filter (where start_date >= date_trunc('week', now())) as week_workout_count,
+            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('year', now())), 0) as year_distance_meters,
+            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
+            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('year', now())), 0) as year_elevation_gain,
+            count(*) filter (where start_date >= date_trunc('year', now())) as year_workout_count,
+            coalesce(sum(distance_meters), 0) as all_time_distance_meters,
+            coalesce(sum(moving_time_seconds), 0) as all_time_moving_time_seconds,
+            coalesce(sum(elevation_gain), 0) as all_time_elevation_gain,
+            count(*) as all_time_workout_count
+          from workouts
+          where user_id = $1
+        `,
+        [athleteId]
+      )
+    ]);
 
     const workouts = workoutsResult.rows;
+    const stats = statsResult.rows[0];
     return {
       athlete: athleteResult.rows[0],
+      stats: {
+        week: {
+          distance_meters: Number(stats?.week_distance_meters ?? 0),
+          moving_time_seconds: Number(stats?.week_moving_time_seconds ?? 0),
+          elevation_gain: Number(stats?.week_elevation_gain ?? 0),
+          workout_count: Number(stats?.week_workout_count ?? 0)
+        },
+        year: {
+          distance_meters: Number(stats?.year_distance_meters ?? 0),
+          moving_time_seconds: Number(stats?.year_moving_time_seconds ?? 0),
+          elevation_gain: Number(stats?.year_elevation_gain ?? 0),
+          workout_count: Number(stats?.year_workout_count ?? 0)
+        },
+        allTime: {
+          distance_meters: Number(stats?.all_time_distance_meters ?? 0),
+          moving_time_seconds: Number(stats?.all_time_moving_time_seconds ?? 0),
+          elevation_gain: Number(stats?.all_time_elevation_gain ?? 0),
+          workout_count: Number(stats?.all_time_workout_count ?? 0)
+        }
+      },
       workouts,
       nextCursor: buildNextCursor(workouts as Array<{ id: number; start_date: string }>, ATHLETE_WORKOUTS_PAGE_SIZE)
     };
