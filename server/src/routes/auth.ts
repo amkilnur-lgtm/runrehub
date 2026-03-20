@@ -1,13 +1,18 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
+import { removeAvatarFile, saveAvatarFromDataUrl } from "../lib/avatar-storage.js";
 import { pool } from "../lib/db.js";
-import { clearAuthCookie, setAuthCookie, verifyPassword } from "../lib/auth.js";
+import { clearAuthCookie, requireAuth, setAuthCookie, verifyPassword } from "../lib/auth.js";
 import { AuthUser } from "../types.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1)
+});
+
+const avatarUploadSchema = z.object({
+  imageDataUrl: z.string().min(1)
 });
 
 export async function authRoutes(app: FastifyInstance) {
@@ -24,7 +29,7 @@ export async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
     const body = loginSchema.parse(request.body);
     const { rows } = await pool.query(
-      `select id, username, full_name, role, coach_id, password_hash from users where username = $1`,
+      `select id, username, full_name, avatar_url, role, coach_id, password_hash from users where username = $1`,
       [body.username]
     );
     const user = rows[0];
@@ -42,6 +47,7 @@ export async function authRoutes(app: FastifyInstance) {
       id: user.id,
       username: user.username,
       fullName: user.full_name,
+      avatarUrl: user.avatar_url,
       role: user.role,
       coachId: user.coach_id
     };
@@ -62,5 +68,40 @@ export async function authRoutes(app: FastifyInstance) {
     } catch {
       return reply.code(401).send({ message: "Не авторизован" });
     }
+  });
+
+  app.put("/api/auth/avatar", { preHandler: requireAuth }, async (request, reply) => {
+    const body = avatarUploadSchema.parse(request.body);
+    const currentAvatarUrl = request.user.avatarUrl;
+    const nextAvatarUrl = await saveAvatarFromDataUrl(request.user.id, body.imageDataUrl);
+
+    try {
+      await pool.query(`update users set avatar_url = $2 where id = $1`, [request.user.id, nextAvatarUrl]);
+      await removeAvatarFile(currentAvatarUrl);
+    } catch (error) {
+      await removeAvatarFile(nextAvatarUrl);
+      throw error;
+    }
+
+    const nextUser: AuthUser = {
+      ...request.user,
+      avatarUrl: nextAvatarUrl
+    };
+    await setAuthCookie(reply, nextUser);
+    return { user: nextUser };
+  });
+
+  app.delete("/api/auth/avatar", { preHandler: requireAuth }, async (request, reply) => {
+    const currentAvatarUrl = request.user.avatarUrl;
+
+    await pool.query(`update users set avatar_url = null where id = $1`, [request.user.id]);
+    await removeAvatarFile(currentAvatarUrl);
+
+    const nextUser: AuthUser = {
+      ...request.user,
+      avatarUrl: null
+    };
+    await setAuthCookie(reply, nextUser);
+    return { user: nextUser };
   });
 }

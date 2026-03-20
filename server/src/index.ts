@@ -17,6 +17,7 @@ import { stravaRoutes } from "./routes/strava.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
+import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
 import { syncDueAthletes } from "./lib/strava.js";
 
 declare module "fastify" {
@@ -88,6 +89,8 @@ await app.register(trainerRoutes);
 await app.register(stravaRoutes);
 
 const publicDir = path.join(__dirname, "public");
+const avatarUploadsRoot = getAvatarUploadsRoot();
+fs.mkdirSync(avatarUploadsRoot, { recursive: true });
 
 // --- Кэш index.html: читаем один раз при старте, а не на каждый запрос ---
 const indexHtml = fs.existsSync(publicDir)
@@ -100,6 +103,12 @@ if (indexHtml) {
     prefix: "/"
   });
 }
+
+await app.register(fastifyStatic, {
+  root: avatarUploadsRoot,
+  prefix: "/uploads/",
+  decorateReply: false
+});
 
 // --- Healthcheck с проверкой БД ---
 app.get("/api/health", async (_request, reply) => {
