@@ -337,8 +337,8 @@ select {
 .compact-laps-head,
 .compact-lap-row {
   display: grid;
-  grid-template-columns: minmax(112px, 1.2fr) minmax(78px, 0.82fr) minmax(90px, 0.82fr) minmax(52px, 0.82fr) minmax(36px, 0.82fr);
-  column-gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
   align-items: center;
 }
 
@@ -759,7 +759,7 @@ select {
   }
 
   .compact-lap-row {
-    grid-template-columns: minmax(58px, 1fr) minmax(54px, 0.72fr) minmax(68px, 0.72fr) minmax(30px, 0.72fr) minmax(24px, 0.72fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 10px;
     font-size: 11px;
@@ -768,7 +768,7 @@ select {
 
   .compact-laps-head {
     display: grid;
-    grid-template-columns: minmax(58px, 1fr) minmax(54px, 0.72fr) minmax(68px, 0.72fr) minmax(30px, 0.72fr) minmax(24px, 0.72fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 0 10px 3px;
     font-size: 10px;
