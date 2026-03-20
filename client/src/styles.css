@@ -765,7 +765,7 @@ select {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 10px;
-    font-size: 12px;
+    font-size: 13px;
     text-align: right;
   }
 
@@ -774,7 +774,7 @@ select {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 0 10px 3px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .compact-lap-row > span::before {
