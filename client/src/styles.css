@@ -639,31 +639,25 @@ select {
 
 .athlete-overview-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(320px, 1fr);
+  grid-template-columns: minmax(260px, 320px) minmax(320px, 1fr);
   gap: 24px;
   align-items: start;
   margin-top: 10px;
   margin-bottom: 18px;
 }
 
-.athlete-profile-card {
-  display: grid;
-  gap: 16px;
-  min-height: 188px;
-  align-content: start;
-}
-
 .athlete-profile-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-start;
+  gap: 18px;
   margin: 0;
+  padding-top: 18px;
 }
 
 .athlete-profile-avatar {
-  width: 72px;
-  height: 72px;
-  font-size: 24px;
+  width: 76px;
+  height: 76px;
+  font-size: 26px;
   transform: none;
   flex: 0 0 auto;
 }
@@ -678,7 +672,7 @@ select {
 }
 
 .athlete-profile-title p {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 16px;
 }
 
@@ -1324,15 +1318,15 @@ select {
     margin-bottom: 16px;
   }
 
-  .athlete-profile-card {
-    gap: 12px;
-    min-height: 0;
+  .athlete-profile-avatar {
+    width: 60px;
+    height: 60px;
+    font-size: 21px;
   }
 
-  .athlete-profile-avatar {
-    width: 58px;
-    height: 58px;
-    font-size: 20px;
+  .athlete-profile-header {
+    gap: 14px;
+    padding-top: 4px;
   }
 
   .athlete-profile-title p {
