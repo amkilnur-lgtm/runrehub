@@ -764,7 +764,7 @@ select {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 10px;
-    font-size: 11px;
+    font-size: 12px;
     text-align: right;
   }
 
@@ -773,7 +773,7 @@ select {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     padding: 0 10px 3px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .compact-lap-row > span::before {
@@ -791,6 +791,10 @@ select {
 
   .chart-card {
     padding: 16px;
+  }
+
+  .chart-frame {
+    margin-bottom: 4px;
   }
 
   .chart-metrics {
@@ -824,9 +828,9 @@ select {
   }
 
   .chart-x-axis {
-    height: 24px;
-    margin-bottom: 8px;
-    padding-top: 2px;
+    height: 20px;
+    margin-bottom: 2px;
+    padding-top: 0;
   }
 
   .chart-x-tick:nth-child(even) {
@@ -834,7 +838,8 @@ select {
   }
 
   .chart-x-label {
-    margin-top: 2px;
+    margin-top: -2px;
+    line-height: 1.1;
   }
 
   .dashboard-workout-row {
