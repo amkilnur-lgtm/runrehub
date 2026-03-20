@@ -614,6 +614,29 @@ select {
   white-space: nowrap;
 }
 
+.athlete-list-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.athlete-list-avatar {
+  width: 42px;
+  height: 42px;
+  font-size: 14px;
+  transform: translateY(1px);
+}
+
+.athlete-list-text {
+  min-width: 0;
+}
+
+.athlete-list-text strong,
+.athlete-list-text .muted {
+  display: block;
+}
+
 .chart-column {
   display: grid;
   gap: 16px;
@@ -1167,6 +1190,16 @@ select {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
     align-items: center;
+  }
+
+  .athlete-list-main {
+    gap: 10px;
+  }
+
+  .athlete-list-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 13px;
   }
 
   .dashboard-workout-date,

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { UserAvatar } from "../components/UserAvatar";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { useApi } from "../hooks/useApi";
 
@@ -8,6 +9,7 @@ type DashboardData = {
     id: number;
     full_name: string;
     username: string;
+    avatar_url: string | null;
     last_workout_at: string | null;
   }>;
   recentWorkouts: Array<{
@@ -56,9 +58,17 @@ export function TrainerDashboardPage() {
         <div className="list">
           {data.athletes.map((athlete) => (
             <Link key={athlete.id} className="list-row link-row" to={`/trainer/athletes/${athlete.id}`}>
-              <div>
-                <strong>{athlete.full_name}</strong>
-                <div className="muted">@{athlete.username}</div>
+              <div className="athlete-list-main">
+                <UserAvatar
+                  fullName={athlete.full_name}
+                  avatarUrl={athlete.avatar_url}
+                  className="athlete-list-avatar"
+                  ariaHidden
+                />
+                <div className="athlete-list-text">
+                  <strong>{athlete.full_name}</strong>
+                  <div className="muted">@{athlete.username}</div>
+                </div>
               </div>
               <div className="muted">
                 {athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "Без пробежек"}
