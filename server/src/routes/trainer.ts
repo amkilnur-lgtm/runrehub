@@ -62,7 +62,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     const hasCursor = beforeDate !== null && beforeId !== null;
 
     const athleteResult = await pool.query(
-      `select id, full_name, username from users where id = $1 and coach_id = $2 and role = 'athlete'`,
+      `select id, full_name, username, avatar_url from users where id = $1 and coach_id = $2 and role = 'athlete'`,
       [athleteId, request.user.id]
     );
 

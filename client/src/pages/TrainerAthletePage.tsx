@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 import { api } from "../api";
+import { UserAvatar } from "../components/UserAvatar";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { useApi } from "../hooks/useApi";
 
@@ -10,6 +11,7 @@ type AthletePageData = {
     id: number;
     full_name: string;
     username: string;
+    avatar_url: string | null;
   };
   workouts: Array<{
     id: number;
@@ -87,8 +89,18 @@ export function TrainerAthletePage() {
   return (
     <div className="card">
       <Link to="/trainer" className="inline-link">Назад</Link>
-      <h2>{data.athlete.full_name}</h2>
-      <p className="muted">@{data.athlete.username}</p>
+      <div className="athlete-profile-header">
+        <UserAvatar
+          fullName={data.athlete.full_name}
+          avatarUrl={data.athlete.avatar_url}
+          className="athlete-profile-avatar"
+          ariaHidden
+        />
+        <div className="athlete-profile-title">
+          <h2>{data.athlete.full_name}</h2>
+          <p className="muted">@{data.athlete.username}</p>
+        </div>
+      </div>
       
       <h3>Все пробежки</h3>
       <div className="list">
