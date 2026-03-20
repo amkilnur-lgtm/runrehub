@@ -9,6 +9,19 @@ import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
 
+function formatLapElevation(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  const rounded = Math.round(value);
+  if (rounded === 0) {
+    return "0";
+  }
+
+  return `${rounded}`;
+}
+
 function formatLapDistanceKilometers(distanceMeters: number) {
   if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
     return "0.00";
@@ -214,10 +227,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           {data.laps.length ? (
             <div className="lap-report-table" role="table" aria-label="Статистика по кругам">
               <div className="lap-report-head muted" role="row">
-                <span>ОТРЕЗОК</span>
+                <span>КРУГ</span>
                 <span>КМ</span>
                 <span>ТЕМП</span>
                 <span>ЧСС</span>
+                <span>М</span>
               </div>
               {data.laps.map((lap, index) => (
                 <div key={lap.id} className="lap-report-row" role="row">
@@ -235,7 +249,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <span className="lap-report-heart-value">
                       {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
                     </span>
-                    <span className="lap-report-heart-unit">bpm</span>
+                  </span>
+                  <span className="lap-report-elevation">
+                    {formatLapElevation(lap.elevation_gain)}
                   </span>
                 </div>
               ))}
