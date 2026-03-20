@@ -56,7 +56,6 @@ select {
   margin: 0 auto;
 }
 
-.topbar,
 .section-header,
 .topbar-actions,
 .list-row {
@@ -70,6 +69,8 @@ select {
   margin-bottom: 24px;
   display: grid;
   gap: 8px;
+  align-items: stretch;
+  justify-content: normal;
 }
 
 .topbar-identity {
@@ -78,10 +79,12 @@ select {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
 .topbar-main-row {
   display: block;
+  width: 100%;
 }
 
 .topbar-left-group {
@@ -112,6 +115,7 @@ select {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
+  justify-self: end;
 }
 
 .topbar h1,
