@@ -547,6 +547,8 @@ select {
   min-width: 44px;
   padding-inline: 16px;
   letter-spacing: 0.1em;
+  background: transparent;
+  box-shadow: none;
 }
 
 .workout-menu-popover {
