@@ -376,6 +376,11 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+.lap-report-elevation {
+  color: #5f5a67;
+  font-weight: 400;
+}
+
 .lap-report-pace-cell {
   display: flex;
   justify-content: flex-start;
@@ -869,6 +874,7 @@ select {
 
   .lap-report-index,
   .lap-report-distance,
+  .lap-report-elevation,
   .lap-report-heart-value,
   .lap-report-pace-pill {
     font-size: 13px;
