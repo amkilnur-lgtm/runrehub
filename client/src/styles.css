@@ -139,9 +139,9 @@ select {
 }
 
 .topbar-avatar {
-  width: 58px;
-  height: 58px;
-  font-size: 20px;
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
   transform: translateY(2px);
 }
 
@@ -901,9 +901,9 @@ select {
   }
 
   .topbar-avatar {
-    width: 48px;
-    height: 48px;
-    font-size: 16px;
+    width: 52px;
+    height: 52px;
+    font-size: 17px;
   }
 
   .avatar-menu-popover {
