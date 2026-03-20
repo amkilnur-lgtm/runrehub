@@ -12,7 +12,7 @@ MVP для тренера и спортсменов:
 ## Локальный запуск
 
 1. Скопировать `.env.example` в `.env`
-2. Заполнить `JWT_SECRET`, `DATABASE_URL`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`
+2. Заполнить `JWT_SECRET`, `DATABASE_URL`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_TOKEN_ENCRYPTION_KEY`
 3. Установить зависимости:
 
 ```bash
@@ -41,3 +41,5 @@ npm run dev
 ```bash
 docker compose up -d --build
 ```
+
+Для production `STRAVA_TOKEN_ENCRYPTION_KEY` обязателен: он используется для шифрования `access_token` и `refresh_token` Strava в базе.
