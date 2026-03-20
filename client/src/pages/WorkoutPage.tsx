@@ -9,17 +9,12 @@ import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
 
-function formatElevation(value: number | null | undefined) {
-  if (value === null || value === undefined || !Number.isFinite(value)) {
-    return "—";
+function formatLapDistanceKilometers(distanceMeters: number) {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    return "0.00";
   }
 
-  const rounded = Math.round(value);
-  if (rounded === 0) {
-    return "0";
-  }
-
-  return `${rounded}`;
+  return (distanceMeters / 1000).toFixed(2);
 }
 
 export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
@@ -55,12 +50,17 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
       navigate(backHref);
     } catch (deleteError) {
-      window.alert(deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку");
+      window.alert(
+        deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
+      );
       setIsDeleting(false);
     }
   }
 
-  const paceChart = useMemo(() => preparePaceChart(data?.streams ?? null, data?.workout ?? null), [data]);
+  const paceChart = useMemo(
+    () => preparePaceChart(data?.streams ?? null, data?.workout ?? null),
+    [data]
+  );
   const heartRateChart = useMemo(
     () => prepareHeartRateChart(data?.streams ?? null, data?.workout ?? null),
     [data]
@@ -116,7 +116,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       setCoachComment(result.coachComment ?? "");
       setCommentStatus("Сохранено");
     } catch (saveError) {
-      setCommentStatus(saveError instanceof Error ? saveError.message : "Не удалось сохранить комментарий");
+      setCommentStatus(
+        saveError instanceof Error ? saveError.message : "Не удалось сохранить комментарий"
+      );
     } finally {
       setIsSavingComment(false);
     }
@@ -210,23 +212,31 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         <div className="card">
           <h2>Отрезки</h2>
           {data.laps.length ? (
-            <div className="compact-laps">
-              <div className="compact-laps-head muted">
-                <span>Отрезок</span>
-                <span>Км</span>
-                <span>Темп</span>
-                <span title="Пульс">♥</span>
-                <span title="Набор/сброс">↕</span>
+            <div className="lap-report-table" role="table" aria-label="Статистика по кругам">
+              <div className="lap-report-head muted" role="row">
+                <span>ОТРЕЗОК</span>
+                <span>КМ</span>
+                <span>ТЕМП</span>
+                <span>ЧСС</span>
               </div>
               {data.laps.map((lap, index) => (
-                <div key={lap.id} className="compact-lap-row">
-                  <span className="lap-name" data-label="Lap">
-                    {lap.name || `Lap ${index + 1}`}
+                <div key={lap.id} className="lap-report-row" role="row">
+                  <span className="lap-report-index">{index + 1}</span>
+                  <span className="lap-report-distance">
+                    {formatLapDistanceKilometers(lap.distance_meters)}
                   </span>
-                  <span data-label="Км">{formatDistance(lap.distance_meters)}</span>
-                  <span data-label="Темп">{formatPace(lap.average_speed)}</span>
-                  <span>{lap.average_heartrate ? `${Math.round(lap.average_heartrate)}` : "—"}</span>
-                  <span data-label="Высота">{formatElevation(lap.elevation_gain)}</span>
+                  <span className="lap-report-pace-cell">
+                    <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
+                  </span>
+                  <span className="lap-report-heart">
+                    <span className="lap-report-heart-icon" aria-hidden="true">
+                      ♥
+                    </span>
+                    <span className="lap-report-heart-value">
+                      {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
+                    </span>
+                    <span className="lap-report-heart-unit">bpm</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -276,7 +286,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </div>
             ) : (
               <div className="workout-comment-text">
-                {data.workout.coach_comment?.trim() || "Тренер пока не оставил комментарий к этой тренировке."}
+                {data.workout.coach_comment?.trim() ||
+                  "Тренер пока не оставил комментарий к этой тренировке."}
               </div>
             )}
           </section>
