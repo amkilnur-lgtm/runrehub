@@ -648,10 +648,9 @@ select {
 
 .athlete-profile-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 18px;
   margin: 0;
-  padding-top: 18px;
 }
 
 .athlete-profile-avatar {
@@ -664,6 +663,9 @@ select {
 
 .athlete-profile-title {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .athlete-profile-title h2 {
@@ -1326,7 +1328,6 @@ select {
 
   .athlete-profile-header {
     gap: 14px;
-    padding-top: 4px;
   }
 
   .athlete-profile-title p {
