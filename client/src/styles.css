@@ -1,6 +1,7 @@
 :root {
   color-scheme: light;
   font-family: "Segoe UI", "Arial", sans-serif;
+  --chart-axis-gutter: 34px;
   background:
     radial-gradient(circle at top left, rgba(255, 120, 80, 0.16), transparent 30%),
     linear-gradient(180deg, #fbfaf7 0%, #f3efe8 100%);
@@ -446,7 +447,7 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr);
   gap: 1px;
   align-items: stretch;
 }
@@ -495,7 +496,7 @@ select {
 
 .chart-x-wrap {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr);
   gap: 1px;
 }
 
@@ -810,7 +811,7 @@ select {
   .chart-grid-wrap,
   .chart-grid-wrap,
   .chart-x-wrap {
-    grid-template-columns: 30px minmax(0, 1fr);
+    --chart-axis-gutter: 30px;
     gap: 1px;
   }
 
@@ -883,13 +884,5 @@ select {
 
   .align-right {
     text-align: left;
-  }
-
-  .chart-x-wrap {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-x-wrap > div:first-child {
-    display: none;
   }
 }
