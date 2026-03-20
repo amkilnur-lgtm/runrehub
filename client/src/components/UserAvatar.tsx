@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 function getInitials(fullName: string | null | undefined) {
   const parts = (fullName ?? "")
     .trim()
@@ -28,11 +30,21 @@ export function UserAvatar({
 }) {
   const initials = getInitials(fullName);
   const classes = ["user-avatar", className].filter(Boolean).join(" ");
+  const [imageVisible, setImageVisible] = useState(Boolean(avatarUrl));
+
+  useEffect(() => {
+    setImageVisible(Boolean(avatarUrl));
+  }, [avatarUrl]);
 
   return (
     <span className={classes} aria-hidden={ariaHidden}>
-      {avatarUrl ? (
-        <img className="user-avatar-image" src={avatarUrl} alt="" />
+      {avatarUrl && imageVisible ? (
+        <img
+          className="user-avatar-image"
+          src={avatarUrl}
+          alt=""
+          onError={() => setImageVisible(false)}
+        />
       ) : (
         initials
       )}
