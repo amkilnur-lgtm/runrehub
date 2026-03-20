@@ -356,15 +356,40 @@ select {
   text-transform: uppercase;
 }
 
-.lap-report-head > span,
-.lap-report-row > span {
-  justify-self: start;
-}
-
 .lap-report-row {
   min-height: 56px;
   padding: 10px 8px;
   border-top: 1px solid rgba(24, 21, 16, 0.06);
+}
+
+.lap-report-head > span:nth-child(1),
+.lap-col-lap {
+  justify-self: start;
+  text-align: left;
+}
+
+.lap-report-head > span:nth-child(2),
+.lap-col-distance {
+  justify-self: start;
+  text-align: left;
+}
+
+.lap-report-head > span:nth-child(3),
+.lap-col-pace {
+  justify-self: start;
+  text-align: left;
+}
+
+.lap-report-head > span:nth-child(4),
+.lap-col-heart {
+  justify-self: start;
+  text-align: left;
+}
+
+.lap-report-head > span:nth-child(5),
+.lap-col-elevation {
+  justify-self: start;
+  text-align: left;
 }
 
 .lap-report-index,
