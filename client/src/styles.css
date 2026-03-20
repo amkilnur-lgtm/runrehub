@@ -74,17 +74,14 @@ select {
 
 .topbar-identity {
   min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-.topbar-main-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  min-height: 52px;
-  width: 100%;
+  gap: 12px;
+}
+
+.topbar-main-row {
+  display: block;
 }
 
 .topbar-left-group {
@@ -651,19 +648,23 @@ select {
   }
 
   .topbar-main-row {
-    gap: 12px;
-    align-items: start;
+    min-height: 0;
   }
 
   .topbar-left-group {
     align-items: flex-start;
     justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 10px;
   }
 
   .topbar-name-box h1 {
     white-space: normal;
     line-height: 1.05;
+  }
+
+  .topbar-identity {
+    align-items: start;
   }
 
   .ghost-button,

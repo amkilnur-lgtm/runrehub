@@ -16,6 +16,11 @@ export function AppLayout() {
       <header className="topbar">
         <div className="topbar-identity">
           <div className="eyebrow">RunningRehab</div>
+          <div className="topbar-actions">
+            <button className="ghost-button topbar-logout" onClick={handleLogout}>
+              Выйти
+            </button>
+          </div>
         </div>
         <div className="topbar-main-row">
           <div className="topbar-left-group">
@@ -23,11 +28,6 @@ export function AppLayout() {
               <h1>{user?.fullName}</h1>
             </div>
             <span className="role-badge">{user?.role}</span>
-          </div>
-          <div className="topbar-actions">
-            <button className="ghost-button topbar-logout" onClick={handleLogout}>
-              Выйти
-            </button>
           </div>
         </div>
       </header>
