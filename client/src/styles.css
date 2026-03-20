@@ -506,6 +506,7 @@ select {
   font-size: 12px;
   margin-bottom: 6px;
   font-variant-numeric: tabular-nums;
+  overflow: visible;
 }
 
 .chart-x-tick {
@@ -513,6 +514,7 @@ select {
   top: 0;
   transform: translateX(-50%);
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .chart-x-tick-start {
@@ -822,12 +824,17 @@ select {
   }
 
   .chart-x-axis {
-    height: 16px;
-    margin-bottom: 4px;
+    height: 24px;
+    margin-bottom: 8px;
+    padding-top: 2px;
   }
 
   .chart-x-tick:nth-child(even) {
     display: none;
+  }
+
+  .chart-x-label {
+    margin-top: 2px;
   }
 
   .dashboard-workout-row {
