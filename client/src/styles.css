@@ -79,7 +79,8 @@ select {
 }
 
 .topbar-main-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
   min-height: 52px;
@@ -107,7 +108,6 @@ select {
   margin: 0;
   line-height: 1;
   display: block;
-  white-space: nowrap;
 }
 
 .topbar-actions {
@@ -115,7 +115,6 @@ select {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .topbar h1,
@@ -652,14 +651,19 @@ select {
   }
 
   .topbar-main-row {
-    grid-template-columns: 1fr auto;
     gap: 12px;
+    align-items: start;
   }
 
   .topbar-left-group {
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .topbar-name-box h1 {
+    white-space: normal;
+    line-height: 1.05;
   }
 
   .ghost-button,
