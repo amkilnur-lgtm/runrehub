@@ -235,14 +235,14 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </div>
               {data.laps.map((lap, index) => (
                 <div key={lap.id} className="lap-report-row" role="row">
-                  <span className="lap-report-index">{index + 1}</span>
-                  <span className="lap-report-distance">
+                  <span className="lap-report-index lap-col-lap">{index + 1}</span>
+                  <span className="lap-report-distance lap-col-distance">
                     {formatLapDistanceKilometers(lap.distance_meters)}
                   </span>
-                  <span className="lap-report-pace-cell">
+                  <span className="lap-report-pace-cell lap-col-pace">
                     <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
                   </span>
-                  <span className="lap-report-heart">
+                  <span className="lap-report-heart lap-col-heart">
                     <span className="lap-report-heart-icon" aria-hidden="true">
                       ♥
                     </span>
@@ -250,7 +250,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                       {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
                     </span>
                   </span>
-                  <span className="lap-report-elevation">
+                  <span className="lap-report-elevation lap-col-elevation">
                     {formatLapElevation(lap.elevation_gain)}
                   </span>
                 </div>
