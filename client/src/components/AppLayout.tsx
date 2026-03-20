@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "./AuthProvider";
+import { UserAvatar } from "./UserAvatar";
 
 export function AppLayout() {
   const { user, logout } = useAuth();
@@ -39,6 +40,7 @@ export function AppLayout() {
         <div className="topbar-main-row">
           <div className="topbar-left-group">
             <div className="topbar-name-box">
+              <UserAvatar fullName={user?.fullName} className="topbar-avatar" ariaHidden />
               <h1>{user?.fullName}</h1>
             </div>
             <span className="role-badge">{user?.role}</span>
