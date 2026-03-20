@@ -19,6 +19,10 @@ type AthletePageData = {
     moving_time_seconds: number;
     average_speed: number | null;
   }>;
+  nextCursor: {
+    beforeDate: string;
+    beforeId: number;
+  } | null;
 };
 
 export function TrainerAthletePage() {
@@ -26,28 +30,33 @@ export function TrainerAthletePage() {
   const { data, loading, error } = useApi<AthletePageData>(`/api/trainer/athletes/${params.id}`);
 
   const [extraWorkouts, setExtraWorkouts] = useState<AthletePageData['workouts']>([]);
+  const [nextCursor, setNextCursor] = useState<AthletePageData["nextCursor"]>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     if (data) {
       setExtraWorkouts([]);
-      setHasMore(data.workouts.length === 20);
+      setNextCursor(data.nextCursor);
+      setHasMore(Boolean(data.nextCursor));
     }
   }, [data]);
 
   async function loadMore() {
-    const currentWorkouts = [...(data?.workouts || []), ...extraWorkouts];
-    const last = currentWorkouts[currentWorkouts.length - 1];
-    if (!last) return;
-    
+    if (!nextCursor) return;
+
     setIsLoadingMore(true);
     try {
-      const moreData = await api<AthletePageData>(`/api/trainer/athletes/${params.id}?before=${last.start_date}`);
-      if (moreData.workouts.length < 20) {
-        setHasMore(false);
-      }
-      setExtraWorkouts(prev => [...prev, ...moreData.workouts]);
+      const search = new URLSearchParams({
+        beforeDate: nextCursor.beforeDate,
+        beforeId: String(nextCursor.beforeId)
+      });
+      const moreData = await api<AthletePageData>(
+        `/api/trainer/athletes/${params.id}?${search.toString()}`
+      );
+      setExtraWorkouts((prev) => [...prev, ...moreData.workouts]);
+      setNextCursor(moreData.nextCursor);
+      setHasMore(Boolean(moreData.nextCursor));
     } catch (err) {
       console.error(err);
     } finally {

@@ -20,14 +20,19 @@ type AthleteDashboardData = {
     start_date: string;
     distance_meters: number;
     moving_time_seconds: number;
-    average_speed: number | null;
-    average_heartrate: number | null;
+      average_speed: number | null;
+      average_heartrate: number | null;
   }>;
+  nextCursor: {
+    beforeDate: string;
+    beforeId: number;
+  } | null;
 };
 
 export function AthleteDashboardPage() {
   const { data, loading, error, refresh } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
   const [extraWorkouts, setExtraWorkouts] = useState<AthleteDashboardData['workouts']>([]);
+  const [nextCursor, setNextCursor] = useState<AthleteDashboardData["nextCursor"]>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -35,22 +40,24 @@ export function AthleteDashboardPage() {
   useEffect(() => {
     if (data) {
       setExtraWorkouts([]);
-      setHasMore(data.workouts.length === 10);
+      setNextCursor(data.nextCursor);
+      setHasMore(Boolean(data.nextCursor));
     }
   }, [data]);
 
   async function loadMore() {
-    const currentWorkouts = [...(data?.workouts || []), ...extraWorkouts];
-    const last = currentWorkouts[currentWorkouts.length - 1];
-    if (!last) return;
-    
+    if (!nextCursor) return;
+
     setIsLoadingMore(true);
     try {
-      const moreData = await api<AthleteDashboardData>(`/api/athlete/dashboard?before=${last.start_date}`);
-      if (moreData.workouts.length < 10) {
-        setHasMore(false);
-      }
-      setExtraWorkouts(prev => [...prev, ...moreData.workouts]);
+      const search = new URLSearchParams({
+        beforeDate: nextCursor.beforeDate,
+        beforeId: String(nextCursor.beforeId)
+      });
+      const moreData = await api<AthleteDashboardData>(`/api/athlete/dashboard?${search.toString()}`);
+      setExtraWorkouts((prev) => [...prev, ...moreData.workouts]);
+      setNextCursor(moreData.nextCursor);
+      setHasMore(Boolean(moreData.nextCursor));
     } catch (err) {
       console.error(err);
     } finally {
@@ -105,9 +112,8 @@ export function AthleteDashboardPage() {
     );
   }
 
-  const latest = data.workouts[0];
-
   const allWorkouts = [...data.workouts, ...extraWorkouts];
+  const latest = allWorkouts[0];
 
   return (
     <div className="stack">

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { FastifyBaseLogger } from "fastify";
 
 import { pool } from "./db.js";
@@ -12,6 +14,20 @@ type TokenResponse = {
     id: number;
   };
 };
+
+type StravaWebhookPayload = {
+  owner_id?: number;
+  object_id?: number;
+  aspect_type?: string;
+  object_type?: string;
+  event_time?: number;
+  subscription_id?: number;
+  updates?: Record<string, unknown>;
+};
+
+export type SyncLatestActivitiesResult =
+  | { synced: true; imported: number; startedAt: string; finishedAt: string }
+  | { synced: false; reason: "not_connected" | "already_running"; startedAt?: string; finishedAt?: string };
 
 type StravaActivity = {
   id: number;
@@ -63,11 +79,66 @@ export type ActivityStreams = {
 };
 
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
+const STRAVA_SYNC_LOCK_NAMESPACE = 4271;
+const ENCRYPTED_TOKEN_PREFIX = "enc:v1:";
 
 function assertStravaConfigured() {
   if (!config.STRAVA_CLIENT_ID || !config.STRAVA_CLIENT_SECRET) {
     throw new Error("STRAVA_NOT_CONFIGURED");
   }
+}
+
+export function getTokenEncryptionKey() {
+  if (!config.STRAVA_TOKEN_ENCRYPTION_KEY) {
+    return null;
+  }
+
+  return crypto.createHash("sha256").update(config.STRAVA_TOKEN_ENCRYPTION_KEY).digest();
+}
+
+export function encryptToken(token: string) {
+  const key = getTokenEncryptionKey();
+  if (!key) {
+    return token;
+  }
+
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return `${ENCRYPTED_TOKEN_PREFIX}${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`;
+}
+
+export function decryptToken(token: string) {
+  if (!token.startsWith(ENCRYPTED_TOKEN_PREFIX)) {
+    return token;
+  }
+
+  const key = getTokenEncryptionKey();
+  if (!key) {
+    throw new Error("STRAVA_TOKEN_ENCRYPTION_KEY_MISSING");
+  }
+
+  const parts = token.slice(ENCRYPTED_TOKEN_PREFIX.length).split(":");
+  if (parts.length !== 3) {
+    throw new Error("STRAVA_TOKEN_DECRYPT_FAILED");
+  }
+
+  const [ivBase64, authTagBase64, encryptedBase64] = parts;
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    key,
+    Buffer.from(ivBase64, "base64")
+  );
+  decipher.setAuthTag(Buffer.from(authTagBase64, "base64"));
+
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encryptedBase64, "base64")),
+    decipher.final()
+  ]);
+
+  return decrypted.toString("utf8");
 }
 
 function getTimeZoneOffsetMs(date: Date, timeZone: string) {
@@ -201,6 +272,90 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
       JSON.stringify(streams.velocity_smooth)
     ]
   );
+}
+
+async function tryAcquireSyncLock(userId: number) {
+  const { rows } = await pool.query(
+    `select pg_try_advisory_lock($1, $2) as locked`,
+    [STRAVA_SYNC_LOCK_NAMESPACE, userId]
+  );
+  return rows[0]?.locked === true;
+}
+
+async function releaseSyncLock(userId: number) {
+  await pool.query(`select pg_advisory_unlock($1, $2)`, [STRAVA_SYNC_LOCK_NAMESPACE, userId]);
+}
+
+async function markSyncStarted(userId: number, startedAt: Date) {
+  await pool.query(
+    `
+      update strava_connections
+      set sync_started_at = $2,
+          last_sync_error = null
+      where user_id = $1
+    `,
+    [userId, startedAt]
+  );
+}
+
+async function markSyncCompleted(userId: number, startedAt: Date, finishedAt: Date) {
+  await pool.query(
+    `
+      update strava_connections
+      set sync_started_at = null,
+          last_synced_at = $2,
+          last_sync_error = null
+      where user_id = $1
+        and (sync_started_at is null or sync_started_at = $3)
+    `,
+    [userId, finishedAt, startedAt]
+  );
+}
+
+async function markSyncFailed(userId: number, startedAt: Date, error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : "Unknown error";
+  await pool.query(
+    `
+      update strava_connections
+      set sync_started_at = null,
+          last_sync_error = $2
+      where user_id = $1
+        and (sync_started_at is null or sync_started_at = $3)
+    `,
+    [userId, errorMessage.slice(0, 1000), startedAt]
+  );
+}
+
+export function createWebhookFingerprint(payload: StravaWebhookPayload) {
+  const fingerprintSource = JSON.stringify({
+    ownerId: payload.owner_id ?? null,
+    objectId: payload.object_id ?? null,
+    aspectType: payload.aspect_type ?? null,
+    objectType: payload.object_type ?? null,
+    eventTime: payload.event_time ?? null,
+    subscriptionId: payload.subscription_id ?? null,
+    updates: payload.updates ?? null
+  });
+
+  return crypto.createHash("sha256").update(fingerprintSource).digest("hex");
+}
+
+export async function registerStravaWebhookEvent(payload: StravaWebhookPayload) {
+  const fingerprint = createWebhookFingerprint(payload);
+  const result = await pool.query(
+    `
+      insert into strava_webhook_events (fingerprint, payload)
+      values ($1, $2::jsonb)
+      on conflict (fingerprint) do nothing
+      returning id
+    `,
+    [fingerprint, JSON.stringify(payload)]
+  );
+
+  return {
+    fingerprint,
+    isDuplicate: !result.rows[0]
+  };
 }
 
 // Обновляем net elevation для всех лапов одним запросом вместо цикла UPDATE
@@ -419,6 +574,8 @@ export async function exchangeCodeForToken(code: string, userId: number) {
   }
 
   const data = (await response.json()) as TokenResponse;
+  const encryptedAccessToken = encryptToken(data.access_token);
+  const encryptedRefreshToken = encryptToken(data.refresh_token);
   await pool.query(
     `
       insert into strava_connections (
@@ -441,8 +598,8 @@ export async function exchangeCodeForToken(code: string, userId: number) {
     [
       userId,
       data.athlete.id,
-      data.access_token,
-      data.refresh_token,
+      encryptedAccessToken,
+      encryptedRefreshToken,
       data.expires_at
     ]
   );
@@ -459,9 +616,12 @@ async function refreshAccessTokenIfNeeded(userId: number) {
     return null;
   }
 
+  const accessToken = decryptToken(connection.access_token as string);
+  const refreshToken = decryptToken(connection.refresh_token as string);
+
   const expiresAt = new Date(connection.expires_at).getTime();
   if (expiresAt - Date.now() > 5 * 60 * 1000) {
-    return connection.access_token as string;
+    return accessToken;
   }
 
   const response = await fetch("https://www.strava.com/oauth/token", {
@@ -473,7 +633,7 @@ async function refreshAccessTokenIfNeeded(userId: number) {
       client_id: config.STRAVA_CLIENT_ID,
       client_secret: config.STRAVA_CLIENT_SECRET,
       grant_type: "refresh_token",
-      refresh_token: connection.refresh_token
+      refresh_token: refreshToken
     })
   });
 
@@ -482,6 +642,8 @@ async function refreshAccessTokenIfNeeded(userId: number) {
   }
 
   const data = (await response.json()) as TokenResponse;
+  const encryptedAccessToken = encryptToken(data.access_token);
+  const encryptedRefreshToken = encryptToken(data.refresh_token);
   await pool.query(
     `
       update strava_connections
@@ -490,7 +652,7 @@ async function refreshAccessTokenIfNeeded(userId: number) {
           expires_at = to_timestamp($4)
       where user_id = $1
     `,
-    [userId, data.access_token, data.refresh_token, data.expires_at]
+    [userId, encryptedAccessToken, encryptedRefreshToken, data.expires_at]
   );
 
   return data.access_token;
@@ -512,46 +674,65 @@ export async function ensureActivityStreams(userId: number, workoutId: number, a
   return fetched;
 }
 
-export async function syncLatestActivities(userId: number) {
-  const token = await refreshAccessTokenIfNeeded(userId);
-  if (!token) {
-    return { synced: false, reason: "not_connected" };
+export async function syncLatestActivities(userId: number): Promise<SyncLatestActivitiesResult> {
+  const lockAcquired = await tryAcquireSyncLock(userId);
+  if (!lockAcquired) {
+    return { synced: false, reason: "already_running" };
   }
 
-  const { rows } = await pool.query(
-    `select connected_at, last_synced_at from strava_connections where user_id = $1`,
-    [userId]
-  );
-  const connection = rows[0];
-  const afterDate = connection.last_synced_at
-    ? new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS)
-    : getStartOfTodayInTimeZone(config.APP_TIMEZONE);
-  const after = Math.floor(new Date(afterDate).getTime() / 1000);
+  const startedAt = new Date();
 
-  const activityResponse = await fetch(
-    `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=20`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+  try {
+    const token = await refreshAccessTokenIfNeeded(userId);
+    if (!token) {
+      return { synced: false, reason: "not_connected" };
     }
-  );
 
-  if (!activityResponse.ok) {
-    throw new Error("STRAVA_ACTIVITIES_FAILED");
+    await markSyncStarted(userId, startedAt);
+
+    const { rows } = await pool.query(
+      `select connected_at, last_synced_at from strava_connections where user_id = $1`,
+      [userId]
+    );
+    const connection = rows[0];
+    const afterDate = connection.last_synced_at
+      ? new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS)
+      : getStartOfTodayInTimeZone(config.APP_TIMEZONE);
+    const after = Math.floor(new Date(afterDate).getTime() / 1000);
+
+    const activityResponse = await fetch(
+      `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=20`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!activityResponse.ok) {
+      throw new Error("STRAVA_ACTIVITIES_FAILED");
+    }
+
+    const activities = (await activityResponse.json()) as StravaActivity[];
+    for (const activity of activities) {
+      await syncSingleActivity(userId, token, activity);
+    }
+
+    const finishedAt = new Date();
+    await markSyncCompleted(userId, startedAt, finishedAt);
+
+    return {
+      synced: true,
+      imported: activities.length,
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString()
+    };
+  } catch (error) {
+    await markSyncFailed(userId, startedAt, error);
+    throw error;
+  } finally {
+    await releaseSyncLock(userId);
   }
-
-  const activities = (await activityResponse.json()) as StravaActivity[];
-  for (const activity of activities) {
-    await syncSingleActivity(userId, token, activity);
-  }
-
-  await pool.query(
-    `update strava_connections set last_synced_at = now() where user_id = $1`,
-    [userId]
-  );
-
-  return { synced: true, imported: activities.length };
 }
 
 export async function syncDueAthletes(logger?: FastifyBaseLogger) {

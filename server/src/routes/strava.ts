@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { addStravaEvent } from "../lib/strava-events.js";
 import { config } from "../config.js";
-import { exchangeCodeForToken, syncLatestActivities } from "../lib/strava.js";
+import { exchangeCodeForToken, registerStravaWebhookEvent, syncLatestActivities } from "../lib/strava.js";
 
 export async function stravaRoutes(app: FastifyInstance) {
   app.get("/api/strava/callback", { preHandler: requireAuth }, async (request, reply) => {
@@ -54,7 +54,15 @@ export async function stravaRoutes(app: FastifyInstance) {
   // Webhook POST: отвечаем Strava немедленно, sync выполняется в фоне (fire-and-forget).
   // Это критично: Strava ждёт ответ не более 2 секунд, иначе отключает подписку.
   app.post("/api/strava/webhook", async (request) => {
-    const body = request.body as { owner_id?: number };
+    const body = request.body as {
+      owner_id?: number;
+      object_id?: number;
+      aspect_type?: string;
+      object_type?: string;
+      event_time?: number;
+      subscription_id?: number;
+      updates?: Record<string, unknown>;
+    };
     app.log.info({ owner_id: body.owner_id ?? null }, "strava webhook received");
     addStravaEvent({
       source: "webhook",
@@ -62,6 +70,18 @@ export async function stravaRoutes(app: FastifyInstance) {
       message: "strava webhook received",
       details: { ownerId: body.owner_id ?? null }
     });
+
+    const webhookEvent = await registerStravaWebhookEvent(body);
+    if (webhookEvent.isDuplicate) {
+      app.log.info({ owner_id: body.owner_id ?? null }, "strava webhook duplicate skipped");
+      addStravaEvent({
+        source: "webhook",
+        level: "info",
+        message: "strava webhook duplicate skipped",
+        details: { ownerId: body.owner_id ?? null }
+      });
+      return { ok: true, duplicate: true };
+    }
 
     if (typeof body.owner_id === "number") {
       const ownerId = body.owner_id;

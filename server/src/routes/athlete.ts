@@ -1,15 +1,28 @@
 import { FastifyInstance } from "fastify";
+import { z } from "zod";
 
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
+import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import { ensureActivityStreams, getStravaAuthUrl, syncLatestActivities } from "../lib/strava.js";
 
-export async function athleteRoutes(app: FastifyInstance) {
-  app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request) => {
-    requireRole(request, ["athlete"]);
+const workoutCursorQuerySchema = z.object({
+  beforeDate: z.string().datetime().optional(),
+  beforeId: z.coerce.number().int().positive().optional()
+});
 
-    const queryInfo = request.query as { before?: string };
-    const beforeDate = queryInfo.before ? new Date(queryInfo.before) : null;
+const WORKOUTS_PAGE_SIZE = 10;
+
+export async function athleteRoutes(app: FastifyInstance) {
+  app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const query = workoutCursorQuerySchema.parse(request.query);
+    if (hasPartialCursor(query)) {
+      return reply.code(400).send({ message: "Invalid workout cursor" });
+    }
+    const beforeDate = query.beforeDate ?? null;
+    const beforeId = query.beforeId ?? null;
+    const hasCursor = beforeDate !== null && beforeId !== null;
 
     const [profileResult, workoutsResult] = await Promise.all([
       pool.query(
@@ -21,17 +34,21 @@ export async function athleteRoutes(app: FastifyInstance) {
         `,
         [request.user.id]
       ),
-      beforeDate 
+      hasCursor
         ? pool.query(
             `
               select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
                      elevation_gain, average_speed, average_heartrate
               from workouts
-              where user_id = $1 and start_date < $2::timestamptz
-              order by start_date desc
-              limit 10
+              where user_id = $1
+                and (
+                  start_date < $2::timestamptz
+                  or (start_date = $2::timestamptz and id < $3)
+                )
+              order by start_date desc, id desc
+              limit $4
             `,
-            [request.user.id, beforeDate]
+            [request.user.id, beforeDate, beforeId, WORKOUTS_PAGE_SIZE]
           )
         : pool.query(
             `
@@ -39,16 +56,18 @@ export async function athleteRoutes(app: FastifyInstance) {
                      elevation_gain, average_speed, average_heartrate
               from workouts
               where user_id = $1
-              order by start_date desc
-              limit 10
+              order by start_date desc, id desc
+              limit $2
             `,
-            [request.user.id]
+            [request.user.id, WORKOUTS_PAGE_SIZE]
           )
     ]);
 
+    const workouts = workoutsResult.rows;
     return {
       athlete: profileResult.rows[0],
-      workouts: workoutsResult.rows
+      workouts,
+      nextCursor: buildNextCursor(workouts as Array<{ id: number; start_date: string }>, WORKOUTS_PAGE_SIZE)
     };
   });
 
