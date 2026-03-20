@@ -343,13 +343,13 @@ select {
 .lap-report-head,
 .lap-report-row {
   display: grid;
-  grid-template-columns: 1.05fr 0.8fr 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 0.78fr 0.82fr 1fr 0.9fr 0.72fr;
+  gap: 14px;
   align-items: center;
 }
 
 .lap-report-head {
-  padding: 14px 6px 12px;
+  padding: 12px 8px 10px;
   font-size: 12px;
   letter-spacing: 0.08em;
   font-weight: 700;
@@ -357,16 +357,22 @@ select {
 }
 
 .lap-report-row {
-  min-height: 64px;
-  padding: 14px 6px;
+  min-height: 56px;
+  padding: 10px 8px;
   border-top: 1px solid rgba(24, 21, 16, 0.06);
 }
 
 .lap-report-index,
-.lap-report-distance,
 .lap-report-heart-value {
   font-size: 16px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lap-report-distance,
+.lap-report-elevation {
+  font-size: 16px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -395,7 +401,7 @@ select {
   display: inline-flex;
   align-items: baseline;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 7px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -403,12 +409,6 @@ select {
   color: #e06d7b;
   font-size: 14px;
   line-height: 1;
-}
-
-.lap-report-heart-unit {
-  color: #8d8796;
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .compact-laps-head,
@@ -852,18 +852,18 @@ select {
 
   .lap-report-head,
   .lap-report-row {
-    grid-template-columns: 0.9fr 0.78fr 0.92fr 1fr;
-    gap: 10px;
+    grid-template-columns: 0.72fr 0.78fr 0.92fr 0.9fr 0.62fr;
+    gap: 8px;
   }
 
   .lap-report-head {
-    padding: 12px 4px 10px;
+    padding: 10px 6px 8px;
     font-size: 11px;
   }
 
   .lap-report-row {
-    min-height: 56px;
-    padding: 12px 4px;
+    min-height: 50px;
+    padding: 9px 6px;
   }
 
   .lap-report-index,
@@ -886,10 +886,6 @@ select {
 
   .lap-report-heart-icon {
     font-size: 12px;
-  }
-
-  .lap-report-heart-unit {
-    font-size: 10px;
   }
 
   .compact-lap-row {
