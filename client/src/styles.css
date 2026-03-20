@@ -343,7 +343,7 @@ select {
 .lap-report-head,
 .lap-report-row {
   display: grid;
-  grid-template-columns: 0.78fr 0.82fr 1fr 0.9fr 0.72fr;
+  grid-template-columns: 0.72fr 0.82fr 1.28fr 0.9fr 0.62fr;
   gap: 14px;
   align-items: center;
 }
@@ -385,7 +385,7 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
+  min-width: 78px;
   min-height: 28px;
   padding: 0 12px;
   border-radius: 10px;
@@ -395,6 +395,7 @@ select {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .lap-report-heart {
@@ -852,7 +853,7 @@ select {
 
   .lap-report-head,
   .lap-report-row {
-    grid-template-columns: 0.72fr 0.78fr 0.92fr 0.9fr 0.62fr;
+    grid-template-columns: 0.66fr 0.76fr 1.16fr 0.88fr 0.54fr;
     gap: 8px;
   }
 
@@ -874,7 +875,7 @@ select {
   }
 
   .lap-report-pace-pill {
-    min-width: 46px;
+    min-width: 70px;
     min-height: 26px;
     padding-inline: 10px;
     border-radius: 8px;
