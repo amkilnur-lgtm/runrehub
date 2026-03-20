@@ -189,12 +189,16 @@ export function TrainerAthletePage() {
       <div className="list">
         {allWorkouts.length === 0 && <div className="muted">Пока нет тренировок.</div>}
         {allWorkouts.map((workout) => (
-          <Link key={workout.id} className="list-row link-row" to={`/trainer/workouts/${workout.id}`}>
-            <div>
+          <Link
+            key={workout.id}
+            className="list-row link-row compact-workout-row"
+            to={`/trainer/workouts/${workout.id}`}
+          >
+            <div className="compact-workout-main">
               <strong>{workout.name}</strong>
               <div className="muted">{formatDate(workout.start_date)}</div>
             </div>
-            <div className="align-right">
+            <div className="align-right compact-workout-meta">
               <div>{formatDistance(workout.distance_meters)}</div>
               <div className="muted">
                 {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}

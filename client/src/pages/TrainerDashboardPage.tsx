@@ -82,13 +82,17 @@ export function TrainerDashboardPage() {
         <h2>Последние пробежки</h2>
         <div className="list">
           {data.recentWorkouts.map((workout) => (
-            <Link key={workout.id} className="list-row link-row" to={`/trainer/workouts/${workout.id}`}>
-              <div>
+            <Link
+              key={workout.id}
+              className="list-row link-row compact-workout-row"
+              to={`/trainer/workouts/${workout.id}`}
+            >
+              <div className="compact-workout-main">
                 <strong>{workout.athlete_name}</strong>
                 <div>{workout.name}</div>
                 <div className="muted">{formatDate(workout.start_date)}</div>
               </div>
-              <div className="align-right">
+              <div className="align-right compact-workout-meta">
                 <div>{formatDistance(workout.distance_meters)}</div>
                 <div className="muted">
                   {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}

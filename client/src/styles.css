@@ -614,6 +614,20 @@ select {
   white-space: nowrap;
 }
 
+.compact-workout-row {
+  padding: 12px 0;
+}
+
+.compact-workout-main,
+.compact-workout-meta {
+  min-width: 0;
+}
+
+.compact-workout-main > div,
+.compact-workout-meta > div {
+  line-height: 1.35;
+}
+
 .athlete-list-main {
   display: flex;
   align-items: center;
@@ -1309,6 +1323,10 @@ select {
     width: 38px;
     height: 38px;
     font-size: 13px;
+  }
+
+  .compact-workout-row {
+    padding: 12px 14px;
   }
 
   .athlete-profile-header {
