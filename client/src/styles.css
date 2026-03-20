@@ -356,6 +356,11 @@ select {
   text-transform: uppercase;
 }
 
+.lap-report-head > span,
+.lap-report-row > span {
+  justify-self: start;
+}
+
 .lap-report-row {
   min-height: 56px;
   padding: 10px 8px;
@@ -379,11 +384,14 @@ select {
 .lap-report-elevation {
   color: #5f5a67;
   font-weight: 400;
+  justify-self: start;
+  text-align: left;
 }
 
 .lap-report-pace-cell {
   display: flex;
   justify-content: flex-start;
+  justify-self: start;
 }
 
 .lap-report-pace-pill {
@@ -407,6 +415,7 @@ select {
   display: inline-flex;
   align-items: baseline;
   justify-content: flex-start;
+  justify-self: start;
   gap: 7px;
   font-variant-numeric: tabular-nums;
 }
