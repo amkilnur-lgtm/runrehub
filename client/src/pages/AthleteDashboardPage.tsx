@@ -1,10 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { useApi } from "../hooks/useApi";
-import { formatDate, formatDistance, formatPace, formatDuration } from "../lib";
 import { UserAvatar } from "../components/UserAvatar";
+import { useApi } from "../hooks/useApi";
+import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+
+type StatsPeriodKey = "week" | "year" | "allTime";
+
+type PeriodStats = {
+  distance_meters: number;
+  moving_time_seconds: number;
+  elevation_gain: number;
+  workout_count: number;
+};
 
 type AthleteDashboardData = {
   athlete: {
@@ -15,14 +24,19 @@ type AthleteDashboardData = {
     connected_at: string | null;
     last_synced_at: string | null;
   };
+  stats: {
+    week: PeriodStats;
+    year: PeriodStats;
+    allTime: PeriodStats;
+  };
   workouts: Array<{
     id: number;
     name: string;
     start_date: string;
     distance_meters: number;
     moving_time_seconds: number;
-      average_speed: number | null;
-      average_heartrate: number | null;
+    average_speed: number | null;
+    average_heartrate: number | null;
   }>;
   nextCursor: {
     beforeDate: string;
@@ -30,16 +44,52 @@ type AthleteDashboardData = {
   } | null;
 };
 
+const statsPeriods: Array<{ key: StatsPeriodKey; label: string }> = [
+  { key: "week", label: "Неделя" },
+  { key: "year", label: "Год" },
+  { key: "allTime", label: "Все время" }
+];
+
+function formatStatsHours(seconds: number) {
+  if (seconds <= 0) {
+    return "0ч 0м";
+  }
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}ч ${minutes}м`;
+}
+
+function formatStatsElevation(value: number) {
+  return `${Math.round(value)} м`;
+}
+
+function formatSyncStatus(connectedAt: string | null, lastSyncedAt: string | null) {
+  if (!connectedAt) {
+    return {
+      title: "Strava не подключена",
+      subtitle: "Подключите Strava для автоматической синхронизации"
+    };
+  }
+
+  return {
+    title: "Strava подключена",
+    subtitle: lastSyncedAt
+      ? `Последняя синхронизация: ${formatDate(lastSyncedAt)}`
+      : "Последняя синхронизация: еще не выполнялась"
+  };
+}
+
 export function AthleteDashboardPage() {
   const { data, loading, error, refresh } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
-  const [extraWorkouts, setExtraWorkouts] = useState<AthleteDashboardData['workouts']>([]);
+  const [extraWorkouts, setExtraWorkouts] = useState<AthleteDashboardData["workouts"]>([]);
   const [nextCursor, setNextCursor] = useState<AthleteDashboardData["nextCursor"]>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriodKey>("week");
   const [isStravaMenuOpen, setIsStravaMenuOpen] = useState(false);
   const stravaMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Сброс при полном рефреше данных
   useEffect(() => {
     if (data) {
       setExtraWorkouts([]);
@@ -75,7 +125,9 @@ export function AthleteDashboardPage() {
   }, [isStravaMenuOpen]);
 
   async function loadMore() {
-    if (!nextCursor) return;
+    if (!nextCursor) {
+      return;
+    }
 
     setIsLoadingMore(true);
     try {
@@ -99,13 +151,14 @@ export function AthleteDashboardPage() {
     window.location.href = response.url;
   }
 
-  async function sync() {
-    await api("/api/athlete/strava/sync", { method: "POST" });
-    refresh();
-  }
-
   async function disconnectStrava() {
-    if (!window.confirm("Вы уверены, что хотите отключить Strava? Ваша история тренировок останется, но новые не будут загружаться.")) return;
+    const confirmed = window.confirm(
+      "Вы уверены, что хотите отключить Strava? История тренировок останется, но новые данные больше не будут подтягиваться автоматически."
+    );
+    if (!confirmed) {
+      return;
+    }
+
     await api("/api/athlete/strava/disconnect", { method: "DELETE" });
     setIsStravaMenuOpen(false);
     refresh();
@@ -131,7 +184,8 @@ export function AthleteDashboardPage() {
   }
 
   const allWorkouts = [...data.workouts, ...extraWorkouts];
-  const latest = allWorkouts[0];
+  const selectedStats = data.stats[selectedPeriod];
+  const syncStatus = formatSyncStatus(data.athlete.connected_at, data.athlete.last_synced_at);
 
   return (
     <div className="stack">
@@ -145,33 +199,24 @@ export function AthleteDashboardPage() {
               ariaHidden
             />
             <div className="athlete-account-title">
-              <h1>{data.athlete.full_name ?? "Спортсмен"}</h1>
+              <h1>{data.athlete.full_name}</h1>
               <p className="muted">@{data.athlete.username}</p>
             </div>
           </div>
           <div className="athlete-account-main">
             <div className="athlete-account-topbar">
               <div className="athlete-account-status">
-                <div>{data.athlete.connected_at ? "Strava подключена" : "Strava не подключена"}</div>
-                <div className="muted">
-                  {data.athlete.connected_at
-                    ? data.athlete.last_synced_at
-                      ? `Последняя синхронизация: ${formatDate(data.athlete.last_synced_at)}`
-                      : "Последняя синхронизация: ещё не выполнялась"
-                    : "Подключите Strava для автоматической синхронизации"}
-                </div>
-              </div>
-              <div className="athlete-strava-control" ref={stravaMenuRef}>
                 {data.athlete.connected_at ? (
-                  <>
+                  <div className="athlete-strava-control" ref={stravaMenuRef}>
                     <button
                       type="button"
-                      className="ghost-button athlete-strava-button"
+                      className="athlete-account-status-trigger"
                       aria-expanded={isStravaMenuOpen}
                       onClick={() => setIsStravaMenuOpen((open) => !open)}
                     >
-                      Strava подключена
+                      {syncStatus.title}
                     </button>
+                    {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
                     {isStravaMenuOpen ? (
                       <div className="athlete-strava-popover">
                         <button
@@ -183,34 +228,53 @@ export function AthleteDashboardPage() {
                         </button>
                       </div>
                     ) : null}
-                  </>
+                  </div>
                 ) : (
-                  <button className="primary-button athlete-strava-button" onClick={connectStrava}>
-                    Подключить Strava
-                  </button>
+                  <>
+                    <button type="button" className="primary-button athlete-strava-button" onClick={connectStrava}>
+                      Подключить Strava
+                    </button>
+                    {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
+                  </>
                 )}
+              </div>
+              <div className="athlete-stats-periods" role="tablist" aria-label="Период статистики">
+                {statsPeriods.map((period) => (
+                  <button
+                    key={period.key}
+                    type="button"
+                    className={
+                      period.key === selectedPeriod
+                        ? "athlete-stats-period is-active"
+                        : "athlete-stats-period"
+                    }
+                    onClick={() => setSelectedPeriod(period.key)}
+                  >
+                    {period.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="athlete-account-stats">
               <div className="athlete-account-stat">
-                <span className="muted">Страва</span>
-                <strong>{data.athlete.connected_at ? "Подключена" : "Не подключена"}</strong>
+                <span className="muted">Километраж</span>
+                <strong>{formatDistance(selectedStats.distance_meters)}</strong>
               </div>
               <div className="athlete-account-stat">
-                <span className="muted">Последняя синхронизация</span>
-                <strong>
-                  {data.athlete.last_synced_at
-                    ? formatDate(data.athlete.last_synced_at)
-                    : "Еще не было"}
-                </strong>
+                <span className="muted">Время</span>
+                <strong>{formatStatsHours(selectedStats.moving_time_seconds)}</strong>
               </div>
               <div className="athlete-account-stat">
-                <span className="muted">Последняя тренировка</span>
-                <strong>{latest ? formatDate(latest.start_date) : "Нет данных"}</strong>
+                <span className="muted">Набор высоты</span>
+                <strong>{formatStatsElevation(selectedStats.elevation_gain)}</strong>
+              </div>
+              <div className="athlete-account-stat">
+                <span className="muted">Тренировки</span>
+                <strong>{selectedStats.workout_count}</strong>
               </div>
             </div>
             <p className="muted athlete-account-caption">
-              Новые тренировки подтягиваются webhook-ом и фоновым sync каждые 15 минут.
+              Периодическая сводка считается по завершенным тренировкам спортсмена.
             </p>
           </div>
         </div>
@@ -235,13 +299,13 @@ export function AthleteDashboardPage() {
             </Link>
           ))}
         </div>
-        {allWorkouts.length > 0 && hasMore && (
-           <div style={{ marginTop: "16px", textAlign: "center" }}>
-             <button className="ghost-button" disabled={isLoadingMore} onClick={loadMore}>
-               {isLoadingMore ? "Загрузка..." : "Загрузить ещё"}
-             </button>
-           </div>
-        )}
+        {allWorkouts.length > 0 && hasMore ? (
+          <div style={{ marginTop: "16px", textAlign: "center" }}>
+            <button className="ghost-button" disabled={isLoadingMore} onClick={loadMore}>
+              {isLoadingMore ? "Загрузка..." : "Загрузить ещё"}
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );
