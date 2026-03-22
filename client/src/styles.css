@@ -662,6 +662,11 @@ select {
   display: block;
 }
 
+.athlete-account-header-shell {
+  display: grid;
+  gap: 10px;
+}
+
 .athlete-account-header {
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(24, 21, 16, 0.08);
@@ -675,7 +680,13 @@ select {
   grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr);
   gap: 24px;
   align-items: start;
-  margin-top: 10px;
+}
+
+.athlete-account-identity-wrap {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding-top: 12px;
 }
 
 .athlete-account-identity {
@@ -683,7 +694,6 @@ select {
   align-items: center;
   gap: 18px;
   min-width: 0;
-  padding-top: 12px;
 }
 
 .athlete-account-avatar {
@@ -730,6 +740,10 @@ select {
   line-height: 1.4;
 }
 
+.athlete-account-status-inline {
+  padding-left: 94px;
+}
+
 .athlete-account-status-trigger {
   width: fit-content;
   padding: 0;
@@ -743,6 +757,22 @@ select {
 
 .athlete-account-status-trigger:hover {
   color: #8a4b16;
+}
+
+.athlete-account-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.athlete-account-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.athlete-account-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 12px;
 }
 
 .athlete-account-stats {
@@ -1412,9 +1442,13 @@ select {
     gap: 14px;
   }
 
+  .athlete-account-identity-wrap {
+    padding-top: 4px;
+    gap: 12px;
+  }
+
   .athlete-account-identity {
     gap: 14px;
-    padding-top: 4px;
   }
 
   .athlete-account-avatar {
@@ -1443,6 +1477,14 @@ select {
 
   .athlete-account-status {
     font-size: 13px;
+  }
+
+  .athlete-account-status-inline {
+    padding-left: 74px;
+  }
+
+  .athlete-account-heading h2 {
+    font-size: 16px;
   }
 
   .athlete-stats-periods {
