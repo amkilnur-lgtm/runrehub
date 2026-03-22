@@ -753,6 +753,45 @@ select {
   font-size: 13px;
 }
 
+.athlete-strava-control {
+  position: relative;
+}
+
+.athlete-strava-button {
+  min-height: 44px;
+}
+
+.athlete-strava-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  z-index: 20;
+}
+
+.athlete-strava-item {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.athlete-strava-item-danger {
+  color: #9a2f13;
+}
+
+.athlete-strava-item-danger:hover {
+  background: #fff1ec;
+}
+
 .athlete-stats-periods {
   display: inline-flex;
   align-items: center;

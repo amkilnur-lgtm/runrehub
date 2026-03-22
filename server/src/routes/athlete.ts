@@ -27,7 +27,7 @@ export async function athleteRoutes(app: FastifyInstance) {
     const [profileResult, workoutsResult] = await Promise.all([
       pool.query(
         `
-          select u.id, u.full_name, u.username, sc.connected_at, sc.last_synced_at
+          select u.id, u.full_name, u.username, u.avatar_url, sc.connected_at, sc.last_synced_at
           from users u
           left join strava_connections sc on sc.user_id = u.id
           where u.id = $1
