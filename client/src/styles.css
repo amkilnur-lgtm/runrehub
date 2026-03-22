@@ -670,6 +670,11 @@ select {
   margin-bottom: 18px;
 }
 
+.athlete-profile-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .athlete-profile-header {
   display: flex;
   align-items: center;
@@ -706,7 +711,7 @@ select {
 .athlete-profile-meta {
   display: grid;
   gap: 4px;
-  margin-top: 16px;
+  margin-left: calc(76px + 18px);
   font-size: 14px;
   line-height: 1.4;
 }
@@ -1373,7 +1378,7 @@ select {
   }
 
   .athlete-profile-meta {
-    margin-top: 12px;
+    margin-left: calc(60px + 14px);
     font-size: 13px;
   }
 

@@ -152,16 +152,19 @@ export function TrainerAthletePage() {
       <section className="card">
         <Link to="/trainer" className="inline-link">Назад</Link>
         <div className="athlete-overview-grid">
-          <div className="athlete-profile-header">
-            <UserAvatar
-              fullName={data.athlete.full_name}
-              avatarUrl={data.athlete.avatar_url}
-              className="athlete-profile-avatar"
-              ariaHidden
-            />
-          <div className="athlete-profile-title">
-            <h2>{data.athlete.full_name}</h2>
-            <p className="muted">@{data.athlete.username}</p>
+          <div className="athlete-profile-panel">
+            <div className="athlete-profile-header">
+              <UserAvatar
+                fullName={data.athlete.full_name}
+                avatarUrl={data.athlete.avatar_url}
+                className="athlete-profile-avatar"
+                ariaHidden
+              />
+              <div className="athlete-profile-title">
+                <h2>{data.athlete.full_name}</h2>
+                <p className="muted">@{data.athlete.username}</p>
+              </div>
+            </div>
             <div className="athlete-profile-meta">
               <div>{syncStatus.title}</div>
               {syncStatus.subtitle ? (
@@ -169,7 +172,6 @@ export function TrainerAthletePage() {
               ) : null}
             </div>
           </div>
-        </div>
           <section className="athlete-stats-card inset-card">
             <div className="athlete-stats-topbar">
               <div>
