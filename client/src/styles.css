@@ -730,6 +730,21 @@ select {
   line-height: 1.4;
 }
 
+.athlete-account-status-trigger {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #181510;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.athlete-account-status-trigger:hover {
+  color: #8a4b16;
+}
+
 .athlete-account-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -755,16 +770,18 @@ select {
 
 .athlete-strava-control {
   position: relative;
+  width: fit-content;
 }
 
 .athlete-strava-button {
   min-height: 44px;
+  width: fit-content;
 }
 
 .athlete-strava-popover {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
   min-width: 180px;
   padding: 8px;
   border-radius: 16px;
