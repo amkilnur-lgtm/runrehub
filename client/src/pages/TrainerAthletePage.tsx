@@ -21,6 +21,8 @@ type AthletePageData = {
     full_name: string;
     username: string;
     avatar_url: string | null;
+    connected_at: string | null;
+    last_synced_at: string | null;
   };
   stats: {
     week: PeriodStats;
@@ -59,6 +61,25 @@ function formatStatsHours(seconds: number) {
 
 function formatStatsElevation(value: number) {
   return `${Math.round(value)} м`;
+}
+
+function formatSyncStatus(
+  connectedAt: string | null,
+  lastSyncedAt: string | null
+) {
+  if (!connectedAt) {
+    return {
+      title: "Strava не подключена",
+      subtitle: null
+    };
+  }
+
+  return {
+    title: "Strava подключена",
+    subtitle: lastSyncedAt
+      ? `Последняя синхронизация: ${formatDate(lastSyncedAt)}`
+      : "Последняя синхронизация: ещё не выполнялась"
+  };
 }
 
 export function TrainerAthletePage() {
@@ -121,6 +142,10 @@ export function TrainerAthletePage() {
 
   const allWorkouts = [...data.workouts, ...extraWorkouts];
   const selectedStats = data.stats[selectedPeriod];
+  const syncStatus = formatSyncStatus(
+    data.athlete.connected_at,
+    data.athlete.last_synced_at
+  );
 
   return (
     <div className="stack">
@@ -134,11 +159,17 @@ export function TrainerAthletePage() {
               className="athlete-profile-avatar"
               ariaHidden
             />
-            <div className="athlete-profile-title">
-              <h2>{data.athlete.full_name}</h2>
-              <p className="muted">@{data.athlete.username}</p>
+          <div className="athlete-profile-title">
+            <h2>{data.athlete.full_name}</h2>
+            <p className="muted">@{data.athlete.username}</p>
+            <div className="athlete-profile-meta">
+              <div>{syncStatus.title}</div>
+              {syncStatus.subtitle ? (
+                <div className="muted">{syncStatus.subtitle}</div>
+              ) : null}
             </div>
           </div>
+        </div>
           <section className="athlete-stats-card inset-card">
             <div className="athlete-stats-topbar">
               <div>
