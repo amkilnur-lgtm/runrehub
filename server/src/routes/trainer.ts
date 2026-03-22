@@ -77,7 +77,18 @@ export async function trainerRoutes(app: FastifyInstance) {
     const hasCursor = beforeDate !== null && beforeId !== null;
 
     const athleteResult = await pool.query(
-      `select id, full_name, username, avatar_url from users where id = $1 and coach_id = $2 and role = 'athlete'`,
+      `
+        select
+          u.id,
+          u.full_name,
+          u.username,
+          u.avatar_url,
+          sc.connected_at,
+          sc.last_synced_at
+        from users u
+        left join strava_connections sc on sc.user_id = u.id
+        where u.id = $1 and u.coach_id = $2 and u.role = 'athlete'
+      `,
       [athleteId, request.user.id]
     );
 

@@ -703,6 +703,14 @@ select {
   font-size: 16px;
 }
 
+.athlete-profile-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .athlete-stats-card {
   display: grid;
   gap: 18px;
@@ -1362,6 +1370,11 @@ select {
 
   .athlete-profile-title p {
     font-size: 15px;
+  }
+
+  .athlete-profile-meta {
+    margin-top: 12px;
+    font-size: 13px;
   }
 
   .athlete-stats-card {
