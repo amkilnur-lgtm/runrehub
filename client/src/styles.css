@@ -662,78 +662,95 @@ select {
   display: block;
 }
 
-.athlete-overview-grid {
+.athlete-account-header {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(24, 21, 16, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+  padding: 24px;
+}
+
+.athlete-account-header-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(320px, 1fr);
+  grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr);
   gap: 24px;
   align-items: start;
   margin-top: 10px;
-  margin-bottom: 18px;
 }
 
-.athlete-profile-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.athlete-profile-header {
+.athlete-account-identity {
   display: flex;
   align-items: center;
   gap: 18px;
-  margin: 0;
+  min-width: 0;
   padding-top: 12px;
 }
 
-.athlete-profile-avatar {
+.athlete-account-avatar {
   width: 76px;
   height: 76px;
   font-size: 26px;
-  transform: none;
   flex: 0 0 auto;
 }
 
-.athlete-profile-title {
+.athlete-account-title {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
 }
 
-.athlete-profile-title h2 {
+.athlete-account-title h1 {
   margin: 0;
   line-height: 1.05;
+  font-size: 40px;
 }
 
-.athlete-profile-title p {
+.athlete-account-title p {
   margin: 8px 0 0;
   font-size: 16px;
 }
 
-.athlete-profile-meta {
-  display: grid;
-  gap: 4px;
-  margin-left: calc(76px + 18px);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.athlete-stats-card {
+.athlete-account-main {
   display: grid;
   gap: 18px;
-  min-height: 188px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: #fff9f2;
 }
 
-.athlete-stats-topbar {
+.athlete-account-topbar {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.athlete-stats-title {
-  display: block;
-  margin-top: 6px;
-  font-size: 18px;
+.athlete-account-status {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.athlete-account-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.athlete-account-stat {
+  display: grid;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(24, 21, 16, 0.08);
+}
+
+.athlete-account-stat strong {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.athlete-account-caption {
+  margin: 0;
+  font-size: 13px;
 }
 
 .athlete-stats-periods {
@@ -759,29 +776,6 @@ select {
   background: #fff;
   color: #181510;
   box-shadow: 0 8px 18px rgba(56, 42, 16, 0.08);
-}
-
-.athlete-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.athlete-stats-item {
-  display: grid;
-  gap: 6px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
-}
-
-.athlete-stats-item strong {
-  font-size: 28px;
-  line-height: 1.05;
-}
-
-.athlete-stats-caption {
-  margin: 0;
-  font-size: 13px;
 }
 
 .chart-column {
@@ -1353,48 +1347,46 @@ select {
     padding: 12px 14px;
   }
 
-  .athlete-profile-header {
-    gap: 12px;
+  .athlete-account-header {
+    padding: 18px;
   }
 
-  .athlete-overview-grid {
+  .athlete-account-header-grid {
     grid-template-columns: 1fr;
     gap: 14px;
-    margin-bottom: 16px;
   }
 
-  .athlete-profile-avatar {
+  .athlete-account-identity {
+    gap: 14px;
+    padding-top: 4px;
+  }
+
+  .athlete-account-avatar {
     width: 60px;
     height: 60px;
     font-size: 21px;
   }
 
-  .athlete-profile-header {
-    gap: 14px;
-    padding-top: 6px;
+  .athlete-account-title h1 {
+    font-size: 32px;
   }
 
-  .athlete-profile-title p {
+  .athlete-account-title p {
     font-size: 15px;
   }
 
-  .athlete-profile-meta {
-    margin-left: calc(60px + 14px);
-    font-size: 13px;
-  }
-
-  .athlete-stats-card {
+  .athlete-account-main {
     gap: 14px;
-    min-height: 0;
+    padding: 16px;
   }
 
-  .athlete-stats-topbar {
+  .athlete-account-topbar {
     display: grid;
     gap: 12px;
   }
 
-  .athlete-stats-title {
-    font-size: 16px;
+  .athlete-account-status {
+    font-size: 13px;
   }
 
   .athlete-stats-periods {
@@ -1407,12 +1399,12 @@ select {
     padding: 8px 12px;
   }
 
-  .athlete-stats-grid {
+  .athlete-account-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
-  .athlete-stats-item strong {
+  .athlete-account-stat strong {
     font-size: 22px;
   }
 
