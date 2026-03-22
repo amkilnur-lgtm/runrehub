@@ -767,6 +767,7 @@ select {
 .athlete-account-heading h2 {
   margin: 0;
   font-size: 18px;
+  font-weight: 600;
 }
 
 .athlete-account-eyebrow {
@@ -791,6 +792,7 @@ select {
 .athlete-account-stat strong {
   font-size: 28px;
   line-height: 1.05;
+  font-weight: 600;
 }
 
 .athlete-account-caption {
