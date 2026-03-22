@@ -194,7 +194,6 @@ export function AppLayout() {
               </div>
               <h1>{user?.fullName}</h1>
             </div>
-            <span className="role-badge">{user?.role}</span>
           </div>
         </div>
       </header>

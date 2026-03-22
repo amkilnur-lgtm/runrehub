@@ -203,7 +203,6 @@ export function AdminPage() {
                       marginBottom: "4px"
                     }}
                   >
-                    <div className="role-badge">{user.role}</div>
                     {user.role !== "admin" && (
                       <button
                         type="button"
