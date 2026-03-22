@@ -149,34 +149,28 @@ export function TrainerAthletePage() {
 
   return (
     <div className="stack">
-      <section className="card">
+      <section className="athlete-account-header">
         <Link to="/trainer" className="inline-link">Назад</Link>
-        <div className="athlete-overview-grid">
-          <div className="athlete-profile-panel">
-            <div className="athlete-profile-header">
-              <UserAvatar
-                fullName={data.athlete.full_name}
-                avatarUrl={data.athlete.avatar_url}
-                className="athlete-profile-avatar"
-                ariaHidden
-              />
-              <div className="athlete-profile-title">
-                <h2>{data.athlete.full_name}</h2>
-                <p className="muted">@{data.athlete.username}</p>
-              </div>
-            </div>
-            <div className="athlete-profile-meta">
-              <div>{syncStatus.title}</div>
-              {syncStatus.subtitle ? (
-                <div className="muted">{syncStatus.subtitle}</div>
-              ) : null}
+        <div className="athlete-account-header-grid">
+          <div className="athlete-account-identity">
+            <UserAvatar
+              fullName={data.athlete.full_name}
+              avatarUrl={data.athlete.avatar_url}
+              className="athlete-account-avatar"
+              ariaHidden
+            />
+            <div className="athlete-account-title">
+              <h1>{data.athlete.full_name}</h1>
+              <p className="muted">@{data.athlete.username}</p>
             </div>
           </div>
-          <section className="athlete-stats-card inset-card">
-            <div className="athlete-stats-topbar">
-              <div>
-                <div className="eyebrow">Сводка</div>
-                <strong className="athlete-stats-title">Статистика спортсмена</strong>
+          <div className="athlete-account-main">
+            <div className="athlete-account-topbar">
+              <div className="athlete-account-status">
+                <div>{syncStatus.title}</div>
+                {syncStatus.subtitle ? (
+                  <div className="muted">{syncStatus.subtitle}</div>
+                ) : null}
               </div>
               <div className="athlete-stats-periods" role="tablist" aria-label="Период статистики">
                 {statsPeriods.map((period) => (
@@ -195,28 +189,28 @@ export function TrainerAthletePage() {
                 ))}
               </div>
             </div>
-            <div className="athlete-stats-grid">
-              <div className="athlete-stats-item">
+            <div className="athlete-account-stats">
+              <div className="athlete-account-stat">
                 <span className="muted">Километраж</span>
                 <strong>{formatDistance(selectedStats.distance_meters)}</strong>
               </div>
-              <div className="athlete-stats-item">
+              <div className="athlete-account-stat">
                 <span className="muted">Время</span>
                 <strong>{formatStatsHours(selectedStats.moving_time_seconds)}</strong>
               </div>
-              <div className="athlete-stats-item">
+              <div className="athlete-account-stat">
                 <span className="muted">Набор высоты</span>
                 <strong>{formatStatsElevation(selectedStats.elevation_gain)}</strong>
               </div>
-              <div className="athlete-stats-item">
+              <div className="athlete-account-stat">
                 <span className="muted">Тренировки</span>
                 <strong>{selectedStats.workout_count}</strong>
               </div>
             </div>
-            <p className="muted athlete-stats-caption">
+            <p className="muted athlete-account-caption">
               Периодическая сводка считается по завершённым тренировкам спортсмена.
             </p>
-          </section>
+          </div>
         </div>
       </section>
 
