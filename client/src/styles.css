@@ -139,10 +139,10 @@ select {
 }
 
 .topbar-avatar {
-  width: 64px;
-  height: 64px;
-  font-size: 22px;
-  transform: translateY(2px);
+  width: 76px;
+  height: 76px;
+  font-size: 26px;
+  transform: none;
 }
 
 .avatar-menu {
@@ -1047,9 +1047,9 @@ select {
   }
 
   .topbar-avatar {
-    width: 52px;
-    height: 52px;
-    font-size: 17px;
+    width: 60px;
+    height: 60px;
+    font-size: 21px;
   }
 
   .avatar-menu-popover {
