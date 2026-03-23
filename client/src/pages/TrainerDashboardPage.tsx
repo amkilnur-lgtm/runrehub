@@ -268,7 +268,7 @@ export function TrainerDashboardPage() {
         </div>
       </section>
 
-      <div className="grid two-columns">
+      <div className="grid two-columns trainer-dashboard-sections">
         <section className="card">
           <h2>Спортсмены</h2>
           <div className="list">

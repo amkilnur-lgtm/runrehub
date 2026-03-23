@@ -771,6 +771,12 @@ select {
   font-weight: 600;
 }
 
+.trainer-dashboard-sections > .card > h2 {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .trainer-dashboard-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.16em;
