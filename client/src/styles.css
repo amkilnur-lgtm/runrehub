@@ -82,6 +82,15 @@ select {
   width: 100%;
 }
 
+.topbar-brand {
+  min-width: 0;
+  color: #3f3326;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+}
+
 .topbar-main-row {
   display: block;
   width: 100%;
@@ -1315,6 +1324,11 @@ select {
   .topbar {
     margin-bottom: 16px;
     gap: 8px;
+  }
+
+  .topbar-brand {
+    font-size: 13px;
+    letter-spacing: 0.05em;
   }
 
   .topbar h1 {
