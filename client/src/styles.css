@@ -687,21 +687,15 @@ select {
   background: #fff9f2;
 }
 
-.trainer-dashboard-identity,
-.athlete-account-identity-wrap {
+.trainer-dashboard-identity {
   display: grid;
   gap: 12px;
-  min-width: 0;
-  padding-top: 10px;
-}
-
-.trainer-dashboard-identity {
   align-content: start;
+  padding: 10px 0 0;
   background: transparent;
 }
 
-.trainer-dashboard-identity-main,
-.athlete-account-identity {
+.trainer-dashboard-identity-main {
   display: flex;
   align-items: flex-start;
   gap: 18px;
@@ -869,6 +863,20 @@ select {
   grid-template-columns: minmax(236px, 300px) minmax(456px, 1fr);
   gap: 20px;
   align-items: start;
+}
+
+.athlete-account-identity-wrap {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.athlete-account-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  min-width: 0;
 }
 
 .athlete-account-avatar {
@@ -1644,10 +1652,9 @@ select {
     gap: 12px;
   }
 
-  .trainer-dashboard-identity,
-  .athlete-account-identity-wrap {
+  .trainer-dashboard-identity {
     gap: 10px;
-    padding-top: 4px;
+    padding: 4px 0 0;
   }
 
   .trainer-dashboard-avatar {
@@ -1693,7 +1700,10 @@ select {
     gap: 10px;
   }
 
-  .trainer-dashboard-identity-main,
+  .trainer-dashboard-identity-main {
+    gap: 14px;
+  }
+
   .athlete-account-identity {
     gap: 14px;
   }
