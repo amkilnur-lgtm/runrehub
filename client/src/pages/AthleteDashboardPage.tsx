@@ -17,6 +17,7 @@ type AthleteDashboardData = {
   };
   stats: {
     week: PeriodStats;
+    month: PeriodStats;
     year: PeriodStats;
     allTime: PeriodStats;
   };

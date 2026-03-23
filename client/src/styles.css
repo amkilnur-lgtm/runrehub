@@ -858,8 +858,8 @@ select {
 
 .athlete-account-header-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(236px, 300px) minmax(456px, 1fr);
+  gap: 20px;
   align-items: start;
 }
 

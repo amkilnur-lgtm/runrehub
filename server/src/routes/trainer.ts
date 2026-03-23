@@ -18,6 +18,10 @@ type AthleteStatsRow = {
   week_moving_time_seconds: number | string | null;
   week_elevation_gain: number | string | null;
   week_workout_count: number | string | null;
+  month_distance_meters: number | string | null;
+  month_moving_time_seconds: number | string | null;
+  month_elevation_gain: number | string | null;
+  month_workout_count: number | string | null;
   year_distance_meters: number | string | null;
   year_moving_time_seconds: number | string | null;
   year_elevation_gain: number | string | null;
@@ -245,6 +249,10 @@ export async function trainerRoutes(app: FastifyInstance) {
             coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
             coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('week', now())), 0) as week_elevation_gain,
             count(*) filter (where start_date >= date_trunc('week', now())) as week_workout_count,
+            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('month', now())), 0) as month_distance_meters,
+            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
+            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('month', now())), 0) as month_elevation_gain,
+            count(*) filter (where start_date >= date_trunc('month', now())) as month_workout_count,
             coalesce(sum(distance_meters) filter (where start_date >= date_trunc('year', now())), 0) as year_distance_meters,
             coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
             coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('year', now())), 0) as year_elevation_gain,
@@ -270,6 +278,12 @@ export async function trainerRoutes(app: FastifyInstance) {
           moving_time_seconds: Number(stats?.week_moving_time_seconds ?? 0),
           elevation_gain: Number(stats?.week_elevation_gain ?? 0),
           workout_count: Number(stats?.week_workout_count ?? 0)
+        },
+        month: {
+          distance_meters: Number(stats?.month_distance_meters ?? 0),
+          moving_time_seconds: Number(stats?.month_moving_time_seconds ?? 0),
+          elevation_gain: Number(stats?.month_elevation_gain ?? 0),
+          workout_count: Number(stats?.month_workout_count ?? 0)
         },
         year: {
           distance_meters: Number(stats?.year_distance_meters ?? 0),
