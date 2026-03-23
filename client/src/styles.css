@@ -771,12 +771,6 @@ select {
   font-weight: 600;
 }
 
-.trainer-dashboard-sections > .card > h2 {
-  margin: 6px 0 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
 .trainer-dashboard-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -863,6 +857,77 @@ select {
 }
 
 .trainer-dashboard-leader-distance {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trainer-dashboard-list-card {
+  display: grid;
+  gap: 14px;
+}
+
+.trainer-dashboard-athlete-list,
+.trainer-dashboard-workout-list {
+  display: grid;
+}
+
+.trainer-dashboard-athlete-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid rgba(24, 21, 16, 0.08);
+}
+
+.trainer-dashboard-athlete-row:first-child,
+.trainer-dashboard-workout-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.trainer-dashboard-athlete-row:last-child,
+.trainer-dashboard-workout-row:last-child {
+  padding-bottom: 0;
+}
+
+.trainer-dashboard-athlete-meta {
+  color: #72685a;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trainer-dashboard-workout-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid rgba(24, 21, 16, 0.08);
+}
+
+.trainer-dashboard-workout-main,
+.trainer-dashboard-workout-meta {
+  min-width: 0;
+}
+
+.trainer-dashboard-workout-main strong,
+.trainer-dashboard-workout-meta > div:first-child {
+  display: block;
+}
+
+.trainer-dashboard-workout-main > div,
+.trainer-dashboard-workout-meta > div {
+  line-height: 1.35;
+}
+
+.trainer-dashboard-workout-meta {
+  text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1712,6 +1777,10 @@ select {
     font-size: 16px;
   }
 
+  .trainer-dashboard-list-card {
+    gap: 12px;
+  }
+
   .trainer-dashboard-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -1719,6 +1788,16 @@ select {
 
   .trainer-dashboard-stat strong {
     font-size: 20px;
+  }
+
+  .trainer-dashboard-athlete-row,
+  .trainer-dashboard-workout-row {
+    gap: 10px;
+  }
+
+  .trainer-dashboard-athlete-meta,
+  .trainer-dashboard-workout-meta {
+    font-size: 13px;
   }
 
   .athlete-account-identity-wrap {
