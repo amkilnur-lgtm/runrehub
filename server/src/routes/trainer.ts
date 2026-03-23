@@ -28,12 +28,24 @@ type AthleteStatsRow = {
   all_time_workout_count: number | string | null;
 };
 
+type TrainerDashboardStatsRow = {
+  week_distance_meters: number | string | null;
+  week_moving_time_seconds: number | string | null;
+  week_workout_count: number | string | null;
+  year_distance_meters: number | string | null;
+  year_moving_time_seconds: number | string | null;
+  year_workout_count: number | string | null;
+  all_time_distance_meters: number | string | null;
+  all_time_moving_time_seconds: number | string | null;
+  all_time_workout_count: number | string | null;
+};
+
 export async function trainerRoutes(app: FastifyInstance) {
   // Оба запроса независимы — запускаем параллельно через Promise.all
   app.get("/api/trainer/dashboard", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
 
-    const [athletesResult, workoutsResult] = await Promise.all([
+    const [athletesResult, workoutsResult, summaryResult, connectedResult, leadersResult] = await Promise.all([
       pool.query(
         `
           select u.id, u.full_name, u.username, u.avatar_url,
@@ -55,12 +67,90 @@ export async function trainerRoutes(app: FastifyInstance) {
           limit 20
         `,
         [request.user.id]
+      ),
+      pool.query<TrainerDashboardStatsRow>(
+        `
+          select
+            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
+            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
+            count(w.id) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
+            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
+            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
+            count(w.id) filter (where w.start_date >= date_trunc('year', now())) as year_workout_count,
+            coalesce(sum(w.distance_meters), 0) as all_time_distance_meters,
+            coalesce(sum(w.moving_time_seconds), 0) as all_time_moving_time_seconds,
+            count(w.id) as all_time_workout_count
+          from users u
+          left join workouts w on w.user_id = u.id
+          where u.role = 'athlete' and u.coach_id = $1
+        `,
+        [request.user.id]
+      ),
+      pool.query(
+        `
+          select count(*) as connected_count
+          from users u
+          join strava_connections sc on sc.user_id = u.id
+          where u.role = 'athlete' and u.coach_id = $1
+        `,
+        [request.user.id]
+      ),
+      pool.query(
+        `
+          select
+            u.id,
+            u.full_name,
+            u.username,
+            u.avatar_url,
+            coalesce(sum(w.distance_meters), 0) as week_distance_meters,
+            count(w.id) as week_workout_count
+          from users u
+          left join workouts w
+            on w.user_id = u.id
+           and w.start_date >= date_trunc('week', now())
+          where u.role = 'athlete' and u.coach_id = $1
+          group by u.id, u.full_name, u.username, u.avatar_url
+          order by week_distance_meters desc, week_workout_count desc, u.full_name asc
+          limit 3
+        `,
+        [request.user.id]
       )
     ]);
 
+    const summary = summaryResult.rows[0];
+
     return {
       athletes: athletesResult.rows,
-      recentWorkouts: workoutsResult.rows
+      recentWorkouts: workoutsResult.rows,
+      connectedAthletesCount: Number(connectedResult.rows[0]?.connected_count ?? 0),
+      stats: {
+        week: {
+          athlete_count: athletesResult.rows.length,
+          workout_count: Number(summary?.week_workout_count ?? 0),
+          distance_meters: Number(summary?.week_distance_meters ?? 0),
+          moving_time_seconds: Number(summary?.week_moving_time_seconds ?? 0)
+        },
+        year: {
+          athlete_count: athletesResult.rows.length,
+          workout_count: Number(summary?.year_workout_count ?? 0),
+          distance_meters: Number(summary?.year_distance_meters ?? 0),
+          moving_time_seconds: Number(summary?.year_moving_time_seconds ?? 0)
+        },
+        allTime: {
+          athlete_count: athletesResult.rows.length,
+          workout_count: Number(summary?.all_time_workout_count ?? 0),
+          distance_meters: Number(summary?.all_time_distance_meters ?? 0),
+          moving_time_seconds: Number(summary?.all_time_moving_time_seconds ?? 0)
+        }
+      },
+      topAthletesThisWeek: leadersResult.rows.map((row) => ({
+        id: Number(row.id),
+        full_name: row.full_name,
+        username: row.username,
+        avatar_url: row.avatar_url,
+        week_distance_meters: Number(row.week_distance_meters ?? 0),
+        week_workout_count: Number(row.week_workout_count ?? 0)
+      }))
     };
   });
 
