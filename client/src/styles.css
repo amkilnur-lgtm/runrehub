@@ -1645,32 +1645,33 @@ select {
   }
 
   .trainer-dashboard-panel {
-    padding: 16px;
-    gap: 14px;
+    padding: 15px;
+    gap: 12px;
   }
 
   .trainer-dashboard-avatar {
-    width: 60px;
-    height: 60px;
-    font-size: 21px;
+    width: 56px;
+    height: 56px;
+    font-size: 19px;
   }
 
   .trainer-dashboard-title h2 {
-    font-size: 32px;
+    font-size: 28px;
   }
 
   .trainer-dashboard-title p {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .trainer-dashboard-meta {
-    padding-left: 78px;
-    font-size: 13px;
+    gap: 1px;
+    padding-left: 70px;
+    font-size: 12px;
   }
 
   .trainer-dashboard-summary-topbar {
     display: grid;
-    gap: 12px;
+    gap: 10px;
   }
 
   .trainer-dashboard-heading h2 {
@@ -1679,11 +1680,11 @@ select {
 
   .trainer-dashboard-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
   }
 
   .trainer-dashboard-stat strong {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .athlete-account-identity-wrap {
