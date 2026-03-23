@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { UserAvatar } from "./UserAvatar";
 import { formatDate, formatDistance } from "../lib";
@@ -32,6 +32,7 @@ type AthleteAccountHeaderProps = {
   onPeriodChange: (period: StatsPeriodKey) => void;
   onConnectStrava?: () => void;
   onDisconnectStrava?: () => Promise<void> | void;
+  avatarControl?: ReactNode;
 };
 
 const statsPeriods: Array<{ key: StatsPeriodKey; label: string }> = [
@@ -72,7 +73,7 @@ function formatSyncStatus(connectedAt: string | null, lastSyncedAt: string | nul
 }
 
 export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
-  const { athlete, stats, selectedPeriod, onPeriodChange, onConnectStrava, onDisconnectStrava } = props;
+  const { athlete, stats, selectedPeriod, onPeriodChange, onConnectStrava, onDisconnectStrava, avatarControl } = props;
   const [isStravaMenuOpen, setIsStravaMenuOpen] = useState(false);
   const stravaMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -111,12 +112,14 @@ export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
       <div className="athlete-account-header-grid">
         <div className="athlete-account-identity-wrap">
           <div className="athlete-account-identity">
-            <UserAvatar
-              fullName={athlete.full_name}
-              avatarUrl={athlete.avatar_url}
-              className="athlete-account-avatar"
-              ariaHidden
-            />
+            {avatarControl ?? (
+              <UserAvatar
+                fullName={athlete.full_name}
+                avatarUrl={athlete.avatar_url}
+                className="athlete-account-avatar"
+                ariaHidden
+              />
+            )}
             <div className="athlete-account-title">
               <h1>{athlete.full_name}</h1>
               <p className="muted">@{athlete.username}</p>

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { AthleteAccountHeader, type PeriodStats, type StatsPeriodKey } from "../components/AthleteAccountHeader";
+import { useAuth } from "../components/AuthProvider";
+import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 
@@ -37,6 +39,7 @@ type AthleteDashboardData = {
 };
 
 export function AthleteDashboardPage() {
+  const { user } = useAuth();
   const { data, loading, error, refresh } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
   const [extraWorkouts, setExtraWorkouts] = useState<AthleteDashboardData["workouts"]>([]);
   const [nextCursor, setNextCursor] = useState<AthleteDashboardData["nextCursor"]>(null);
@@ -121,6 +124,13 @@ export function AthleteDashboardPage() {
         onPeriodChange={setSelectedPeriod}
         onConnectStrava={connectStrava}
         onDisconnectStrava={disconnectStrava}
+        avatarControl={
+          <EditableAvatarMenu
+            fullName={user?.fullName ?? data.athlete.full_name}
+            avatarUrl={user?.avatarUrl ?? data.athlete.avatar_url}
+            className="athlete-account-avatar"
+          />
+        }
       />
 
       <section className="card">
