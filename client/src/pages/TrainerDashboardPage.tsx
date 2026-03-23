@@ -68,12 +68,58 @@ function formatStatsHours(seconds: number) {
   return `${hours}ч ${minutes}м`;
 }
 
-function formatSummaryCaption(periodLabel: string, stats: GroupPeriodStats) {
-  if (stats.workout_count === 0) {
-    return `За ${periodLabel.toLowerCase()} пока нет завершенных тренировок по группе.`;
+function pluralize(count: number, one: string, few: string, many: string) {
+  const lastTwo = count % 100;
+  const lastOne = count % 10;
+
+  if (lastTwo >= 11 && lastTwo <= 14) {
+    return many;
   }
 
-  return `${stats.active_athlete_count} из ${stats.athlete_count} спортсменов были активны за ${periodLabel.toLowerCase()}.`;
+  if (lastOne === 1) {
+    return one;
+  }
+
+  if (lastOne >= 2 && lastOne <= 4) {
+    return few;
+  }
+
+  return many;
+}
+
+function formatAthleteCount(count: number) {
+  return `${count} ${pluralize(count, "спортсмен", "спортсмена", "спортсменов")}`;
+}
+
+function formatConnectedCount(count: number) {
+  return `${count} ${pluralize(count, "спортсмен подключил", "спортсмена подключили", "спортсменов подключили")} Strava`;
+}
+
+function formatWorkoutCount(count: number) {
+  return `${count} ${pluralize(count, "тренировка", "тренировки", "тренировок")}`;
+}
+
+function formatPeriodPhrase(period: StatsPeriodKey) {
+  switch (period) {
+    case "week":
+      return "за неделю";
+    case "month":
+      return "за месяц";
+    case "year":
+      return "за год";
+    case "allTime":
+      return "за все время";
+  }
+}
+
+function formatSummaryCaption(period: StatsPeriodKey, stats: GroupPeriodStats) {
+  const periodPhrase = formatPeriodPhrase(period);
+
+  if (stats.workout_count === 0) {
+    return `У группы пока нет завершенных тренировок ${periodPhrase}.`;
+  }
+
+  return `${formatAthleteCount(stats.active_athlete_count)} из ${formatAthleteCount(stats.athlete_count)} были активны ${periodPhrase}.`;
 }
 
 export function TrainerDashboardPage() {
@@ -109,8 +155,9 @@ export function TrainerDashboardPage() {
   }
 
   const selectedStats = data.stats[selectedPeriod];
-  const selectedPeriodLabel = statsPeriods.find((period) => period.key === selectedPeriod)?.label ?? "Период";
-  const hasLeaderData = data.topAthletesThisWeek.some((athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0);
+  const hasLeaderData = data.topAthletesThisWeek.some(
+    (athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0
+  );
 
   return (
     <div className="stack">
@@ -130,8 +177,8 @@ export function TrainerDashboardPage() {
               </div>
             </div>
             <div className="trainer-dashboard-meta">
-              <div>{data.athletes.length} спортсменов</div>
-              <div className="muted">{data.connectedAthletesCount} подключили Strava</div>
+              <div>{formatAthleteCount(data.athletes.length)}</div>
+              <div className="muted">{formatConnectedCount(data.connectedAthletesCount)}</div>
             </div>
           </div>
 
@@ -177,7 +224,7 @@ export function TrainerDashboardPage() {
               </div>
             </div>
             <p className="muted trainer-dashboard-caption">
-              {formatSummaryCaption(selectedPeriodLabel, selectedStats)}
+              {formatSummaryCaption(selectedPeriod, selectedStats)}
             </p>
           </div>
 
@@ -203,7 +250,7 @@ export function TrainerDashboardPage() {
                     />
                     <div className="trainer-dashboard-leader-text">
                       <strong>{athlete.full_name}</strong>
-                      <div className="muted">{athlete.week_workout_count} тренировки</div>
+                      <div className="muted">{formatWorkoutCount(athlete.week_workout_count)}</div>
                     </div>
                     <div className="trainer-dashboard-leader-distance">
                       {formatDistance(athlete.week_distance_meters)}
