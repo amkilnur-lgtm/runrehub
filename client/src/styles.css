@@ -1741,10 +1741,13 @@ select {
     width: fit-content;
     max-width: 100%;
     flex-wrap: wrap;
+    gap: 3px;
+    padding: 2px;
   }
 
   .athlete-stats-period {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    font-size: 15px;
   }
 
   .athlete-account-stats {
