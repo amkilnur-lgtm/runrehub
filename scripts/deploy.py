@@ -143,7 +143,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    return deploy(parse_args())
+    try:
+        return deploy(parse_args())
+    except KeyboardInterrupt:
+        print("\nDeploy interrupted by user.", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":
