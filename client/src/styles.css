@@ -89,12 +89,8 @@ select {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #72685a;
-  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
   line-height: 1;
-  text-transform: uppercase;
   text-align: center;
   white-space: nowrap;
   max-width: calc(100% - 180px);
@@ -1338,8 +1334,6 @@ select {
   }
 
   .topbar-brand {
-    font-size: 12px;
-    letter-spacing: 0.12em;
     max-width: calc(100% - 132px);
   }
 
