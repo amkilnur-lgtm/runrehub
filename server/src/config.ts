@@ -13,7 +13,7 @@ const configSchema = z
     JWT_SECRET: z.string().min(8),
     ADMIN_USERNAME: z.string().default("admin"),
     ADMIN_PASSWORD: z.string().min(6),
-    ADMIN_FULL_NAME: z.string().default("RunRehab Admin"),
+    ADMIN_FULL_NAME: z.string().default("RunningRehab Admin"),
     DATABASE_URL: z.string().min(1),
     STRAVA_CLIENT_ID: z.string().optional(),
     STRAVA_CLIENT_SECRET: z.string().optional(),
