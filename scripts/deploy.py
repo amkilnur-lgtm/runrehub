@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -13,6 +14,13 @@ DEFAULT_HOSTKEY = "ssh-ed25519 255 SHA256:/fzdD/7oR90d0y5F3BxIXD8NMwMlRcrgu9//5/
 DEFAULT_REMOTE_DIR = "/opt/runrehab"
 DEFAULT_CONTAINER = "runrehab-app-1"
 DEFAULT_HEALTH_URL = "http://127.0.0.1:3000/api/health"
+
+
+@dataclass
+class CommandResult:
+    returncode: int
+    stdout: str
+    stderr: str
 
 def load_config() -> dict[str, str]:
     config_path = Path("deploy.json")
@@ -39,7 +47,7 @@ def build_plink_command(password: str, host: str, user: str, hostkey: str, remot
     ]
 
 
-def run_remote(password: str, host: str, user: str, hostkey: str, remote_command: str, retries: int = 1) -> subprocess.CompletedProcess[str]:
+def run_remote(password: str, host: str, user: str, hostkey: str, remote_command: str, retries: int = 1) -> CommandResult:
     attempt = 0
     while True:
         attempt += 1
@@ -50,13 +58,52 @@ def run_remote(password: str, host: str, user: str, hostkey: str, remote_command
             encoding="utf-8",
             errors="replace",
         )
+        command_result = CommandResult(
+            returncode=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
         if result.returncode == 0:
-            return result
+            return command_result
 
         combined = "\n".join(part for part in [result.stdout.strip(), result.stderr.strip()] if part)
         is_network_glitch = "unexpectedly closed network connection" in combined.lower()
         if attempt > retries or not is_network_glitch:
-            return result
+            return command_result
+
+        print(f"[retry {attempt}/{retries}] SSH connection dropped, retrying...", file=sys.stderr)
+        time.sleep(2)
+
+
+def run_remote_streamed(password: str, host: str, user: str, hostkey: str, remote_command: str, retries: int = 1) -> CommandResult:
+    attempt = 0
+    while True:
+        attempt += 1
+        process = subprocess.Popen(
+            build_plink_command(password, host, user, hostkey, remote_command),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        output_chunks: list[str] = []
+        assert process.stdout is not None
+        for line in process.stdout:
+            output_chunks.append(line)
+            print(line, end="")
+
+        returncode = process.wait()
+        stdout = "".join(output_chunks)
+        command_result = CommandResult(returncode=returncode, stdout=stdout, stderr="")
+
+        if returncode == 0:
+            return command_result
+
+        is_network_glitch = "unexpectedly closed network connection" in stdout.lower()
+        if attempt > retries or not is_network_glitch:
+            return command_result
 
         print(f"[retry {attempt}/{retries}] SSH connection dropped, retrying...", file=sys.stderr)
         time.sleep(2)
@@ -71,7 +118,7 @@ def require_password(cli_password: str | None) -> str:
     sys.exit(2)
 
 
-def print_output(result: subprocess.CompletedProcess[str]) -> None:
+def print_output(result: CommandResult) -> None:
     if result.stdout.strip():
         print(result.stdout.strip())
     if result.stderr.strip():
@@ -88,7 +135,7 @@ def deploy(args: argparse.Namespace) -> int:
     )
 
     print("[1/2] Deploying on server...")
-    deploy_result = run_remote(
+    deploy_result = run_remote_streamed(
         password=password,
         host=args.host,
         user=args.user,
@@ -96,7 +143,6 @@ def deploy(args: argparse.Namespace) -> int:
         remote_command=deploy_command,
         retries=args.ssh_retries,
     )
-    print_output(deploy_result)
     if deploy_result.returncode != 0:
         return deploy_result.returncode
 
