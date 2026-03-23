@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../components/AuthProvider";
+import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 
@@ -165,11 +166,10 @@ export function TrainerDashboardPage() {
         <div className="trainer-dashboard-grid">
           <div className="trainer-dashboard-panel trainer-dashboard-identity">
             <div className="trainer-dashboard-identity-main">
-              <UserAvatar
+              <EditableAvatarMenu
                 fullName={user?.fullName}
                 avatarUrl={user?.avatarUrl}
                 className="trainer-dashboard-avatar"
-                ariaHidden
               />
               <div className="trainer-dashboard-title">
                 <h2>{user?.fullName}</h2>
