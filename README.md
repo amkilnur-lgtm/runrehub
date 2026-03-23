@@ -1,4 +1,4 @@
-# RunRehab MVP
+# RunningRehab MVP
 
 MVP для тренера и спортсменов:
 

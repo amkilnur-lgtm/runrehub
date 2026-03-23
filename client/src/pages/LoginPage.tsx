@@ -37,7 +37,7 @@ export function LoginPage() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="eyebrow">RunRehab</div>
+        <div className="eyebrow">RunningRehab</div>
         <h1>Вход в кабинет</h1>
         <p className="muted">
           Админ выдает логин и пароль. После входа спортсмен может привязать свою Strava.
