@@ -863,7 +863,10 @@ select {
 
 .trainer-dashboard-list-card {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 24px;
+  background: #fff9f2;
 }
 
 .trainer-dashboard-athlete-list,
@@ -1779,6 +1782,7 @@ select {
 
   .trainer-dashboard-list-card {
     gap: 12px;
+    padding: 15px;
   }
 
   .trainer-dashboard-stats {

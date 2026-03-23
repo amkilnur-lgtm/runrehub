@@ -272,7 +272,6 @@ export function TrainerDashboardPage() {
         <section className="card trainer-dashboard-list-card">
           <div className="trainer-dashboard-heading">
             <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
-            <h2>Все спортсмены</h2>
           </div>
           <div className="trainer-dashboard-athlete-list">
             {data.athletes.map((athlete) => (
@@ -302,7 +301,6 @@ export function TrainerDashboardPage() {
         <section className="card trainer-dashboard-list-card">
           <div className="trainer-dashboard-heading">
             <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
-            <h2>Последние пробежки</h2>
           </div>
           {data.recentWorkouts.length > 0 ? (
             <div className="trainer-dashboard-workout-list">
