@@ -99,7 +99,7 @@ select {
 
 .topbar-name-box {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   min-height: 44px;
   min-width: 0;
@@ -107,7 +107,7 @@ select {
 
 .topbar-name-box h1 {
   margin: 0;
-  line-height: 1;
+  line-height: 1.05;
   display: block;
   font-size: 28px;
   min-width: 0;
@@ -695,7 +695,7 @@ select {
 
 .trainer-dashboard-identity-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   min-width: 0;
 }
@@ -709,7 +709,7 @@ select {
 
 .trainer-dashboard-title {
   display: grid;
-  align-content: center;
+  align-content: start;
   gap: 6px;
   min-width: 0;
 }
@@ -872,7 +872,7 @@ select {
 
 .athlete-account-identity {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 18px;
   min-width: 0;
 }
@@ -886,7 +886,7 @@ select {
 
 .athlete-account-title {
   display: grid;
-  align-content: center;
+  align-content: start;
   gap: 6px;
   min-width: 0;
 }
