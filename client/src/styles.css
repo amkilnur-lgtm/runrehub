@@ -776,6 +776,13 @@ select {
   gap: 10px;
 }
 
+.trainer-dashboard-leader-empty {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 120px;
+}
+
 .trainer-dashboard-leader-row {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
