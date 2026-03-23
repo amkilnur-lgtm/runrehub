@@ -6,7 +6,7 @@ import { useAuth } from "../components/AuthProvider";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 
-type StatsPeriodKey = "week" | "year" | "allTime";
+type StatsPeriodKey = "week" | "month" | "year" | "allTime";
 
 type GroupPeriodStats = {
   athlete_count: number;
@@ -37,6 +37,7 @@ type DashboardData = {
   connectedAthletesCount: number;
   stats: {
     week: GroupPeriodStats;
+    month: GroupPeriodStats;
     year: GroupPeriodStats;
     allTime: GroupPeriodStats;
   };
@@ -52,6 +53,7 @@ type DashboardData = {
 
 const statsPeriods: Array<{ key: StatsPeriodKey; label: string }> = [
   { key: "week", label: "Неделя" },
+  { key: "month", label: "Месяц" },
   { key: "year", label: "Год" },
   { key: "allTime", label: "Все время" }
 ];

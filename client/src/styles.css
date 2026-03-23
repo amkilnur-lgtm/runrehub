@@ -674,8 +674,8 @@ select {
 
 .trainer-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 0.95fr) minmax(420px, 1.45fr) minmax(280px, 1.05fr);
-  gap: 18px;
+  grid-template-columns: minmax(228px, 0.88fr) minmax(460px, 1.6fr) minmax(280px, 1.02fr);
+  gap: 14px;
   align-items: stretch;
 }
 

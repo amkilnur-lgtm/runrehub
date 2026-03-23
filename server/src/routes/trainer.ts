@@ -33,6 +33,10 @@ type TrainerDashboardStatsRow = {
   week_distance_meters: number | string | null;
   week_moving_time_seconds: number | string | null;
   week_workout_count: number | string | null;
+  month_active_athlete_count: number | string | null;
+  month_distance_meters: number | string | null;
+  month_moving_time_seconds: number | string | null;
+  month_workout_count: number | string | null;
   year_active_athlete_count: number | string | null;
   year_distance_meters: number | string | null;
   year_moving_time_seconds: number | string | null;
@@ -78,6 +82,10 @@ export async function trainerRoutes(app: FastifyInstance) {
             coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
             coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
+            count(distinct u.id) filter (where w.start_date >= date_trunc('month', now())) as month_active_athlete_count,
+            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('month', now())), 0) as month_distance_meters,
+            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
+            count(w.id) filter (where w.start_date >= date_trunc('month', now())) as month_workout_count,
             count(distinct u.id) filter (where w.start_date >= date_trunc('year', now())) as year_active_athlete_count,
             coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
             coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
@@ -136,6 +144,13 @@ export async function trainerRoutes(app: FastifyInstance) {
           workout_count: Number(summary?.week_workout_count ?? 0),
           distance_meters: Number(summary?.week_distance_meters ?? 0),
           moving_time_seconds: Number(summary?.week_moving_time_seconds ?? 0)
+        },
+        month: {
+          athlete_count: athletesResult.rows.length,
+          active_athlete_count: Number(summary?.month_active_athlete_count ?? 0),
+          workout_count: Number(summary?.month_workout_count ?? 0),
+          distance_meters: Number(summary?.month_distance_meters ?? 0),
+          moving_time_seconds: Number(summary?.month_moving_time_seconds ?? 0)
         },
         year: {
           athlete_count: athletesResult.rows.length,
