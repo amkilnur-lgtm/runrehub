@@ -1,10 +1,9 @@
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "./AuthProvider";
-import { EditableAvatarMenu } from "./EditableAvatarMenu";
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -31,18 +30,6 @@ export function AppLayout() {
               </svg>
               Выйти
             </button>
-          </div>
-        </div>
-        <div className="topbar-main-row">
-          <div className="topbar-left-group">
-            <div className="topbar-name-box">
-              <EditableAvatarMenu
-                fullName={user?.fullName}
-                avatarUrl={user?.avatarUrl}
-                className="topbar-avatar"
-              />
-              <h1>{user?.fullName}</h1>
-            </div>
           </div>
         </div>
       </header>
