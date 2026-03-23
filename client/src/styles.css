@@ -110,6 +110,8 @@ select {
   line-height: 1;
   display: block;
   font-size: 28px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .user-avatar {
@@ -703,10 +705,15 @@ select {
   flex: 0 0 auto;
 }
 
+.trainer-dashboard-title {
+  min-width: 0;
+}
+
 .trainer-dashboard-title h2 {
   margin: 0;
   font-size: 34px;
   line-height: 1.05;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -880,6 +887,8 @@ select {
   margin: 0;
   line-height: 1.05;
   font-size: 40px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .athlete-account-title p {
