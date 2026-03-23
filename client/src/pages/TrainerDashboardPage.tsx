@@ -269,8 +269,7 @@ export function TrainerDashboardPage() {
       </section>
 
       <div className="grid two-columns trainer-dashboard-sections">
-        <section className="card">
-          <div className="trainer-dashboard-list-card">
+        <section className="card trainer-dashboard-list-section">
             <div className="trainer-dashboard-heading">
               <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
             </div>
@@ -297,11 +296,9 @@ export function TrainerDashboardPage() {
                 </Link>
               ))}
             </div>
-          </div>
         </section>
 
-        <section className="card">
-          <div className="trainer-dashboard-list-card">
+        <section className="card trainer-dashboard-list-section">
             <div className="trainer-dashboard-heading">
               <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
             </div>
@@ -333,7 +330,6 @@ export function TrainerDashboardPage() {
                 <div className="muted">Здесь появятся последние тренировки группы.</div>
               </div>
             )}
-          </div>
         </section>
       </div>
     </div>
