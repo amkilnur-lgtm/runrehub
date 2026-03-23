@@ -269,67 +269,71 @@ export function TrainerDashboardPage() {
       </section>
 
       <div className="grid two-columns trainer-dashboard-sections">
-        <section className="card trainer-dashboard-list-card">
-          <div className="trainer-dashboard-heading">
-            <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
-          </div>
-          <div className="trainer-dashboard-athlete-list">
-            {data.athletes.map((athlete) => (
-              <Link
-                key={athlete.id}
-                className="trainer-dashboard-athlete-row"
-                to={`/trainer/athletes/${athlete.id}`}
-              >
-                <UserAvatar
-                  fullName={athlete.full_name}
-                  avatarUrl={athlete.avatar_url}
-                  className="trainer-dashboard-leader-avatar"
-                  ariaHidden
-                />
-                <div className="trainer-dashboard-leader-text">
-                  <strong>{athlete.full_name}</strong>
-                  <div className="muted">@{athlete.username}</div>
-                </div>
-                <div className="trainer-dashboard-athlete-meta">
-                  {athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "Без пробежек"}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="card trainer-dashboard-list-card">
-          <div className="trainer-dashboard-heading">
-            <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
-          </div>
-          {data.recentWorkouts.length > 0 ? (
-            <div className="trainer-dashboard-workout-list">
-              {data.recentWorkouts.map((workout) => (
+        <section className="card">
+          <div className="trainer-dashboard-list-card">
+            <div className="trainer-dashboard-heading">
+              <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
+            </div>
+            <div className="trainer-dashboard-athlete-list">
+              {data.athletes.map((athlete) => (
                 <Link
-                  key={workout.id}
-                  className="trainer-dashboard-workout-row"
-                  to={`/trainer/workouts/${workout.id}`}
+                  key={athlete.id}
+                  className="trainer-dashboard-athlete-row"
+                  to={`/trainer/athletes/${athlete.id}`}
                 >
-                  <div className="trainer-dashboard-workout-main">
-                    <strong>{workout.athlete_name}</strong>
-                    <div>{workout.name}</div>
-                    <div className="muted">{formatDate(workout.start_date)}</div>
+                  <UserAvatar
+                    fullName={athlete.full_name}
+                    avatarUrl={athlete.avatar_url}
+                    className="trainer-dashboard-leader-avatar"
+                    ariaHidden
+                  />
+                  <div className="trainer-dashboard-leader-text">
+                    <strong>{athlete.full_name}</strong>
+                    <div className="muted">@{athlete.username}</div>
                   </div>
-                  <div className="trainer-dashboard-workout-meta">
-                    <div>{formatDistance(workout.distance_meters)}</div>
-                    <div className="muted">
-                      {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
-                    </div>
+                  <div className="trainer-dashboard-athlete-meta">
+                    {athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "Без пробежек"}
                   </div>
                 </Link>
               ))}
             </div>
-          ) : (
-            <div className="trainer-dashboard-leader-empty">
-              <strong>Пока нет недавних пробежек.</strong>
-              <div className="muted">Здесь появятся последние тренировки группы.</div>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="trainer-dashboard-list-card">
+            <div className="trainer-dashboard-heading">
+              <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
             </div>
-          )}
+            {data.recentWorkouts.length > 0 ? (
+              <div className="trainer-dashboard-workout-list">
+                {data.recentWorkouts.map((workout) => (
+                  <Link
+                    key={workout.id}
+                    className="trainer-dashboard-workout-row"
+                    to={`/trainer/workouts/${workout.id}`}
+                  >
+                    <div className="trainer-dashboard-workout-main">
+                      <strong>{workout.athlete_name}</strong>
+                      <div>{workout.name}</div>
+                      <div className="muted">{formatDate(workout.start_date)}</div>
+                    </div>
+                    <div className="trainer-dashboard-workout-meta">
+                      <div>{formatDistance(workout.distance_meters)}</div>
+                      <div className="muted">
+                        {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="trainer-dashboard-leader-empty">
+                <strong>Пока нет недавних пробежек.</strong>
+                <div className="muted">Здесь появятся последние тренировки группы.</div>
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </div>
