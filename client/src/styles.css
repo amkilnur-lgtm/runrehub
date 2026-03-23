@@ -919,6 +919,11 @@ select {
   white-space: nowrap;
 }
 
+.trainer-dashboard-list-section {
+  display: grid;
+  gap: 10px;
+}
+
 .athlete-account-header-shell {
   display: grid;
   gap: 10px;
@@ -1777,6 +1782,10 @@ select {
   .trainer-dashboard-workout-row {
     gap: 10px;
     padding: 14px;
+  }
+
+  .trainer-dashboard-list-section {
+    gap: 12px;
   }
 
   .trainer-dashboard-athlete-meta,
