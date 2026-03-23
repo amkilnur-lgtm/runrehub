@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { UserAvatar } from "./UserAvatar";
 import { formatDate, formatDistance } from "../lib";
 
-export type StatsPeriodKey = "week" | "year" | "allTime";
+export type StatsPeriodKey = "week" | "month" | "year" | "allTime";
 
 export type PeriodStats = {
   distance_meters: number;
@@ -24,6 +24,7 @@ type AthleteAccountHeaderProps = {
   athlete: AthleteIdentity;
   stats: {
     week: PeriodStats;
+    month: PeriodStats;
     year: PeriodStats;
     allTime: PeriodStats;
   };
@@ -35,6 +36,7 @@ type AthleteAccountHeaderProps = {
 
 const statsPeriods: Array<{ key: StatsPeriodKey; label: string }> = [
   { key: "week", label: "Неделя" },
+  { key: "month", label: "Месяц" },
   { key: "year", label: "Год" },
   { key: "allTime", label: "Все время" }
 ];
