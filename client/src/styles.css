@@ -1651,9 +1651,9 @@ select {
   }
 
   .trainer-dashboard-avatar {
-    width: 56px;
-    height: 56px;
-    font-size: 19px;
+    width: 60px;
+    height: 60px;
+    font-size: 21px;
   }
 
   .trainer-dashboard-title h2 {
