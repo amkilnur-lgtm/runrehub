@@ -10,6 +10,7 @@ type StatsPeriodKey = "week" | "year" | "allTime";
 
 type GroupPeriodStats = {
   athlete_count: number;
+  active_athlete_count: number;
   workout_count: number;
   distance_meters: number;
   moving_time_seconds: number;
@@ -65,6 +66,14 @@ function formatStatsHours(seconds: number) {
   return `${hours}ч ${minutes}м`;
 }
 
+function formatSummaryCaption(periodLabel: string, stats: GroupPeriodStats) {
+  if (stats.workout_count === 0) {
+    return `За ${periodLabel.toLowerCase()} пока нет завершенных тренировок по группе.`;
+  }
+
+  return `${stats.active_athlete_count} из ${stats.athlete_count} спортсменов были активны за ${periodLabel.toLowerCase()}.`;
+}
+
 export function TrainerDashboardPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi<DashboardData>("/api/trainer/dashboard");
@@ -98,6 +107,8 @@ export function TrainerDashboardPage() {
   }
 
   const selectedStats = data.stats[selectedPeriod];
+  const selectedPeriodLabel = statsPeriods.find((period) => period.key === selectedPeriod)?.label ?? "Период";
+  const hasLeaderData = data.topAthletesThisWeek.some((athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0);
 
   return (
     <div className="stack">
@@ -147,8 +158,8 @@ export function TrainerDashboardPage() {
             </div>
             <div className="trainer-dashboard-stats">
               <div className="trainer-dashboard-stat">
-                <span className="muted">Спортсмены</span>
-                <strong>{selectedStats.athlete_count}</strong>
+                <span className="muted">Активные</span>
+                <strong>{selectedStats.active_athlete_count}</strong>
               </div>
               <div className="trainer-dashboard-stat">
                 <span className="muted">Тренировки</span>
@@ -164,7 +175,7 @@ export function TrainerDashboardPage() {
               </div>
             </div>
             <p className="muted trainer-dashboard-caption">
-              Сводка считается по завершенным тренировкам всех закрепленных спортсменов.
+              {formatSummaryCaption(selectedPeriodLabel, selectedStats)}
             </p>
           </div>
 
@@ -173,30 +184,37 @@ export function TrainerDashboardPage() {
               <span className="muted trainer-dashboard-eyebrow">Лидеры</span>
               <h2>Топ-3 на неделе</h2>
             </div>
-            <div className="trainer-dashboard-leader-list">
-              {data.topAthletesThisWeek.map((athlete, index) => (
-                <Link
-                  key={athlete.id}
-                  className="trainer-dashboard-leader-row"
-                  to={`/trainer/athletes/${athlete.id}`}
-                >
-                  <div className="trainer-dashboard-leader-rank">{index + 1}</div>
-                  <UserAvatar
-                    fullName={athlete.full_name}
-                    avatarUrl={athlete.avatar_url}
-                    className="trainer-dashboard-leader-avatar"
-                    ariaHidden
-                  />
-                  <div className="trainer-dashboard-leader-text">
-                    <strong>{athlete.full_name}</strong>
-                    <div className="muted">{athlete.week_workout_count} тренировки</div>
-                  </div>
-                  <div className="trainer-dashboard-leader-distance">
-                    {formatDistance(athlete.week_distance_meters)}
-                  </div>
-                </Link>
-              ))}
-            </div>
+            {hasLeaderData ? (
+              <div className="trainer-dashboard-leader-list">
+                {data.topAthletesThisWeek.map((athlete, index) => (
+                  <Link
+                    key={athlete.id}
+                    className="trainer-dashboard-leader-row"
+                    to={`/trainer/athletes/${athlete.id}`}
+                  >
+                    <div className="trainer-dashboard-leader-rank">{index + 1}</div>
+                    <UserAvatar
+                      fullName={athlete.full_name}
+                      avatarUrl={athlete.avatar_url}
+                      className="trainer-dashboard-leader-avatar"
+                      ariaHidden
+                    />
+                    <div className="trainer-dashboard-leader-text">
+                      <strong>{athlete.full_name}</strong>
+                      <div className="muted">{athlete.week_workout_count} тренировки</div>
+                    </div>
+                    <div className="trainer-dashboard-leader-distance">
+                      {formatDistance(athlete.week_distance_meters)}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="trainer-dashboard-leader-empty">
+                <strong>На этой неделе пока нет завершенных тренировок.</strong>
+                <div className="muted">Лидеры появятся, как только группа начнет набирать объем.</div>
+              </div>
+            )}
           </div>
         </div>
       </section>

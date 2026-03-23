@@ -29,12 +29,15 @@ type AthleteStatsRow = {
 };
 
 type TrainerDashboardStatsRow = {
+  week_active_athlete_count: number | string | null;
   week_distance_meters: number | string | null;
   week_moving_time_seconds: number | string | null;
   week_workout_count: number | string | null;
+  year_active_athlete_count: number | string | null;
   year_distance_meters: number | string | null;
   year_moving_time_seconds: number | string | null;
   year_workout_count: number | string | null;
+  all_time_active_athlete_count: number | string | null;
   all_time_distance_meters: number | string | null;
   all_time_moving_time_seconds: number | string | null;
   all_time_workout_count: number | string | null;
@@ -71,12 +74,15 @@ export async function trainerRoutes(app: FastifyInstance) {
       pool.query<TrainerDashboardStatsRow>(
         `
           select
+            count(distinct u.id) filter (where w.start_date >= date_trunc('week', now())) as week_active_athlete_count,
             coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
             coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
+            count(distinct u.id) filter (where w.start_date >= date_trunc('year', now())) as year_active_athlete_count,
             coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
             coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('year', now())) as year_workout_count,
+            count(distinct u.id) filter (where w.id is not null) as all_time_active_athlete_count,
             coalesce(sum(w.distance_meters), 0) as all_time_distance_meters,
             coalesce(sum(w.moving_time_seconds), 0) as all_time_moving_time_seconds,
             count(w.id) as all_time_workout_count
@@ -126,18 +132,21 @@ export async function trainerRoutes(app: FastifyInstance) {
       stats: {
         week: {
           athlete_count: athletesResult.rows.length,
+          active_athlete_count: Number(summary?.week_active_athlete_count ?? 0),
           workout_count: Number(summary?.week_workout_count ?? 0),
           distance_meters: Number(summary?.week_distance_meters ?? 0),
           moving_time_seconds: Number(summary?.week_moving_time_seconds ?? 0)
         },
         year: {
           athlete_count: athletesResult.rows.length,
+          active_athlete_count: Number(summary?.year_active_athlete_count ?? 0),
           workout_count: Number(summary?.year_workout_count ?? 0),
           distance_meters: Number(summary?.year_distance_meters ?? 0),
           moving_time_seconds: Number(summary?.year_moving_time_seconds ?? 0)
         },
         allTime: {
           athlete_count: athletesResult.rows.length,
+          active_athlete_count: Number(summary?.all_time_active_athlete_count ?? 0),
           workout_count: Number(summary?.all_time_workout_count ?? 0),
           distance_meters: Number(summary?.all_time_distance_meters ?? 0),
           moving_time_seconds: Number(summary?.all_time_moving_time_seconds ?? 0)
