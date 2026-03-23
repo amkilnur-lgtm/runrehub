@@ -75,23 +75,31 @@ select {
 
 .topbar-identity {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  position: relative;
+  display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
+  min-height: 44px;
 }
 
 .topbar-brand {
   min-width: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   color: #72685a;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   line-height: 1;
   text-transform: uppercase;
-  justify-self: center;
   text-align: center;
+  white-space: nowrap;
+  max-width: calc(100% - 180px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-main-row {
@@ -238,8 +246,7 @@ select {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
-  justify-self: end;
-  grid-column: 3;
+  margin-left: auto;
 }
 
 .topbar h1,
@@ -1331,8 +1338,9 @@ select {
   }
 
   .topbar-brand {
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 0.12em;
+    max-width: calc(100% - 132px);
   }
 
   .topbar h1 {
