@@ -688,8 +688,10 @@ select {
 }
 
 .trainer-dashboard-identity {
+  display: grid;
+  gap: 12px;
   align-content: start;
-  padding-inline: 0;
+  padding: 10px 0 0;
   background: transparent;
 }
 
@@ -1648,6 +1650,11 @@ select {
   .trainer-dashboard-panel {
     padding: 15px;
     gap: 12px;
+  }
+
+  .trainer-dashboard-identity {
+    gap: 10px;
+    padding: 4px 0 0;
   }
 
   .trainer-dashboard-avatar {
