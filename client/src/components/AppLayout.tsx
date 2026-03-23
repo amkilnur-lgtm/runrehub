@@ -15,7 +15,7 @@ export function AppLayout() {
     <div className="shell">
       <header className="topbar">
         <div className="topbar-identity">
-          <div className="topbar-brand">RunningRehab</div>
+          <div className="eyebrow topbar-brand">RunningRehab</div>
           <div className="topbar-actions">
             <button className="ghost-button topbar-logout" onClick={handleLogout}>
               <svg viewBox="0 0 24 24" className="topbar-logout-icon" aria-hidden="true">
