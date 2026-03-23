@@ -100,7 +100,7 @@ select {
 .topbar-name-box {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   min-height: 44px;
   min-width: 0;
 }
@@ -689,6 +689,8 @@ select {
 
 .trainer-dashboard-identity {
   align-content: start;
+  padding-inline: 8px 0;
+  background: transparent;
 }
 
 .trainer-dashboard-identity-main {
@@ -706,6 +708,9 @@ select {
 }
 
 .trainer-dashboard-title {
+  display: grid;
+  align-content: center;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -718,7 +723,7 @@ select {
 }
 
 .trainer-dashboard-title p {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 16px;
 }
 
@@ -880,6 +885,9 @@ select {
 }
 
 .athlete-account-title {
+  display: grid;
+  align-content: center;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -892,7 +900,7 @@ select {
 }
 
 .athlete-account-title p {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 16px;
 }
 
