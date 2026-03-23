@@ -76,7 +76,7 @@ select {
 .topbar-identity {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -84,11 +84,14 @@ select {
 
 .topbar-brand {
   min-width: 0;
-  color: #3f3326;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
+  color: #72685a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  justify-self: center;
+  text-align: center;
 }
 
 .topbar-main-row {
@@ -236,6 +239,7 @@ select {
   justify-content: flex-end;
   flex: 0 0 auto;
   justify-self: end;
+  grid-column: 3;
 }
 
 .topbar h1,
@@ -1328,7 +1332,7 @@ select {
 
   .topbar-brand {
     font-size: 13px;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.12em;
   }
 
   .topbar h1 {
@@ -1372,7 +1376,7 @@ select {
   }
 
   .topbar-identity {
-    align-items: start;
+    align-items: center;
   }
 
   .ghost-button,
