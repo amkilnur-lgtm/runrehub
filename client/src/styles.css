@@ -1373,8 +1373,9 @@ select {
 }
 
 .workout-summary-card-with-route {
-  grid-template-columns: minmax(360px, 1.16fr) minmax(320px, 0.9fr);
-  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.35fr);
+  align-items: stretch;
 }
 
 .workout-summary-header {
@@ -1413,6 +1414,10 @@ select {
   padding: 20px;
   border-radius: 24px;
   background: #fff9f2;
+}
+
+.workout-summary-card-with-route .workout-summary-panel {
+  min-height: 100%;
 }
 
 .workout-summary-stats {
