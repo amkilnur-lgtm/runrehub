@@ -1297,13 +1297,16 @@ select {
 }
 
 .workout-menu-trigger {
-  min-width: 44px;
-  padding-inline: 16px;
-  letter-spacing: 0.1em;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  letter-spacing: 0.18em;
+  font-size: 24px;
   background: transparent;
   box-shadow: none;
   line-height: 1;
-  align-self: center;
+  align-self: start;
 }
 
 .workout-menu-popover {
@@ -1325,12 +1328,20 @@ select {
   border-radius: 12px;
   padding: 12px 14px;
   background: transparent;
-  color: #9a2f13;
+  color: #181510;
   text-align: left;
   cursor: pointer;
 }
 
 .workout-menu-item:hover:enabled {
+  background: #f6f0e7;
+}
+
+.workout-menu-item-danger {
+  color: #9a2f13;
+}
+
+.workout-menu-item-danger:hover:enabled {
   background: #fff1ec;
 }
 
