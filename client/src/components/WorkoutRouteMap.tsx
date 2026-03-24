@@ -88,20 +88,20 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         </Pane>
         <CircleMarker
           center={start}
-          radius={5.8}
+          radius={6.2}
           pathOptions={{
             color: "#ffffff",
-            weight: 2.2,
+            weight: 2.3,
             fillColor: "#181510",
             fillOpacity: 1
           }}
         />
         <CircleMarker
           center={end}
-          radius={5.8}
+          radius={6.2}
           pathOptions={{
             color: "#fc4c02",
-            weight: 2.2,
+            weight: 2.3,
             fillColor: "#ffffff",
             fillOpacity: 1
           }}
