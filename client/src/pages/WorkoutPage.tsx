@@ -163,11 +163,20 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
   return (
     <div className="stack">
-      <section className="card">
-        <div className="section-header workout-header">
-          <Link to={backHref} className="inline-link">
-            Назад
-          </Link>
+      <Link to={backHref} className="inline-link workout-back-link">
+        Назад
+      </Link>
+
+      <section className="card workout-summary-card">
+        <div className="section-header workout-summary-header">
+          <div className="trainer-dashboard-heading workout-summary-heading">
+            <span className="muted trainer-dashboard-eyebrow">СВОДКА</span>
+            <h2>{data.workout.name}</h2>
+            <p className="muted">
+              {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
+              {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
+            </p>
+          </div>
           <div className="workout-menu" ref={menuRef}>
             <button
               type="button"
@@ -192,31 +201,30 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             ) : null}
           </div>
         </div>
-        <h2>{data.workout.name}</h2>
-        <p className="muted">
-          {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
-          {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
-        </p>
-        <div className="grid workout-stats-grid">
-          <div className="card inset-card">
-            <div className="muted">Километраж</div>
-            <div className="stat-value">{formatDistance(data.workout.distance_meters)}</div>
-          </div>
-          <div className="card inset-card">
-            <div className="muted">Общее время</div>
-            <div className="stat-value">{formatDuration(data.workout.moving_time_seconds)}</div>
-          </div>
-          <div className="card inset-card">
-            <div className="muted">Средний темп</div>
-            <div className="stat-value">{formatPace(data.workout.average_speed)}</div>
-          </div>
-          <div className="card inset-card">
-            <div className="muted">Средний пульс</div>
-            <div className="stat-value">{formatHeartRate(data.workout.average_heartrate)}</div>
-          </div>
-          <div className="card inset-card">
-            <div className="muted">Набор высоты</div>
-            <div className="stat-value">{`${Math.round(data.workout.elevation_gain ?? 0)} м`}</div>
+
+        <div className="workout-summary-panel">
+          <div className="workout-summary-stats">
+            <div className="workout-summary-stat">
+              <span className="muted">Километраж</span>
+              <strong>{formatDistance(data.workout.distance_meters)}</strong>
+            </div>
+            <div className="workout-summary-stat">
+              <span className="muted">Общее время</span>
+              <strong>{formatDuration(data.workout.moving_time_seconds)}</strong>
+            </div>
+            <div className="workout-summary-stat">
+              <span className="muted">Средний темп</span>
+              <strong>{formatPace(data.workout.average_speed)}</strong>
+            </div>
+            <div className="workout-summary-stat">
+              <span className="muted">Средний пульс</span>
+              <strong>{formatHeartRate(data.workout.average_heartrate)}</strong>
+            </div>
+            <div className="workout-summary-stat">
+              <span className="muted">Набор высоты</span>
+              <strong>{`${Math.round(data.workout.elevation_gain ?? 0)} м`}</strong>
+            </div>
+            <div className="workout-summary-stat workout-summary-stat-placeholder" aria-hidden="true" />
           </div>
         </div>
       </section>
@@ -247,9 +255,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   {data.laps.map((lap, index) => (
                     <tr key={lap.id} className="lap-report-row">
                       <td className="lap-report-index">{index + 1}</td>
-                      <td className="lap-report-distance">
-                        {formatLapDistanceKilometers(lap.distance_meters)}
-                      </td>
+                      <td className="lap-report-distance">{formatLapDistanceKilometers(lap.distance_meters)}</td>
                       <td className="lap-report-pace-cell">
                         <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
                       </td>
@@ -261,9 +267,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                           {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
                         </span>
                       </td>
-                      <td className="lap-report-elevation">
-                        {formatLapElevation(lap.elevation_gain)}
-                      </td>
+                      <td className="lap-report-elevation">{formatLapElevation(lap.elevation_gain)}</td>
                     </tr>
                   ))}
                 </tbody>
