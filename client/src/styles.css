@@ -1301,12 +1301,20 @@ select {
   min-height: 0;
   padding: 0;
   border-radius: 0;
-  letter-spacing: 0.18em;
-  font-size: 24px;
   background: transparent;
   box-shadow: none;
   line-height: 1;
   align-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workout-menu-icon {
+  width: 12px;
+  height: 18px;
+  display: block;
+  fill: currentColor;
 }
 
 .workout-menu-popover {
