@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import { StreamChart } from "../components/StreamChart";
-import { WorkoutRouteMap } from "../components/WorkoutRouteMap";
 import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
+
+const WorkoutRouteMap = lazy(async () => import("../components/WorkoutRouteMap").then((module) => ({ default: module.WorkoutRouteMap })));
 
 function formatLapElevation(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -288,7 +289,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         </div>
         {data.streams?.latlng?.length ? (
           <div className="workout-route-shell">
-            <WorkoutRouteMap points={data.streams.latlng} />
+            <Suspense
+              fallback={
+                <div className="workout-route-loading skeleton-card" aria-hidden="true">
+                  <div className="workout-route-loading-grid" />
+                </div>
+              }
+            >
+              <WorkoutRouteMap points={data.streams.latlng} />
+            </Suspense>
           </div>
         ) : null}
       </section>

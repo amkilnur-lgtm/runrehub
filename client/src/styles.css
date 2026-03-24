@@ -1442,6 +1442,12 @@ select {
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
 }
 
+.workout-route-map-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .workout-route-map {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -1458,6 +1464,16 @@ select {
 .workout-route-maplibre {
   background: #dfe7ee;
   font: inherit;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.workout-route-maplibre.is-ready {
+  opacity: 1;
+}
+
+.workout-route-maplibre.is-hidden {
+  display: none;
 }
 
 .workout-route-maplibre .maplibregl-canvas {
@@ -1495,6 +1511,30 @@ select {
 .workout-route-maplibre .maplibregl-canvas-container.maplibregl-touch-zoom-rotate,
 .workout-route-maplibre .maplibregl-canvas {
   cursor: default;
+}
+
+.workout-route-loading,
+.workout-route-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(244, 248, 245, 0.96) 0%, rgba(233, 239, 236, 0.96) 100%);
+  z-index: 1;
+}
+
+.workout-route-loading-grid {
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.workout-route-error {
+  color: #8e816f;
+  font-size: 14px;
 }
 
 .workout-comment-card {
