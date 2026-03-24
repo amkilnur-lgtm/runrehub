@@ -130,6 +130,8 @@ function resolveStyleUrl() {
 export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const touchStateRef = useRef<{ x: number; y: number; active: boolean } | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -171,6 +173,9 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     const style = resolveStyleUrl() ?? createFallbackStyle();
     const routeData = buildRouteFeatureCollection(points);
     const bounds = getBounds(points);
+    const isTouchDevice =
+      typeof window !== "undefined" &&
+      (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches);
 
     const map = new maplibregl.Map({
       container,
@@ -180,9 +185,16 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
       touchPitch: false
     });
 
+    mapRef.current = map;
     map.scrollZoom.disable();
     map.keyboard.disable();
     map.touchZoomRotate.disableRotation();
+    if (isTouchDevice) {
+      map.dragPan.disable();
+      map.touchZoomRotate.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+    }
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true
@@ -268,6 +280,91 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
 
     return () => map.remove();
   }, [isVisible, points]);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    const map = mapRef.current;
+
+    if (!shell || !map) {
+      return;
+    }
+
+    const isTouchDevice =
+      typeof window !== "undefined" &&
+      (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches);
+
+    if (!isTouchDevice) {
+      return;
+    }
+
+    const enableInteractiveMap = (allowZoom: boolean) => {
+      map.dragPan.enable();
+      if (allowZoom) {
+        map.touchZoomRotate.enable();
+      } else {
+        map.touchZoomRotate.disable();
+        map.touchZoomRotate.disableRotation();
+      }
+    };
+
+    const disableInteractiveMap = () => {
+      map.dragPan.disable();
+      map.touchZoomRotate.disable();
+      map.touchZoomRotate.disableRotation();
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        enableInteractiveMap(true);
+        touchStateRef.current = null;
+        return;
+      }
+
+      const touch = event.touches[0];
+      touchStateRef.current = { x: touch.clientX, y: touch.clientY, active: true };
+      disableInteractiveMap();
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        enableInteractiveMap(true);
+        touchStateRef.current = null;
+        return;
+      }
+
+      const touchState = touchStateRef.current;
+      if (!touchState?.active) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      const dx = touch.clientX - touchState.x;
+      const dy = touch.clientY - touchState.y;
+
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        enableInteractiveMap(false);
+      } else if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        disableInteractiveMap();
+      }
+    };
+
+    const handleTouchEnd = () => {
+      touchStateRef.current = null;
+      disableInteractiveMap();
+    };
+
+    shell.addEventListener("touchstart", handleTouchStart, { passive: true });
+    shell.addEventListener("touchmove", handleTouchMove, { passive: true });
+    shell.addEventListener("touchend", handleTouchEnd, { passive: true });
+    shell.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+
+    return () => {
+      shell.removeEventListener("touchstart", handleTouchStart);
+      shell.removeEventListener("touchmove", handleTouchMove);
+      shell.removeEventListener("touchend", handleTouchEnd);
+      shell.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [isReady]);
 
   if (points.length < 2) {
     return null;
