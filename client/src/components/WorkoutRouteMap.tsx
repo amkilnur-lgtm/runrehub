@@ -15,7 +15,7 @@ function FitRouteBounds({ points }: { points: [number, number][] }) {
     }
 
     map.fitBounds(latLngBounds(points), {
-      padding: [8, 8],
+      padding: [10, 10],
       maxZoom: 17
     });
   }, [map, points]);
@@ -43,7 +43,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     <div className="workout-route-map" aria-label="Маршрут пробежки">
       <MapContainer
         bounds={bounds}
-        boundsOptions={{ padding: [8, 8] }}
+        boundsOptions={{ padding: [10, 10] }}
         scrollWheelZoom={false}
         dragging
         zoomControl={false}
@@ -56,7 +56,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         />
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-          opacity={0.78}
+          opacity={0.64}
           attribution=""
         />
         <FitRouteBounds points={points} />
@@ -65,7 +65,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#ffffff",
-              weight: 8,
+              weight: 7.6,
               opacity: 0.98,
               lineCap: "round",
               lineJoin: "round"
@@ -78,7 +78,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#fc4c02",
-              weight: 4.4,
+              weight: 4.2,
               opacity: 1,
               lineCap: "round",
               lineJoin: "round"
@@ -88,20 +88,20 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         </Pane>
         <CircleMarker
           center={start}
-          radius={7}
+          radius={7.5}
           pathOptions={{
             color: "#ffffff",
-            weight: 3,
+            weight: 2.8,
             fillColor: "#181510",
             fillOpacity: 1
           }}
         />
         <CircleMarker
           center={end}
-          radius={7}
+          radius={7.5}
           pathOptions={{
             color: "#fc4c02",
-            weight: 3,
+            weight: 2.8,
             fillColor: "#ffffff",
             fillOpacity: 1
           }}
