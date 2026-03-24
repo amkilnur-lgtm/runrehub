@@ -1436,8 +1436,8 @@ select {
 
 .workout-route-shell {
   min-width: 0;
-  padding: 20px;
   border-radius: 24px;
+  overflow: hidden;
   background: #fff9f2;
 }
 
@@ -2039,7 +2039,6 @@ select {
   }
 
   .workout-route-shell {
-    padding: 18px;
     border-radius: 20px;
   }
 
