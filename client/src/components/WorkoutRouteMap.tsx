@@ -56,7 +56,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         />
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-          opacity={0.64}
+          opacity={0.72}
           attribution=""
         />
         <FitRouteBounds points={points} />
