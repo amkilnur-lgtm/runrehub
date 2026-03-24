@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, { type LngLatBoundsLike, type StyleSpecification } from "maplibre-gl";
 
 const DEFAULT_BOUNDS_PADDING = 10;
@@ -128,15 +128,45 @@ function resolveStyleUrl() {
 }
 
 export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+
+    if (!shell) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "160px 0px"
+      }
+    );
+
+    observer.observe(shell);
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
 
-    if (!container || points.length < 2) {
+    if (!container || points.length < 2 || !isVisible) {
       return;
     }
+
+    setIsReady(false);
+    setHasError(false);
 
     const style = resolveStyleUrl() ?? createFallbackStyle();
     const routeData = buildRouteFeatureCollection(points);
@@ -150,7 +180,6 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
       touchPitch: false
     });
 
-    mapRef.current = map;
     map.scrollZoom.disable();
     map.keyboard.disable();
     map.touchZoomRotate.disableRotation();
@@ -159,6 +188,10 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         compact: true
       })
     );
+
+    map.on("error", () => {
+      setHasError(true);
+    });
 
     map.on("load", () => {
       map.addSource("route", {
@@ -171,12 +204,14 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         type: "line",
         source: "route",
         filter: ["==", ["get", "kind"], "route"],
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
         paint: {
           "line-color": "#ffffff",
           "line-width": 7.6,
-          "line-opacity": 0.98,
-          "line-cap": "round",
-          "line-join": "round"
+          "line-opacity": 0.98
         }
       });
 
@@ -185,12 +220,14 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         type: "line",
         source: "route",
         filter: ["==", ["get", "kind"], "route"],
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
         paint: {
           "line-color": "#fc4c02",
           "line-width": 4.2,
-          "line-opacity": 1,
-          "line-cap": "round",
-          "line-join": "round"
+          "line-opacity": 1
         }
       });
 
@@ -225,17 +262,30 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         maxZoom: DEFAULT_MAX_ZOOM,
         animate: false
       });
+
+      setIsReady(true);
     });
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [points]);
+    return () => map.remove();
+  }, [isVisible, points]);
 
   if (points.length < 2) {
     return null;
   }
 
-  return <div ref={containerRef} className="workout-route-map workout-route-maplibre" aria-label="Маршрут пробежки" />;
+  return (
+    <div ref={shellRef} className="workout-route-map-shell">
+      {!isReady && !hasError ? (
+        <div className="workout-route-loading skeleton-card" aria-hidden="true">
+          <div className="workout-route-loading-grid" />
+        </div>
+      ) : null}
+      {hasError ? <div className="workout-route-error">Не удалось загрузить карту.</div> : null}
+      <div
+        ref={containerRef}
+        className={`workout-route-map workout-route-maplibre${isReady ? " is-ready" : ""}${hasError ? " is-hidden" : ""}`}
+        aria-label="Маршрут пробежки"
+      />
+    </div>
+  );
 }
