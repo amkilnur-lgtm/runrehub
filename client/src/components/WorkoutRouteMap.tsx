@@ -3,7 +3,7 @@ import maplibregl, { type LngLatBoundsLike, type StyleSpecification } from "mapl
 
 const DEFAULT_BOUNDS_PADDING = 10;
 const DEFAULT_MAX_ZOOM = 17;
-const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/streets-v2/style.json?key={API_KEY}";
+const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/dataviz-light/style.json?key={API_KEY}";
 
 function createFallbackStyle(): StyleSpecification {
   return {
