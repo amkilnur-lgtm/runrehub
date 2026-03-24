@@ -285,12 +285,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             </div>
             <div className="workout-summary-stat workout-summary-stat-placeholder" aria-hidden="true" />
           </div>
-          {data.streams?.latlng?.length ? (
-            <div className="workout-route-shell">
-              <WorkoutRouteMap points={data.streams.latlng} />
-            </div>
-          ) : null}
         </div>
+        {data.streams?.latlng?.length ? (
+          <div className="workout-route-shell">
+            <WorkoutRouteMap points={data.streams.latlng} />
+          </div>
+        ) : null}
       </section>
 
       <section className="grid workout-layout">
