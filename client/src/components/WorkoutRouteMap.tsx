@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { type LngLatBoundsLike, type StyleSpecification } from "maplibre-gl";
+import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 
 const DEFAULT_BOUNDS_PADDING = 10;
 const DEFAULT_MAX_ZOOM = 17;
@@ -130,7 +130,7 @@ function resolveStyleUrl() {
 export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
   const touchStateRef = useRef<{
     startX: number;
     startY: number;
@@ -176,116 +176,136 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     setIsReady(false);
     setHasError(false);
 
-    const style = resolveStyleUrl() ?? createFallbackStyle();
-    const routeData = buildRouteFeatureCollection(points);
-    const bounds = getBounds(points);
-    const isTouchDevice =
-      typeof window !== "undefined" &&
-      (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches);
+    let cancelled = false;
+    let activeMap: MapLibreMap | null = null;
 
-    const map = new maplibregl.Map({
-      container,
-      style,
-      attributionControl: false,
-      dragRotate: false,
-      touchPitch: false
-    });
+    const initializeMap = async () => {
+      const { default: maplibregl } = await import("maplibre-gl");
+      if (cancelled) {
+        return;
+      }
 
-    mapRef.current = map;
-    map.scrollZoom.disable();
-    map.keyboard.disable();
-    map.touchZoomRotate.enable();
-    map.touchZoomRotate.disableRotation();
-    if (isTouchDevice) {
-      map.dragPan.disable();
-      map.doubleClickZoom.disable();
-      map.boxZoom.disable();
-    }
-    map.addControl(
-      new maplibregl.AttributionControl({
-        compact: true
-      })
-    );
+      const style = resolveStyleUrl() ?? createFallbackStyle();
+      const routeData = buildRouteFeatureCollection(points);
+      const bounds = getBounds(points);
+      const isTouchDevice =
+        typeof window !== "undefined" &&
+        (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches);
 
-    map.on("error", () => {
-      setHasError(true);
-    });
-
-    map.on("load", () => {
-      map.addSource("route", {
-        type: "geojson",
-        data: routeData
+      const map = new maplibregl.Map({
+        container,
+        style,
+        attributionControl: false,
+        dragRotate: false,
+        touchPitch: false
       });
 
-      map.addLayer({
-        id: "route-shadow",
-        type: "line",
-        source: "route",
-        filter: ["==", ["get", "kind"], "route"],
-        layout: {
-          "line-cap": "round",
-          "line-join": "round"
-        },
-        paint: {
-          "line-color": "#ffffff",
-          "line-width": 7.6,
-          "line-opacity": 0.98
+      activeMap = map;
+      mapRef.current = map;
+      map.scrollZoom.disable();
+      map.keyboard.disable();
+      map.touchZoomRotate.enable();
+      map.touchZoomRotate.disableRotation();
+      if (isTouchDevice) {
+        map.dragPan.disable();
+        map.doubleClickZoom.disable();
+        map.boxZoom.disable();
+      }
+      map.addControl(
+        new maplibregl.AttributionControl({
+          compact: true
+        })
+      );
+
+      map.on("error", () => {
+        if (!cancelled) {
+          setHasError(true);
         }
       });
 
-      map.addLayer({
-        id: "route-line",
-        type: "line",
-        source: "route",
-        filter: ["==", ["get", "kind"], "route"],
-        layout: {
-          "line-cap": "round",
-          "line-join": "round"
-        },
-        paint: {
-          "line-color": "#fc4c02",
-          "line-width": 4.2,
-          "line-opacity": 1
+      map.on("load", () => {
+        if (cancelled) {
+          return;
         }
-      });
 
-      map.addLayer({
-        id: "route-start",
-        type: "circle",
-        source: "route",
-        filter: ["==", ["get", "kind"], "start"],
-        paint: {
-          "circle-radius": 6.2,
-          "circle-color": "#181510",
-          "circle-stroke-width": 2.3,
-          "circle-stroke-color": "#ffffff"
-        }
-      });
+        map.addSource("route", {
+          type: "geojson",
+          data: routeData
+        });
 
-      map.addLayer({
-        id: "route-end",
-        type: "circle",
-        source: "route",
-        filter: ["==", ["get", "kind"], "end"],
-        paint: {
-          "circle-radius": 5.6,
-          "circle-color": "#ffffff",
-          "circle-stroke-width": 2.1,
-          "circle-stroke-color": "#fc4c02"
-        }
-      });
+        map.addLayer({
+          id: "route-shadow",
+          type: "line",
+          source: "route",
+          filter: ["==", ["get", "kind"], "route"],
+          layout: {
+            "line-cap": "round",
+            "line-join": "round"
+          },
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 7.6,
+            "line-opacity": 0.98
+          }
+        });
 
-      map.fitBounds(bounds, {
-        padding: DEFAULT_BOUNDS_PADDING,
-        maxZoom: DEFAULT_MAX_ZOOM,
-        animate: false
-      });
+        map.addLayer({
+          id: "route-line",
+          type: "line",
+          source: "route",
+          filter: ["==", ["get", "kind"], "route"],
+          layout: {
+            "line-cap": "round",
+            "line-join": "round"
+          },
+          paint: {
+            "line-color": "#fc4c02",
+            "line-width": 4.2,
+            "line-opacity": 1
+          }
+        });
 
-      setIsReady(true);
-    });
+        map.addLayer({
+          id: "route-start",
+          type: "circle",
+          source: "route",
+          filter: ["==", ["get", "kind"], "start"],
+          paint: {
+            "circle-radius": 6.2,
+            "circle-color": "#181510",
+            "circle-stroke-width": 2.3,
+            "circle-stroke-color": "#ffffff"
+          }
+        });
+
+        map.addLayer({
+          id: "route-end",
+          type: "circle",
+          source: "route",
+          filter: ["==", ["get", "kind"], "end"],
+          paint: {
+            "circle-radius": 5.6,
+            "circle-color": "#ffffff",
+            "circle-stroke-width": 2.1,
+            "circle-stroke-color": "#fc4c02"
+          }
+        });
+
+        map.fitBounds(bounds, {
+          padding: DEFAULT_BOUNDS_PADDING,
+          maxZoom: DEFAULT_MAX_ZOOM,
+          animate: false
+        });
+
+        setIsReady(true);
+      });
+    };
+
+    void initializeMap();
 
     return () => {
-      map.remove();
+      cancelled = true;
+      activeMap?.remove();
       mapRef.current = null;
     };
   }, [isVisible, points]);
