@@ -11,7 +11,7 @@ import { TrainerDashboardPage } from "./pages/TrainerDashboardPage";
 import { TrainerAthletePage } from "./pages/TrainerAthletePage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
-import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
 
 const router = createBrowserRouter([
