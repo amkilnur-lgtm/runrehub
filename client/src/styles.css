@@ -1448,45 +1448,53 @@ select {
   min-height: 240px;
 }
 
-.workout-route-leaflet,
-.workout-route-map {
+.workout-route-map,
+.workout-route-maplibre {
   width: 100%;
   height: 100%;
   display: block;
 }
 
-.workout-route-leaflet {
+.workout-route-maplibre {
   background: #dfe7ee;
   font: inherit;
 }
 
-.workout-route-leaflet .leaflet-tile-pane {
-  filter: saturate(1.22) contrast(1.11) brightness(0.992) hue-rotate(4deg);
+.workout-route-maplibre .maplibregl-canvas {
+  filter: saturate(1.06) contrast(1.02) brightness(0.995);
 }
 
-.workout-route-leaflet .leaflet-container {
+.workout-route-maplibre .maplibregl-map {
   background: #dfe7ee;
 }
 
-.workout-route-leaflet .leaflet-control-attribution {
+.workout-route-maplibre .maplibregl-ctrl-bottom-right,
+.workout-route-maplibre .maplibregl-ctrl-bottom-left {
+  pointer-events: none;
+}
+
+.workout-route-maplibre .maplibregl-ctrl-attrib {
   background: rgba(255, 255, 255, 0.72);
   color: #8e816f;
   font-size: 9px;
   backdrop-filter: blur(6px);
   padding: 1px 4px;
+  margin: 0 6px 6px 0;
+  pointer-events: auto;
 }
 
-.workout-route-leaflet .leaflet-overlay-pane,
-.workout-route-leaflet .leaflet-marker-pane {
-  filter: saturate(1.02);
-}
-
-.workout-route-leaflet .leaflet-tile {
-  image-rendering: auto;
-}
-
-.workout-route-leaflet .leaflet-control-attribution a {
+.workout-route-maplibre .maplibregl-ctrl-attrib a {
   color: inherit;
+}
+
+.workout-route-maplibre .maplibregl-ctrl-logo {
+  display: none !important;
+}
+
+.workout-route-maplibre .maplibregl-canvas-container.maplibregl-interactive,
+.workout-route-maplibre .maplibregl-canvas-container.maplibregl-touch-zoom-rotate,
+.workout-route-maplibre .maplibregl-canvas {
+  cursor: default;
 }
 
 .workout-comment-card {
