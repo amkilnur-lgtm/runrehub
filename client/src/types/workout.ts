@@ -3,6 +3,7 @@ export type StreamSeries = {
   time: number[];
   heartrate: number[];
   velocity_smooth: number[];
+  latlng: [number, number][];
 } | null;
 
 export type WorkoutData = {

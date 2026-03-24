@@ -55,7 +55,7 @@ type StravaLap = {
   end_index?: number | null;
 };
 
-type StreamPayload = Record<string, { type: string; data: number[] } | undefined>;
+type StreamPayload = Record<string, { type: string; data: unknown[] } | undefined>;
 
 type LapRow = {
   id: number;
@@ -76,6 +76,7 @@ export type ActivityStreams = {
   heartrate: number[];
   altitude: number[];
   velocity_smooth: number[];
+  latlng: [number, number][];
 };
 
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
@@ -213,6 +214,33 @@ function computeLapNetElevation(
   return endAltitude - startAltitude;
 }
 
+function isNumberArray(values: unknown[]): values is number[] {
+  return values.every((value) => typeof value === "number" && Number.isFinite(value));
+}
+
+function parseNumberStream(values: unknown[] | undefined) {
+  if (!Array.isArray(values) || !isNumberArray(values)) {
+    return [];
+  }
+
+  return values;
+}
+
+function parseLatLngStream(values: unknown[] | undefined) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values.filter((value): value is [number, number] => (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    Number.isFinite(value[0]) &&
+    typeof value[1] === "number" &&
+    Number.isFinite(value[1])
+  ));
+}
+
 async function fetchActivityStreamsFromStrava(userId: number, activityId: number) {
   const token = await refreshAccessTokenIfNeeded(userId);
   if (!token) {
@@ -220,7 +248,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   }
 
   const response = await fetch(
-    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,time,heartrate,altitude,velocity_smooth&key_by_type=true`,
+    `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=distance,time,heartrate,altitude,velocity_smooth,latlng&key_by_type=true`,
     {
       headers: {
         Authorization: `Bearer ${token}`
@@ -234,11 +262,12 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
 
   const payload = (await response.json()) as StreamPayload;
   return {
-    distance: payload.distance?.data ?? [],
-    time: payload.time?.data ?? [],
-    heartrate: payload.heartrate?.data ?? [],
-    altitude: payload.altitude?.data ?? [],
-    velocity_smooth: payload.velocity_smooth?.data ?? []
+    distance: parseNumberStream(payload.distance?.data),
+    time: parseNumberStream(payload.time?.data),
+    heartrate: parseNumberStream(payload.heartrate?.data),
+    altitude: parseNumberStream(payload.altitude?.data),
+    velocity_smooth: parseNumberStream(payload.velocity_smooth?.data),
+    latlng: parseLatLngStream(payload.latlng?.data)
   } satisfies ActivityStreams;
 }
 
@@ -252,15 +281,17 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
         heartrate_stream,
         altitude_stream,
         velocity_stream,
+        latlng_stream,
         fetched_at
       )
-      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, now())
+      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, now())
       on conflict (workout_id) do update
       set distance_stream = excluded.distance_stream,
           time_stream = excluded.time_stream,
           heartrate_stream = excluded.heartrate_stream,
           altitude_stream = excluded.altitude_stream,
           velocity_stream = excluded.velocity_stream,
+          latlng_stream = excluded.latlng_stream,
           fetched_at = now()
     `,
     [
@@ -269,7 +300,8 @@ async function saveActivityStreams(workoutId: number, streams: ActivityStreams) 
       JSON.stringify(streams.time),
       JSON.stringify(streams.heartrate),
       JSON.stringify(streams.altitude),
-      JSON.stringify(streams.velocity_smooth)
+      JSON.stringify(streams.velocity_smooth),
+      JSON.stringify(streams.latlng)
     ]
   );
 }
@@ -399,7 +431,7 @@ async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
 export async function getStoredActivityStreams(workoutId: number) {
   const { rows } = await pool.query(
     `
-      select distance_stream, time_stream, heartrate_stream, altitude_stream, velocity_stream
+      select distance_stream, time_stream, heartrate_stream, altitude_stream, velocity_stream, latlng_stream
       from workout_streams
       where workout_id = $1
     `,
@@ -416,7 +448,8 @@ export async function getStoredActivityStreams(workoutId: number) {
     time: Array.isArray(row.time_stream) ? row.time_stream : [],
     heartrate: Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [],
     altitude: Array.isArray(row.altitude_stream) ? row.altitude_stream : [],
-    velocity_smooth: Array.isArray(row.velocity_stream) ? row.velocity_stream : []
+    velocity_smooth: Array.isArray(row.velocity_stream) ? row.velocity_stream : [],
+    latlng: parseLatLngStream(Array.isArray(row.latlng_stream) ? row.latlng_stream : [])
   } satisfies ActivityStreams;
 }
 
