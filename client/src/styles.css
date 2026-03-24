@@ -1343,6 +1343,67 @@ select {
   align-items: center;
 }
 
+.workout-back-link {
+  width: fit-content;
+}
+
+.workout-summary-card {
+  display: grid;
+  gap: 18px;
+}
+
+.workout-summary-header {
+  align-items: start;
+}
+
+.workout-summary-heading {
+  min-width: 0;
+}
+
+.workout-summary-heading h2 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.workout-summary-heading p {
+  margin: 0;
+  font-size: 16px;
+}
+
+.workout-summary-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 24px;
+  background: #fff9f2;
+}
+
+.workout-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.workout-summary-stat {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(24, 21, 16, 0.08);
+}
+
+.workout-summary-stat strong {
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.workout-summary-stat-placeholder {
+  visibility: hidden;
+}
+
 .workout-comment-card {
   padding: 20px 22px;
 }
@@ -1910,6 +1971,27 @@ select {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     gap: 8px;
+  }
+
+  .workout-summary-card {
+    gap: 16px;
+  }
+
+  .workout-summary-heading h2 {
+    font-size: 30px;
+  }
+
+  .workout-summary-panel {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .workout-summary-stats {
+    gap: 12px;
+  }
+
+  .workout-summary-stat strong {
+    font-size: 22px;
   }
 
   .align-right {
