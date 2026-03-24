@@ -11,6 +11,10 @@ const workoutCursorQuerySchema = z.object({
   beforeId: z.coerce.number().int().positive().optional()
 });
 
+const workoutRenameSchema = z.object({
+  name: z.string().trim().min(1)
+});
+
 const WORKOUTS_PAGE_SIZE = 10;
 
 type AthleteStatsRow = {
@@ -215,5 +219,28 @@ export async function athleteRoutes(app: FastifyInstance) {
     }
 
     return { ok: true };
+  });
+
+  app.put("/api/athlete/workouts/:id/name", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const params = request.params as { id: string };
+    const body = workoutRenameSchema.parse(request.body);
+    const workoutId = Number(params.id);
+
+    const result = await pool.query(
+      `
+        update workouts
+        set name = $3
+        where id = $1 and user_id = $2
+        returning name
+      `,
+      [workoutId, request.user.id, body.name]
+    );
+
+    if (!result.rows[0]) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    return { ok: true, name: result.rows[0].name };
   });
 }

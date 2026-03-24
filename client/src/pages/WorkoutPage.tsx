@@ -34,8 +34,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const params = useParams();
   const navigate = useNavigate();
   const prefix = mode === "trainer" ? "/api/trainer/workouts/" : "/api/athlete/workouts/";
-  const { data, loading, error } = useApi<WorkoutData>(`${prefix}${params.id}`);
+  const { data, loading, error, refresh } = useApi<WorkoutData>(`${prefix}${params.id}`);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [coachComment, setCoachComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -67,6 +68,43 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
       );
       setIsDeleting(false);
+    }
+  }
+
+  async function handleRename() {
+    if (!data?.workout.id || isRenaming) {
+      return;
+    }
+
+    setIsMenuOpen(false);
+    const nextName = window.prompt("Новое название пробежки", data.workout.name);
+    if (nextName === null) {
+      return;
+    }
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      window.alert("Название не может быть пустым.");
+      return;
+    }
+
+    if (trimmedName === data.workout.name) {
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      await api<{ ok: true; name: string }>(`${prefix}${data.workout.id}/name`, {
+        method: "PUT",
+        body: JSON.stringify({ name: trimmedName })
+      });
+      refresh();
+    } catch (renameError) {
+      window.alert(
+        renameError instanceof Error ? renameError.message : "Не удалось переименовать тренировку"
+      );
+    } finally {
+      setIsRenaming(false);
     }
   }
 
@@ -192,7 +230,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 <button
                   type="button"
                   className="workout-menu-item"
-                  disabled={isDeleting}
+                  disabled={isRenaming || isDeleting}
+                  onClick={handleRename}
+                >
+                  {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
+                </button>
+                <button
+                  type="button"
+                  className="workout-menu-item workout-menu-item-danger"
+                  disabled={isDeleting || isRenaming}
                   onClick={handleDelete}
                 >
                   {isDeleting ? "Удаляем..." : "Удалить тренировку"}
