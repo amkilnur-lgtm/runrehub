@@ -1513,6 +1513,13 @@ select {
   cursor: default;
 }
 
+@media (pointer: coarse) {
+  .workout-route-maplibre .maplibregl-canvas-container,
+  .workout-route-maplibre .maplibregl-canvas {
+    touch-action: pan-y pinch-zoom;
+  }
+}
+
 .workout-route-loading,
 .workout-route-error {
   position: absolute;
