@@ -15,8 +15,8 @@ function FitRouteBounds({ points }: { points: [number, number][] }) {
     }
 
     map.fitBounds(latLngBounds(points), {
-      padding: [12, 12],
-      maxZoom: 16
+      padding: [8, 8],
+      maxZoom: 17
     });
   }, [map, points]);
 
@@ -43,7 +43,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     <div className="workout-route-map" aria-label="Маршрут пробежки">
       <MapContainer
         bounds={bounds}
-        boundsOptions={{ padding: [12, 12] }}
+        boundsOptions={{ padding: [8, 8] }}
         scrollWheelZoom={false}
         dragging
         zoomControl={false}
@@ -51,8 +51,13 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         className="workout-route-leaflet"
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        />
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+          opacity={0.78}
+          attribution=""
         />
         <FitRouteBounds points={points} />
         <Pane name="route-shadow" style={{ zIndex: 410 }}>
@@ -60,8 +65,8 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#ffffff",
-              weight: 9,
-              opacity: 0.96,
+              weight: 8,
+              opacity: 0.98,
               lineCap: "round",
               lineJoin: "round"
             }}
@@ -73,7 +78,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#fc4c02",
-              weight: 5,
+              weight: 4.4,
               opacity: 1,
               lineCap: "round",
               lineJoin: "round"
@@ -87,7 +92,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
           pathOptions={{
             color: "#ffffff",
             weight: 3,
-            fillColor: "#fc4c02",
+            fillColor: "#181510",
             fillOpacity: 1
           }}
         />
@@ -95,9 +100,9 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
           center={end}
           radius={7}
           pathOptions={{
-            color: "#ffffff",
+            color: "#fc4c02",
             weight: 3,
-            fillColor: "#181510",
+            fillColor: "#ffffff",
             fillOpacity: 1
           }}
         />
