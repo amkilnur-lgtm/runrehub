@@ -1364,7 +1364,16 @@ select {
 }
 
 .workout-summary-header {
+  display: grid;
+  gap: 8px;
   align-items: start;
+}
+
+.workout-summary-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .workout-summary-heading {
