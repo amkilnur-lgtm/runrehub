@@ -1,5 +1,9 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
+ARG VITE_MAP_API_KEY
+ARG VITE_MAP_STYLE_URL
+ENV VITE_MAP_API_KEY=$VITE_MAP_API_KEY
+ENV VITE_MAP_STYLE_URL=$VITE_MAP_STYLE_URL
 
 COPY package.json ./
 COPY server/package.json server/package.json

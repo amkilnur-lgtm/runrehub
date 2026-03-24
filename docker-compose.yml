@@ -18,6 +18,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_MAP_API_KEY: ${VITE_MAP_API_KEY:-}
+        VITE_MAP_STYLE_URL: ${VITE_MAP_STYLE_URL:-}
     restart: unless-stopped
     env_file:
       - .env
