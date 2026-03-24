@@ -107,29 +107,36 @@ export function TrainerAthletePage() {
         />
       </section>
 
-      <section className="card">
-        <h3>Все пробежки</h3>
-        <div className="list">
-          {allWorkouts.length === 0 ? <div className="muted">Пока нет тренировок.</div> : null}
-          {allWorkouts.map((workout) => (
-            <Link
-              key={workout.id}
-              className="list-row link-row compact-workout-row"
-              to={`/trainer/workouts/${workout.id}`}
-            >
-              <div className="compact-workout-main">
-                <strong>{workout.name}</strong>
-                <div className="muted">{formatDate(workout.start_date)}</div>
-              </div>
-              <div className="align-right compact-workout-meta">
-                <div>{formatDistance(workout.distance_meters)}</div>
-                <div className="muted">
-                  {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
-                </div>
-              </div>
-            </Link>
-          ))}
+      <section className="card trainer-dashboard-list-section">
+        <div className="trainer-dashboard-heading">
+          <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
         </div>
+        {allWorkouts.length === 0 ? (
+          <div className="trainer-dashboard-leader-empty">
+            <strong>Пока нет тренировок.</strong>
+          </div>
+        ) : (
+          <div className="trainer-dashboard-workout-list">
+            {allWorkouts.map((workout) => (
+              <Link
+                key={workout.id}
+                className="trainer-dashboard-workout-row"
+                to={`/trainer/workouts/${workout.id}`}
+              >
+                <div className="trainer-dashboard-workout-main">
+                  <strong>{workout.name}</strong>
+                  <div className="muted">{formatDate(workout.start_date)}</div>
+                </div>
+                <div className="trainer-dashboard-workout-meta">
+                  <div>{formatDistance(workout.distance_meters)}</div>
+                  <div className="muted">
+                    {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
         {allWorkouts.length > 0 && hasMore ? (
           <div style={{ marginTop: "16px", textAlign: "center" }}>
             <button className="ghost-button" disabled={isLoadingMore} onClick={loadMore}>
