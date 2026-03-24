@@ -207,7 +207,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         Назад
       </Link>
 
-      <section className="card workout-summary-card">
+      <section className={`card workout-summary-card${data.streams?.latlng?.length ? " workout-summary-card-with-route" : ""}`}>
         <div className="workout-summary-panel">
           <div className="workout-summary-header">
             <div className="workout-summary-topbar">
