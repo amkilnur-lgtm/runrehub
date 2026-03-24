@@ -206,61 +206,61 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       </Link>
 
       <section className="card workout-summary-card">
-        <div className="workout-summary-header">
-          <div className="workout-summary-topbar">
-            <span className="muted trainer-dashboard-eyebrow">СВОДКА</span>
-            <div className="workout-menu" ref={menuRef}>
-              <button
-                type="button"
-                className="ghost-button workout-menu-trigger"
-                aria-label="Действия"
-                aria-expanded={isMenuOpen}
-                onClick={() => setIsMenuOpen((open) => !open)}
-              >
-                <svg
-                  className="workout-menu-icon"
-                  viewBox="0 0 4 18"
-                  aria-hidden="true"
-                  focusable="false"
+        <div className="workout-summary-panel">
+          <div className="workout-summary-header">
+            <div className="workout-summary-topbar">
+              <span className="muted trainer-dashboard-eyebrow">СВОДКА</span>
+              <div className="workout-menu" ref={menuRef}>
+                <button
+                  type="button"
+                  className="ghost-button workout-menu-trigger"
+                  aria-label="Действия"
+                  aria-expanded={isMenuOpen}
+                  onClick={() => setIsMenuOpen((open) => !open)}
                 >
-                  <circle cx="2" cy="2" r="1.25" />
-                  <circle cx="2" cy="9" r="1.25" />
-                  <circle cx="2" cy="16" r="1.25" />
-                </svg>
-              </button>
-              {isMenuOpen ? (
-                <div className="workout-menu-popover">
-                  <button
-                    type="button"
-                    className="workout-menu-item"
-                    disabled={isRenaming || isDeleting}
-                    onClick={handleRename}
+                  <svg
+                    className="workout-menu-icon"
+                    viewBox="0 0 4 18"
+                    aria-hidden="true"
+                    focusable="false"
                   >
-                    {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
-                  </button>
-                  <button
-                    type="button"
-                    className="workout-menu-item workout-menu-item-danger"
-                    disabled={isDeleting || isRenaming}
-                    onClick={handleDelete}
-                  >
-                    {isDeleting ? "Удаляем..." : "Удалить тренировку"}
-                  </button>
-                </div>
-              ) : null}
+                    <circle cx="2" cy="2" r="1.25" />
+                    <circle cx="2" cy="9" r="1.25" />
+                    <circle cx="2" cy="16" r="1.25" />
+                  </svg>
+                </button>
+                {isMenuOpen ? (
+                  <div className="workout-menu-popover">
+                    <button
+                      type="button"
+                      className="workout-menu-item"
+                      disabled={isRenaming || isDeleting}
+                      onClick={handleRename}
+                    >
+                      {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
+                    </button>
+                    <button
+                      type="button"
+                      className="workout-menu-item workout-menu-item-danger"
+                      disabled={isDeleting || isRenaming}
+                      onClick={handleDelete}
+                    >
+                      {isDeleting ? "Удаляем..." : "Удалить тренировку"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="trainer-dashboard-heading workout-summary-heading">
+              <h2>{data.workout.name}</h2>
+              <p className="muted">
+                {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
+                {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
+              </p>
             </div>
           </div>
 
-          <div className="trainer-dashboard-heading workout-summary-heading">
-            <h2>{data.workout.name}</h2>
-            <p className="muted">
-              {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
-              {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="workout-summary-panel">
           <div className="workout-summary-stats">
             <div className="workout-summary-stat">
               <span className="muted">Километраж</span>
