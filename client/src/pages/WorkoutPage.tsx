@@ -217,7 +217,16 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 aria-expanded={isMenuOpen}
                 onClick={() => setIsMenuOpen((open) => !open)}
               >
-                ...
+                <svg
+                  className="workout-menu-icon"
+                  viewBox="0 0 4 18"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <circle cx="2" cy="2" r="1.25" />
+                  <circle cx="2" cy="9" r="1.25" />
+                  <circle cx="2" cy="16" r="1.25" />
+                </svg>
               </button>
               {isMenuOpen ? (
                 <div className="workout-menu-popover">
