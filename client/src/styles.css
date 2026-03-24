@@ -1367,13 +1367,12 @@ select {
 }
 
 .workout-summary-card {
-  display: grid;
-  gap: 18px;
+  padding: 18px;
 }
 
 .workout-summary-header {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -1390,8 +1389,9 @@ select {
 
 .workout-summary-heading h2 {
   margin: 0;
-  font-size: 34px;
-  line-height: 1.05;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
@@ -1402,7 +1402,7 @@ select {
 
 .workout-summary-panel {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   padding: 20px;
   border-radius: 24px;
   background: #fff9f2;
@@ -2002,11 +2002,11 @@ select {
   }
 
   .workout-summary-card {
-    gap: 16px;
+    padding: 16px;
   }
 
   .workout-summary-heading h2 {
-    font-size: 30px;
+    font-size: 18px;
   }
 
   .workout-summary-panel {
