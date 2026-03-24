@@ -1461,7 +1461,11 @@ select {
 }
 
 .workout-route-leaflet .leaflet-tile-pane {
-  filter: saturate(0.82) contrast(1.03) brightness(1.02);
+  filter: saturate(0.76) contrast(1.02) brightness(1.03);
+}
+
+.workout-route-leaflet .leaflet-container {
+  background: #eef2ea;
 }
 
 .workout-route-leaflet .leaflet-control-attribution {

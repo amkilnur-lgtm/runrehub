@@ -6,13 +6,17 @@ function FitRouteBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
 
   useEffect(() => {
+    map.attributionControl.setPrefix("");
+  }, [map]);
+
+  useEffect(() => {
     if (points.length < 2) {
       return;
     }
 
     map.fitBounds(latLngBounds(points), {
-      padding: [24, 24],
-      maxZoom: 15
+      padding: [12, 12],
+      maxZoom: 16
     });
   }, [map, points]);
 
@@ -39,7 +43,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     <div className="workout-route-map" aria-label="Маршрут пробежки">
       <MapContainer
         bounds={bounds}
-        boundsOptions={{ padding: [24, 24] }}
+        boundsOptions={{ padding: [12, 12] }}
         scrollWheelZoom={false}
         dragging
         zoomControl={false}
@@ -56,8 +60,8 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#ffffff",
-              weight: 8,
-              opacity: 0.92,
+              weight: 9,
+              opacity: 0.96,
               lineCap: "round",
               lineJoin: "round"
             }}
@@ -69,7 +73,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
             positions={points}
             pathOptions={{
               color: "#fc4c02",
-              weight: 4.6,
+              weight: 5,
               opacity: 1,
               lineCap: "round",
               lineJoin: "round"
