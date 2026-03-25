@@ -55,11 +55,12 @@ select {
   display: block;
   width: min(100%, 280px);
   height: auto;
-  margin: 0 0 14px;
+  margin: 0 auto 18px;
 }
 
-.login-eyebrow {
-  margin-bottom: 8px;
+.login-card h1 {
+  font-size: clamp(2.2rem, 5vw, 2.75rem);
+  font-weight: 750;
 }
 
 .shell {
