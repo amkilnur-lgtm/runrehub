@@ -51,11 +51,17 @@ select {
   padding: 32px;
 }
 
+.login-logo-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 24px;
+}
+
 .login-logo {
   display: block;
   width: min(100%, 238px);
   height: auto;
-  margin: 0 auto 24px;
+  margin: 0;
 }
 
 .login-card h1 {
