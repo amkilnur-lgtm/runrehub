@@ -64,9 +64,12 @@ export function formatTelegramWorkoutMessage(input: {
   const workoutUrl = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${input.workoutId}`;
 
   return [
-    `Спортсмен <b>${athleteName}</b> побегал <b>${distanceKm} км</b>`,
+    `<b>${athleteName} побегала</b>`,
+    "",
+    `Дистанция: <b>${distanceKm} км</b>`,
     `Средний темп: <b>${escapeTelegramHtml(paceText)}</b>`,
     `Средний пульс: <b>${escapeTelegramHtml(heartRateText)}</b>`,
-    `<a href="${escapeTelegramHtml(workoutUrl)}">Открыть пробежку</a>`
+    "",
+    `<a href="${escapeTelegramHtml(workoutUrl)}">Посмотреть тренировку</a>`
   ].join("\n");
 }
