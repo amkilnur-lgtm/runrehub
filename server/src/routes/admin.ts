@@ -4,6 +4,8 @@ import { z } from "zod";
 import { hashPassword, requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
+import { isTelegramConfigured } from "../lib/telegram.js";
+import { sendTelegramTestMessage } from "../lib/telegram-notifications.js";
 
 const createUserSchema = z.object({
   username: z.string().min(3),
@@ -15,6 +17,11 @@ const createUserSchema = z.object({
 
 const stravaEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(100)
+});
+
+const updateTrainerTelegramSchema = z.object({
+  chatId: z.string().trim().max(128).nullable(),
+  notificationsEnabled: z.boolean()
 });
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -37,6 +44,31 @@ export async function adminRoutes(app: FastifyInstance) {
       `select id, full_name from users where role = 'trainer' order by full_name asc`
     );
     return { trainers: rows };
+  });
+
+  app.get("/api/admin/trainers/telegram", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    const { rows } = await pool.query(
+      `
+        select
+          trainer.id,
+          trainer.full_name,
+          trainer.telegram_chat_id,
+          trainer.telegram_notifications_enabled,
+          coalesce(count(job.id) filter (where job.status in ('pending', 'processing')), 0)::int as pending_jobs,
+          coalesce(count(job.id) filter (where job.status = 'sent'), 0)::int as sent_jobs
+        from users trainer
+        left join telegram_notification_jobs job on job.coach_user_id = trainer.id
+        where trainer.role = 'trainer'
+        group by trainer.id
+        order by trainer.full_name asc
+      `
+    );
+
+    return {
+      configured: isTelegramConfigured(),
+      trainers: rows
+    };
   });
 
   app.get("/api/admin/strava/events", { preHandler: requireAuth }, async (request) => {
@@ -84,6 +116,67 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Пользователь не найден или его нельзя удалить" });
     }
 
+    return { ok: true };
+  });
+
+  app.put("/api/admin/trainers/:id/telegram", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    const trainerId = parseInt(params.id, 10);
+    const body = updateTrainerTelegramSchema.parse(request.body);
+    const chatId = body.chatId?.trim() ? body.chatId.trim() : null;
+
+    const { rows } = await pool.query(
+      `
+        update users
+        set telegram_chat_id = $2,
+            telegram_notifications_enabled = $3
+        where id = $1
+          and role = 'trainer'
+        returning id, full_name, telegram_chat_id, telegram_notifications_enabled
+      `,
+      [trainerId, chatId, body.notificationsEnabled]
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ message: "Trainer not found" });
+    }
+
+    return { trainer: rows[0] };
+  });
+
+  app.post("/api/admin/trainers/:id/telegram/test", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+
+    if (!isTelegramConfigured()) {
+      return reply.code(400).send({ message: "Telegram bot is not configured" });
+    }
+
+    const params = request.params as { id: string };
+    const trainerId = parseInt(params.id, 10);
+    const { rows } = await pool.query(
+      `
+        select id, full_name, telegram_chat_id
+        from users
+        where id = $1
+          and role = 'trainer'
+      `,
+      [trainerId]
+    );
+
+    const trainer = rows[0] as
+      | { id: number; full_name: string; telegram_chat_id: string | null }
+      | undefined;
+
+    if (!trainer) {
+      return reply.code(404).send({ message: "Trainer not found" });
+    }
+
+    if (!trainer.telegram_chat_id?.trim()) {
+      return reply.code(400).send({ message: "Telegram chat id is empty" });
+    }
+
+    await sendTelegramTestMessage(trainer.telegram_chat_id, trainer.full_name);
     return { ok: true };
   });
 }

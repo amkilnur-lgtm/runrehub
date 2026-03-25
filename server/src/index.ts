@@ -19,6 +19,7 @@ import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
 import { syncDueAthletes } from "./lib/strava.js";
+import { processPendingTelegramNotifications } from "./lib/telegram-notifications.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -162,3 +163,20 @@ addStravaEvent({
 setInterval(() => {
   void syncDueAthletes(app.log);
 }, syncIntervalMs);
+
+const telegramIntervalMs = 30 * 1000;
+app.log.info({ intervalMs: telegramIntervalMs }, "telegram notification worker started");
+addStravaEvent({
+  source: "system",
+  level: "info",
+  message: "telegram notification worker started",
+  details: { intervalMs: telegramIntervalMs }
+});
+setInterval(() => {
+  void processPendingTelegramNotifications(app.log).catch((error) => {
+    app.log.error({ err: error }, "telegram notification worker tick failed");
+  });
+}, telegramIntervalMs);
+void processPendingTelegramNotifications(app.log).catch((error) => {
+  app.log.error({ err: error }, "telegram notification worker initial run failed");
+});

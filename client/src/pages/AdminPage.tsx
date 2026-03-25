@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { api } from "../api";
 import { useApi } from "../hooks/useApi";
@@ -15,6 +15,15 @@ type AdminUser = {
 type Trainer = {
   id: number;
   full_name: string;
+};
+
+type TrainerTelegramSettings = {
+  id: number;
+  full_name: string;
+  telegram_chat_id: string | null;
+  telegram_notifications_enabled: boolean;
+  pending_jobs: number;
+  sent_jobs: number;
 };
 
 type StravaEvent = {
@@ -48,6 +57,10 @@ export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
   const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/strava/events?limit=80");
+  const telegramApi = useApi<{
+    configured: boolean;
+    trainers: TrainerTelegramSettings[];
+  }>("/api/admin/trainers/telegram");
 
   const [form, setForm] = useState({
     fullName: "",
@@ -56,6 +69,25 @@ export function AdminPage() {
     role: "trainer",
     coachId: ""
   });
+  const [telegramDrafts, setTelegramDrafts] = useState<
+    Record<number, { chatId: string; notificationsEnabled: boolean }>
+  >({});
+  const [savingTrainerId, setSavingTrainerId] = useState<number | null>(null);
+  const [testingTrainerId, setTestingTrainerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const nextDrafts = Object.fromEntries(
+      (telegramApi.data?.trainers ?? []).map((trainer) => [
+        trainer.id,
+        {
+          chatId: trainer.telegram_chat_id ?? "",
+          notificationsEnabled: trainer.telegram_notifications_enabled
+        }
+      ])
+    );
+
+    setTelegramDrafts(nextDrafts);
+  }, [telegramApi.data]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -93,9 +125,47 @@ export function AdminPage() {
     }
   }
 
+  async function saveTelegramSettings(trainerId: number) {
+    const draft = telegramDrafts[trainerId];
+    if (!draft) {
+      return;
+    }
+
+    setSavingTrainerId(trainerId);
+    try {
+      await api(`/api/admin/trainers/${trainerId}/telegram`, {
+        method: "PUT",
+        body: JSON.stringify({
+          chatId: draft.chatId.trim() ? draft.chatId.trim() : null,
+          notificationsEnabled: draft.notificationsEnabled
+        })
+      });
+      telegramApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка сохранения Telegram: ${err.message}`);
+    } finally {
+      setSavingTrainerId(null);
+    }
+  }
+
+  async function sendTelegramTest(trainerId: number) {
+    setTestingTrainerId(trainerId);
+    try {
+      await api(`/api/admin/trainers/${trainerId}/telegram/test`, {
+        method: "POST"
+      });
+      alert("Тестовое сообщение отправлено");
+    } catch (err: any) {
+      alert(`Ошибка тестового сообщения: ${err.message}`);
+    } finally {
+      setTestingTrainerId(null);
+    }
+  }
+
   const users = usersApi.data?.users ?? [];
   const trainers = trainersApi.data?.trainers ?? [];
   const events = eventsApi.data?.events ?? [];
+  const telegramTrainers = telegramApi.data?.trainers ?? [];
   const logText = events.map(formatLogLine).join("\n");
 
   return (
@@ -122,6 +192,105 @@ export function AdminPage() {
           {!eventsApi.loading && !eventsApi.error && events.length > 0 ? (
             <textarea className="admin-log-output" value={logText} readOnly spellCheck={false} />
           ) : null}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <h2>Telegram тренеров</h2>
+            <p className="muted">
+              Здесь можно задать chat id, включить уведомления о новых пробежках и отправить тест.
+            </p>
+          </div>
+          <button type="button" className="ghost-button" onClick={telegramApi.refresh}>
+            Обновить
+          </button>
+        </div>
+
+        {telegramApi.data && !telegramApi.data.configured ? (
+          <div className="admin-telegram-hint">
+            Telegram bot не настроен на сервере. Добавь <code>TELEGRAM_BOT_TOKEN</code> в
+            окружение, чтобы включить отправку.
+          </div>
+        ) : null}
+
+        {telegramApi.error ? <div className="error-box">{telegramApi.error}</div> : null}
+
+        <div className="admin-telegram-list">
+          {telegramTrainers.map((trainer) => {
+            const draft = telegramDrafts[trainer.id] ?? {
+              chatId: trainer.telegram_chat_id ?? "",
+              notificationsEnabled: trainer.telegram_notifications_enabled
+            };
+
+            return (
+              <div key={trainer.id} className="admin-telegram-row inset-card">
+                <div className="admin-telegram-topline">
+                  <div>
+                    <strong>{trainer.full_name}</strong>
+                    <div className="muted">
+                      {trainer.telegram_chat_id ? "Chat id задан" : "Chat id не задан"} · pending:{" "}
+                      {trainer.pending_jobs} · sent: {trainer.sent_jobs}
+                    </div>
+                  </div>
+
+                  <label className="admin-telegram-toggle">
+                    <input
+                      type="checkbox"
+                      checked={draft.notificationsEnabled}
+                      onChange={(event) =>
+                        setTelegramDrafts((current) => ({
+                          ...current,
+                          [trainer.id]: {
+                            ...draft,
+                            notificationsEnabled: event.target.checked
+                          }
+                        }))
+                      }
+                    />
+                    <span>Уведомления включены</span>
+                  </label>
+                </div>
+
+                <label className="admin-telegram-field">
+                  Telegram chat id
+                  <input
+                    value={draft.chatId}
+                    placeholder="Например: 123456789"
+                    onChange={(event) =>
+                      setTelegramDrafts((current) => ({
+                        ...current,
+                        [trainer.id]: {
+                          ...draft,
+                          chatId: event.target.value
+                        }
+                      }))
+                    }
+                  />
+                </label>
+
+                <div className="admin-telegram-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => saveTelegramSettings(trainer.id)}
+                    disabled={savingTrainerId === trainer.id}
+                  >
+                    {savingTrainerId === trainer.id ? "Сохраняю..." : "Сохранить"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => sendTelegramTest(trainer.id)}
+                    disabled={testingTrainerId === trainer.id || !draft.chatId.trim()}
+                  >
+                    {testingTrainerId === trainer.id ? "Отправляю..." : "Тест"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

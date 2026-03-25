@@ -4,6 +4,7 @@ import { FastifyBaseLogger } from "fastify";
 
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
+import { enqueueNewWorkoutTelegramNotification } from "./telegram-notifications.js";
 import { config } from "../config.js";
 
 type TokenResponse = {
@@ -458,6 +459,7 @@ export async function getStoredActivityStreams(workoutId: number) {
 async function syncSingleActivity(userId: number, token: string, activity: StravaActivity) {
   const client = await pool.connect();
   let workoutId: number;
+  let isNewWorkout = false;
 
   try {
     await client.query("BEGIN");
@@ -492,7 +494,7 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
             average_speed = excluded.average_speed,
             average_heartrate = excluded.average_heartrate,
             max_heartrate = excluded.max_heartrate
-        returning id
+        returning id, (xmax = 0) as inserted
       `,
       [
         userId,
@@ -512,6 +514,7 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
     );
 
     workoutId = workoutResult.rows[0].id as number;
+    isNewWorkout = workoutResult.rows[0].inserted === true;
 
     // Загружаем laps параллельно со streams
     const [lapResponse, streamsData] = await Promise.all([
@@ -576,7 +579,11 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
     client.release();
   }
 
-  return workoutId;
+  if (isNewWorkout) {
+    await enqueueNewWorkoutTelegramNotification(workoutId);
+  }
+
+  return { workoutId, isNewWorkout };
 }
 
 export function getStravaAuthUrl() {

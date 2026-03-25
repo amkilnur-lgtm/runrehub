@@ -423,6 +423,58 @@ select {
   overflow: auto;
 }
 
+.admin-telegram-hint {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff9f2;
+  color: #72685a;
+}
+
+.admin-telegram-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.admin-telegram-row {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-telegram-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-telegram-field {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.admin-telegram-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #72685a;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.admin-telegram-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.admin-telegram-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .align-right {
   text-align: right;
 }
@@ -2168,6 +2220,10 @@ select {
 
   .section-header {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-telegram-topline {
     flex-direction: column;
   }
 

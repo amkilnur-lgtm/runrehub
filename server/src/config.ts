@@ -18,7 +18,9 @@ const configSchema = z
     STRAVA_CLIENT_ID: z.string().optional(),
     STRAVA_CLIENT_SECRET: z.string().optional(),
     STRAVA_WEBHOOK_VERIFY_TOKEN: z.string().default("change-me"),
-    STRAVA_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional()
+    STRAVA_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional(),
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_BOT_USERNAME: z.string().optional()
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && !value.STRAVA_TOKEN_ENCRYPTION_KEY) {
