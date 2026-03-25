@@ -932,6 +932,10 @@ select {
   gap: 10px;
 }
 
+.trainer-dashboard-sections {
+  align-items: start;
+}
+
 .athlete-account-header-shell {
   display: grid;
   gap: 10px;
