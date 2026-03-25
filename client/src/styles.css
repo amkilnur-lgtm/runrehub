@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   font-family: "Segoe UI", "Arial", sans-serif;
-  --chart-axis-gutter: 34px;
+  --chart-axis-gutter: 31px;
   background:
     radial-gradient(circle at top left, rgba(255, 120, 80, 0.16), transparent 30%),
     linear-gradient(180deg, #fbfaf7 0%, #f3efe8 100%);
@@ -1242,7 +1242,7 @@ select {
 .chart-y-axis span {
   position: absolute;
   right: 0;
-  transform: translate(-3px, -50%);
+  transform: translate(-1px, -50%);
   line-height: 1;
 }
 
@@ -1261,7 +1261,7 @@ select {
 .chart-grid-line {
   position: absolute;
   left: 0;
-  right: 0;
+  right: 3px;
   height: 1px;
   background: rgba(24, 21, 16, 0.034);
   transform: translateY(-50%);
@@ -1269,8 +1269,8 @@ select {
 
 .chart-svg {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  inset: 0 3px 0 0;
+  width: auto;
   height: 100%;
 }
 
@@ -1912,7 +1912,7 @@ select {
   .chart-grid-wrap,
   .chart-grid-wrap,
   .chart-x-wrap {
-    --chart-axis-gutter: 30px;
+    --chart-axis-gutter: 28px;
     gap: 1px;
   }
 
