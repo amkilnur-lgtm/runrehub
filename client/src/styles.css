@@ -51,6 +51,17 @@ select {
   padding: 32px;
 }
 
+.login-logo {
+  display: block;
+  width: min(100%, 280px);
+  height: auto;
+  margin: 0 0 14px;
+}
+
+.login-eyebrow {
+  margin-bottom: 8px;
+}
+
 .shell {
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   max-width: 1180px;
