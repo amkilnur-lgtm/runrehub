@@ -26,17 +26,17 @@ export function StreamChart({
   return (
     <div className="chart-card">
       <div className="chart-title-row">
-        <strong>{title}</strong>
+        <strong className="chart-title">{title}</strong>
         <span className="muted chart-axis-caption">{model.axisCaption}</span>
       </div>
       <div className="chart-metrics">
-        <div>
+        <div className="chart-metric">
           <div className="chart-metric-value">{model.summaryLeft}</div>
-          <div className="muted">{model.summaryLeftLabel}</div>
+          <div className="chart-metric-label">{model.summaryLeftLabel}</div>
         </div>
-        <div>
+        <div className="chart-metric">
           <div className="chart-metric-value">{model.summaryRight}</div>
-          <div className="muted">{model.summaryRightLabel}</div>
+          <div className="chart-metric-label">{model.summaryRightLabel}</div>
         </div>
       </div>
       <div className="chart-frame">
@@ -59,16 +59,25 @@ export function StreamChart({
             <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
               <defs>
                 <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.34" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.04" />
+                  <stop offset="0%" stopColor={color} stopOpacity="0.38" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.06" />
                 </linearGradient>
               </defs>
               <path d={model.areaPath} fill={`url(#${title}-gradient)`} />
               <path
                 d={model.linePath}
                 fill="none"
+                stroke="rgba(255, 255, 255, 0.86)"
+                strokeWidth="2.4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <path
+                d={model.linePath}
+                fill="none"
                 stroke={color}
-                strokeWidth="1.25"
+                strokeOpacity="0.96"
+                strokeWidth="1.45"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
