@@ -376,7 +376,8 @@ export async function trainerRoutes(app: FastifyInstance) {
     const result = await pool.query(
       `
         update workouts w
-        set name = $3
+        set name = $3,
+            custom_name = $3
         from users u
         where w.id = $1
           and w.user_id = u.id

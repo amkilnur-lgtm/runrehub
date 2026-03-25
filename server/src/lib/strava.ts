@@ -468,6 +468,7 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
           user_id,
           strava_activity_id,
           name,
+          strava_name,
           sport_type,
           start_date,
           distance_meters,
@@ -478,9 +479,10 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
           average_heartrate,
           max_heartrate
         )
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
         on conflict (strava_activity_id) do update
-        set name = excluded.name,
+        set name = coalesce(workouts.custom_name, excluded.strava_name),
+            strava_name = excluded.strava_name,
             sport_type = excluded.sport_type,
             start_date = excluded.start_date,
             distance_meters = excluded.distance_meters,
@@ -495,6 +497,7 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
       [
         userId,
         activity.id,
+        activity.name,
         activity.name,
         activity.sport_type,
         activity.start_date,

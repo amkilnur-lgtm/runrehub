@@ -230,7 +230,8 @@ export async function athleteRoutes(app: FastifyInstance) {
     const result = await pool.query(
       `
         update workouts
-        set name = $3
+        set name = $3,
+            custom_name = $3
         where id = $1 and user_id = $2
         returning name
       `,
