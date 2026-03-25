@@ -59,8 +59,9 @@ export function StreamChart({
             <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
               <defs>
                 <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.38" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.06" />
+                  <stop offset="0%" stopColor={color} stopOpacity="0.48" />
+                  <stop offset="42%" stopColor={color} stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.03" />
                 </linearGradient>
               </defs>
               <path d={model.areaPath} fill={`url(#${title}-gradient)`} />
@@ -68,7 +69,7 @@ export function StreamChart({
                 d={model.linePath}
                 fill="none"
                 stroke="rgba(255, 255, 255, 0.86)"
-                strokeWidth="2.4"
+                strokeWidth="2.3"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -77,7 +78,7 @@ export function StreamChart({
                 fill="none"
                 stroke={color}
                 strokeOpacity="0.96"
-                strokeWidth="1.45"
+                strokeWidth="1.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
