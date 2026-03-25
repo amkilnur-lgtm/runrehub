@@ -1378,7 +1378,7 @@ select {
 
 .workout-summary-card-with-route {
   display: grid;
-  grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.35fr);
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
   align-items: start;
 }
 
@@ -1450,11 +1450,13 @@ select {
   overflow: hidden;
   background: #dfe7ee;
   box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  align-self: stretch;
 }
 
 .workout-route-map-shell {
   position: relative;
   width: 100%;
+  height: 100%;
 }
 
 .workout-route-map {
@@ -1526,6 +1528,14 @@ select {
   .workout-route-maplibre .maplibregl-canvas-container,
   .workout-route-maplibre .maplibregl-canvas {
     touch-action: pan-y pinch-zoom;
+  }
+}
+
+@media (min-width: 901px) {
+  .workout-route-map {
+    aspect-ratio: auto;
+    min-height: 100%;
+    height: 100%;
   }
 }
 
