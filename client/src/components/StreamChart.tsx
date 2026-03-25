@@ -16,7 +16,7 @@ export function StreamChart({
     return (
       <div className="chart-card">
         <div className="chart-title-row">
-          <strong>{title}</strong>
+          <span className="muted trainer-dashboard-eyebrow">{title}</span>
         </div>
         <div className="chart-empty muted">Нет данных Strava для этого графика.</div>
       </div>
@@ -26,7 +26,7 @@ export function StreamChart({
   return (
     <div className="chart-card">
       <div className="chart-title-row">
-        <strong className="chart-title">{title}</strong>
+        <span className="muted trainer-dashboard-eyebrow">{title}</span>
         <span className="muted chart-axis-caption">{model.axisCaption}</span>
       </div>
       <div className="chart-metrics">

@@ -1178,6 +1178,18 @@ select {
   margin-bottom: 12px;
 }
 
+.workout-layout > .card > h2,
+.workout-comment-card .chart-title-row > strong {
+  display: inline-block;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8e816f;
+}
+
 .chart-title {
   font-size: 15px;
   font-weight: 700;
