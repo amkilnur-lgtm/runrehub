@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../components/AuthProvider";
+import logoImage from "../assets/logo_red horizontal.png";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -37,7 +38,8 @@ export function LoginPage() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="eyebrow">RunningRehab</div>
+        <img className="login-logo" src={logoImage} alt="Running Rehab" />
+        <div className="eyebrow login-eyebrow">RunningRehab</div>
         <h1>Вход в кабинет</h1>
         <p className="muted">
           Админ выдает логин и пароль. После входа спортсмен может привязать свою Strava.
