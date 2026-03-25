@@ -54,7 +54,7 @@ select {
 .login-logo-wrap {
   display: flex;
   justify-content: center;
-  padding: 20px 0 24px;
+  padding: 32px 0;
 }
 
 .login-logo {
@@ -1721,6 +1721,10 @@ select {
   .login-card,
   .card {
     border-radius: 20px;
+  }
+
+  .login-logo-wrap {
+    padding: 28px 0;
   }
 
   .login-card,
