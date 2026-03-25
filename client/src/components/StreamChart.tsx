@@ -84,6 +84,7 @@ export function StreamChart({
               />
             </svg>
           </div>
+          <div className="chart-side-gutter" aria-hidden="true" />
         </div>
       </div>
       <div className="chart-x-wrap">
@@ -101,10 +102,12 @@ export function StreamChart({
             </span>
           ))}
         </div>
+        <div className="chart-side-gutter" aria-hidden="true" />
       </div>
       <div className="chart-x-wrap">
         <div />
         <div className="chart-x-label muted">{model.xLabel}</div>
+        <div className="chart-side-gutter" aria-hidden="true" />
       </div>
     </div>
   );

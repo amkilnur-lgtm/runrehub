@@ -1,7 +1,8 @@
 :root {
   color-scheme: light;
   font-family: "Segoe UI", "Arial", sans-serif;
-  --chart-axis-gutter: 31px;
+  --chart-axis-gutter: 29px;
+  --chart-side-gutter: 7px;
   background:
     radial-gradient(circle at top left, rgba(255, 120, 80, 0.16), transparent 30%),
     linear-gradient(180deg, #fbfaf7 0%, #f3efe8 100%);
@@ -1225,7 +1226,7 @@ select {
 
 .chart-grid-wrap {
   display: grid;
-  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr);
+  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr) var(--chart-side-gutter);
   gap: 1px;
   align-items: stretch;
 }
@@ -1242,7 +1243,7 @@ select {
 .chart-y-axis span {
   position: absolute;
   right: 0;
-  transform: translate(-1px, -50%);
+  transform: translateY(-50%);
   line-height: 1;
 }
 
@@ -1261,7 +1262,7 @@ select {
 .chart-grid-line {
   position: absolute;
   left: 0;
-  right: 3px;
+  right: 0;
   height: 1px;
   background: rgba(24, 21, 16, 0.034);
   transform: translateY(-50%);
@@ -1269,15 +1270,19 @@ select {
 
 .chart-svg {
   position: absolute;
-  inset: 0 3px 0 0;
-  width: auto;
+  inset: 0;
+  width: 100%;
   height: 100%;
 }
 
 .chart-x-wrap {
   display: grid;
-  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr);
+  grid-template-columns: var(--chart-axis-gutter) minmax(0, 1fr) var(--chart-side-gutter);
   gap: 1px;
+}
+
+.chart-side-gutter {
+  width: 100%;
 }
 
 .chart-x-axis {
@@ -1912,7 +1917,8 @@ select {
   .chart-grid-wrap,
   .chart-grid-wrap,
   .chart-x-wrap {
-    --chart-axis-gutter: 28px;
+    --chart-axis-gutter: 25px;
+    --chart-side-gutter: 10px;
     gap: 1px;
   }
 
