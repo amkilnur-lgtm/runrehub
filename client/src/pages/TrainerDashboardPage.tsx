@@ -127,6 +127,7 @@ export function TrainerDashboardPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi<DashboardData>("/api/trainer/dashboard");
   const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriodKey>("week");
+  const recentWorkoutsLimit = 8;
 
   if (loading) {
     return (
@@ -156,6 +157,7 @@ export function TrainerDashboardPage() {
   }
 
   const selectedStats = data.stats[selectedPeriod];
+  const recentWorkoutPreview = data.recentWorkouts.slice(0, recentWorkoutsLimit);
   const hasLeaderData = data.topAthletesThisWeek.some(
     (athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0
   );
@@ -302,9 +304,9 @@ export function TrainerDashboardPage() {
             <div className="trainer-dashboard-heading">
               <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
             </div>
-            {data.recentWorkouts.length > 0 ? (
+            {recentWorkoutPreview.length > 0 ? (
               <div className="trainer-dashboard-workout-list">
-                {data.recentWorkouts.map((workout) => (
+                {recentWorkoutPreview.map((workout) => (
                   <Link
                     key={workout.id}
                     className="trainer-dashboard-workout-row"
