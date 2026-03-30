@@ -85,10 +85,19 @@ export async function trainerRoutes(app: FastifyInstance) {
       ),
       pool.query(
         `
-          select w.id, w.user_id, w.name, w.start_date, w.distance_meters, w.moving_time_seconds,
-                 w.average_heartrate, w.average_speed, u.full_name as athlete_name
+          select
+            w.id,
+            w.user_id,
+            w.name,
+            w.start_date,
+            coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+            coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+            coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate,
+            coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+            u.full_name as athlete_name
           from workouts w
           join users u on u.id = w.user_id
+          left join workout_corrections wc on wc.workout_id = w.id
           where u.coach_id = $1
           order by w.start_date desc
           limit 20
@@ -99,23 +108,24 @@ export async function trainerRoutes(app: FastifyInstance) {
         `
           select
             count(distinct u.id) filter (where w.start_date >= date_trunc('week', now())) as week_active_athlete_count,
-            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
-            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
             count(distinct u.id) filter (where w.start_date >= date_trunc('month', now())) as month_active_athlete_count,
-            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('month', now())), 0) as month_distance_meters,
-            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('month', now())) as month_workout_count,
             count(distinct u.id) filter (where w.start_date >= date_trunc('year', now())) as year_active_athlete_count,
-            coalesce(sum(w.distance_meters) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
-            coalesce(sum(w.moving_time_seconds) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
             count(w.id) filter (where w.start_date >= date_trunc('year', now())) as year_workout_count,
             count(distinct u.id) filter (where w.id is not null) as all_time_active_athlete_count,
-            coalesce(sum(w.distance_meters), 0) as all_time_distance_meters,
-            coalesce(sum(w.moving_time_seconds), 0) as all_time_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0) as all_time_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)), 0) as all_time_moving_time_seconds,
             count(w.id) as all_time_workout_count
           from users u
           left join workouts w on w.user_id = u.id
+          left join workout_corrections wc on wc.workout_id = w.id
           where u.role = 'athlete' and u.coach_id = $1
         `,
         [request.user.id]
@@ -136,12 +146,13 @@ export async function trainerRoutes(app: FastifyInstance) {
             u.full_name,
             u.username,
             u.avatar_url,
-            coalesce(sum(w.distance_meters), 0) as week_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0) as week_distance_meters,
             count(w.id) as week_workout_count
           from users u
           left join workouts w
             on w.user_id = u.id
            and w.start_date >= date_trunc('week', now())
+          left join workout_corrections wc on wc.workout_id = w.id
           where u.role = 'athlete' and u.coach_id = $1
           group by u.id, u.full_name, u.username, u.avatar_url
           order by week_distance_meters desc, week_workout_count desc, u.full_name asc
@@ -234,26 +245,44 @@ export async function trainerRoutes(app: FastifyInstance) {
       hasCursor
         ? pool.query(
             `
-              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
-                     elevation_gain, average_speed, average_heartrate
-              from workouts
-              where user_id = $1
+              select
+                w.id,
+                w.name,
+                w.sport_type,
+                w.start_date,
+                coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+                coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+                coalesce(wc.corrected_elevation_gain, w.elevation_gain) as elevation_gain,
+                coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+              from workouts w
+              left join workout_corrections wc on wc.workout_id = w.id
+              where w.user_id = $1
                 and (
-                  start_date < $2::timestamptz
-                  or (start_date = $2::timestamptz and id < $3)
+                  w.start_date < $2::timestamptz
+                  or (w.start_date = $2::timestamptz and w.id < $3)
                 )
-              order by start_date desc, id desc
+              order by w.start_date desc, w.id desc
               limit $4
             `,
             [athleteId, beforeDate, beforeId, ATHLETE_WORKOUTS_PAGE_SIZE]
           )
         : pool.query(
             `
-              select id, name, sport_type, start_date, distance_meters, moving_time_seconds,
-                     elevation_gain, average_speed, average_heartrate
-              from workouts
-              where user_id = $1
-              order by start_date desc, id desc
+              select
+                w.id,
+                w.name,
+                w.sport_type,
+                w.start_date,
+                coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+                coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+                coalesce(wc.corrected_elevation_gain, w.elevation_gain) as elevation_gain,
+                coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+              from workouts w
+              left join workout_corrections wc on wc.workout_id = w.id
+              where w.user_id = $1
+              order by w.start_date desc, w.id desc
               limit $2
             `,
             [athleteId, ATHLETE_WORKOUTS_PAGE_SIZE]
@@ -261,24 +290,25 @@ export async function trainerRoutes(app: FastifyInstance) {
       pool.query<AthleteStatsRow>(
         `
           select
-            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('week', now())), 0) as week_distance_meters,
-            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
-            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('week', now())), 0) as week_elevation_gain,
-            count(*) filter (where start_date >= date_trunc('week', now())) as week_workout_count,
-            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('month', now())), 0) as month_distance_meters,
-            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
-            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('month', now())), 0) as month_elevation_gain,
-            count(*) filter (where start_date >= date_trunc('month', now())) as month_workout_count,
-            coalesce(sum(distance_meters) filter (where start_date >= date_trunc('year', now())), 0) as year_distance_meters,
-            coalesce(sum(moving_time_seconds) filter (where start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
-            coalesce(sum(elevation_gain) filter (where start_date >= date_trunc('year', now())), 0) as year_elevation_gain,
-            count(*) filter (where start_date >= date_trunc('year', now())) as year_workout_count,
-            coalesce(sum(distance_meters), 0) as all_time_distance_meters,
-            coalesce(sum(moving_time_seconds), 0) as all_time_moving_time_seconds,
-            coalesce(sum(elevation_gain), 0) as all_time_elevation_gain,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_elevation_gain,
+            count(*) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_elevation_gain,
+            count(*) filter (where w.start_date >= date_trunc('month', now())) as month_workout_count,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_elevation_gain,
+            count(*) filter (where w.start_date >= date_trunc('year', now())) as year_workout_count,
+            coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0) as all_time_distance_meters,
+            coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)), 0) as all_time_moving_time_seconds,
+            coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)), 0) as all_time_elevation_gain,
             count(*) as all_time_workout_count
-          from workouts
-          where user_id = $1
+          from workouts w
+          left join workout_corrections wc on wc.workout_id = w.id
+          where w.user_id = $1
         `,
         [athleteId]
       )
