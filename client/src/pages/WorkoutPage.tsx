@@ -43,6 +43,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [coachComment, setCoachComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
+  const [isFixingGps, setIsFixingGps] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
@@ -177,6 +178,90 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
   }
 
+  async function handlePreviewAndApplyGpsFix() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps) {
+      return;
+    }
+
+    setIsFixingGps(true);
+    setIsMenuOpen(false);
+
+    try {
+      const preview = await api<{
+        ok: true;
+        preview: {
+          removedSegments: Array<{ removedDistanceMeters: number; removedTimeSeconds: number }>;
+          before: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          after: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+        };
+      }>(`/api/trainer/workouts/${data.workout.id}/gps-fix/preview`, {
+        method: "POST"
+      });
+
+      const { before, after, removedSegments } = preview.preview;
+      const confirmed = window.confirm(
+        `Найдено ${removedSegments.length} аномальных сегм.` +
+          `\nДистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
+          `\nВремя: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
+          `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +
+          `\nНабор: ${Math.round(before.elevation_gain ?? 0)} м → ${Math.round(after.elevation_gain ?? 0)} м` +
+          `\n\nПрименить исправление?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await api(`/api/trainer/workouts/${data.workout.id}/gps-fix/apply`, {
+        method: "POST"
+      });
+      refresh();
+    } catch (fixError) {
+      window.alert(
+        fixError instanceof Error ? fixError.message : "Не удалось исправить GPS-пробежку"
+      );
+    } finally {
+      setIsFixingGps(false);
+    }
+  }
+
+  async function handleResetGpsFix() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps) {
+      return;
+    }
+
+    const confirmed = window.confirm("Отменить исправление GPS и вернуть исходные данные Strava?");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsFixingGps(true);
+    setIsMenuOpen(false);
+
+    try {
+      await api(`/api/trainer/workouts/${data.workout.id}/gps-fix`, {
+        method: "DELETE"
+      });
+      refresh();
+    } catch (resetError) {
+      window.alert(
+        resetError instanceof Error ? resetError.message : "Не удалось отменить исправление GPS"
+      );
+    } finally {
+      setIsFixingGps(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="stack">
@@ -233,6 +318,24 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 </button>
                 {isMenuOpen ? (
                   <div className="workout-menu-popover">
+                    {mode === "trainer" ? (
+                      <button
+                        type="button"
+                        className="workout-menu-item"
+                        disabled={isFixingGps || isRenaming || isDeleting}
+                        onClick={
+                          data.workout.gps_fix?.is_corrected
+                            ? handleResetGpsFix
+                            : handlePreviewAndApplyGpsFix
+                        }
+                      >
+                        {isFixingGps
+                          ? "Обрабатываем..."
+                          : data.workout.gps_fix?.is_corrected
+                            ? "Отменить исправление GPS"
+                            : "Исправить пробежку"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="workout-menu-item"
@@ -260,6 +363,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
                 {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
               </p>
+              {data.workout.gps_fix?.is_corrected ? (
+                <span className="muted workout-gps-fix-badge">GPS исправлено</span>
+              ) : null}
             </div>
           </div>
 
