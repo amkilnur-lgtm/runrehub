@@ -37,6 +37,7 @@ type CorrectedStreamsPayload = {
   distance: number[];
   time: number[];
   heartrate: number[];
+  cadence: number[];
   altitude: number[];
   velocity_smooth: number[];
   latlng: [number, number][];
@@ -91,6 +92,9 @@ const MAX_STEP_DISTANCE_METERS = 120;
 const MAX_STEP_GEO_DISTANCE_METERS = 150;
 const MIN_REMOVAL_DISTANCE_METERS = 25;
 const MAX_SUSPECT_GAP = 2;
+const MAX_REALISTIC_CADENCE = 230;
+const MAX_NORMAL_CADENCE = 205;
+const HIGH_INTENSITY_HR_FRACTION = 0.88;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -207,6 +211,7 @@ function rebuildCorrectedStreams(streams: ActivityStreams, keepMask: boolean[]) 
   const correctedTime: number[] = [];
   const correctedHeartrate: number[] = [];
   const correctedAltitude: number[] = [];
+  const correctedCadence: number[] = [];
   const correctedVelocity: number[] = [];
   const correctedLatLng: [number, number][] = [];
   const keptOriginalIndices: number[] = [];
@@ -238,6 +243,7 @@ function rebuildCorrectedStreams(streams: ActivityStreams, keepMask: boolean[]) 
     correctedDistance.push(cumulativeDistance);
     correctedTime.push(cumulativeTime);
     correctedHeartrate.push(toFiniteNumber(streams.heartrate[index], NaN));
+    correctedCadence.push(toFiniteNumber(streams.cadence[index], NaN));
     correctedAltitude.push(toFiniteNumber(streams.altitude[index], NaN));
     correctedVelocity.push(toFiniteNumber(streams.velocity_smooth[index], NaN));
 
@@ -263,6 +269,7 @@ function rebuildCorrectedStreams(streams: ActivityStreams, keepMask: boolean[]) 
       distance: correctedDistance,
       time: correctedTime,
       heartrate: correctedHeartrate,
+      cadence: correctedCadence,
       altitude: correctedAltitude,
       velocity_smooth: correctedVelocity,
       latlng: normalizedLatLng
@@ -351,6 +358,14 @@ export function buildGpsFixPreview(
   }
 
   const suspectSteps: number[] = [];
+  const hrHighThreshold = (() => {
+    const maxHr = toFiniteNumber(workout.max_heartrate, 0);
+    if (maxHr > 0) {
+      return maxHr * HIGH_INTENSITY_HR_FRACTION;
+    }
+    const averageHr = toFiniteNumber(workout.average_heartrate, 0);
+    return averageHr > 0 ? averageHr + 12 : 0;
+  })();
 
   for (let index = 1; index < size; index += 1) {
     const dt = toFiniteNumber(streams.time[index]) - toFiniteNumber(streams.time[index - 1]);
@@ -375,12 +390,46 @@ export function buildGpsFixPreview(
     const geoSpeed = geoDistance / dt;
     const distanceJump = distanceDelta > MAX_STEP_DISTANCE_METERS && dt < 12;
     const geoJump = geoDistance > MAX_STEP_GEO_DISTANCE_METERS && dt < 12;
+    const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
+    const heartRateValue = toFiniteNumber(streams.heartrate[index], NaN);
+    const cadenceLooksNormal =
+      Number.isFinite(cadenceValue) &&
+      cadenceValue > 0 &&
+      cadenceValue <= MAX_NORMAL_CADENCE;
+    const cadenceLooksBroken =
+      Number.isFinite(cadenceValue) &&
+      cadenceValue > MAX_REALISTIC_CADENCE;
+    const heartRateLooksModerate =
+      Number.isFinite(heartRateValue) &&
+      heartRateValue > 0 &&
+      hrHighThreshold > 0 &&
+      heartRateValue < hrHighThreshold;
+    const heartRateLooksHigh =
+      Number.isFinite(heartRateValue) &&
+      heartRateValue > 0 &&
+      hrHighThreshold > 0 &&
+      heartRateValue >= hrHighThreshold;
+
+    const cadenceHrSupport =
+      cadenceLooksBroken ||
+      ((recordedSpeed > MAX_RUN_SPEED_MPS + 0.7 || geoSpeed > MAX_GEO_SPEED_MPS + 0.7) &&
+        cadenceLooksNormal &&
+        heartRateLooksModerate);
+    const strongRawSignal =
+      recordedSpeed > MAX_RUN_SPEED_MPS + 1.4 ||
+      geoSpeed > MAX_GEO_SPEED_MPS + 1.4 ||
+      distanceDelta > MAX_STEP_DISTANCE_METERS * 1.8 ||
+      geoDistance > MAX_STEP_GEO_DISTANCE_METERS * 1.8;
 
     if (
-      recordedSpeed > MAX_RUN_SPEED_MPS ||
-      geoSpeed > MAX_GEO_SPEED_MPS ||
       distanceJump ||
-      geoJump
+      geoJump ||
+      strongRawSignal ||
+      (
+        (recordedSpeed > MAX_RUN_SPEED_MPS || geoSpeed > MAX_GEO_SPEED_MPS) &&
+        !heartRateLooksHigh &&
+        cadenceHrSupport
+      )
     ) {
       suspectSteps.push(index);
     }

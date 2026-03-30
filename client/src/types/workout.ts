@@ -2,6 +2,7 @@ export type StreamSeries = {
   distance: number[];
   time: number[];
   heartrate: number[];
+  cadence: number[];
   velocity_smooth: number[];
   latlng: [number, number][];
 } | null;
