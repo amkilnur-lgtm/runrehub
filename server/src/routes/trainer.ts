@@ -5,6 +5,13 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import { ensureActivityStreams } from "../lib/strava.js";
+import {
+  applyWorkoutCorrectionToView,
+  buildGpsFixPreview,
+  deleteWorkoutCorrection,
+  getActiveWorkoutCorrection,
+  upsertWorkoutCorrection
+} from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
   beforeDate: z.string().datetime().optional(),
@@ -337,11 +344,15 @@ export async function trainerRoutes(app: FastifyInstance) {
       workoutResult.rows[0].strava_activity_id as number
     );
 
-    return {
-      workout: workoutResult.rows[0],
-      laps: lapsResult.rows,
-      streams
-    };
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(
+      workoutResult.rows[0],
+      lapsResult.rows,
+      streams,
+      correction
+    );
+
+    return correctedView;
   });
 
   app.delete("/api/trainer/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
@@ -420,5 +431,125 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     return { ok: true, coachComment: result.rows[0].coach_comment ?? null };
+  });
+
+  app.post("/api/trainer/workouts/:id/gps-fix/preview", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await ensureActivityStreams(
+      workout.user_id as number,
+      workoutId,
+      workout.strava_activity_id as number
+    );
+
+    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams);
+    if (!preview) {
+      return reply.code(400).send({ message: "Явных GPS-скачков не найдено" });
+    }
+
+    return {
+      ok: true,
+      preview: {
+        removedSegments: preview.removedSegments,
+        before: {
+          distance_meters: workout.distance_meters,
+          moving_time_seconds: workout.moving_time_seconds,
+          average_speed: workout.average_speed,
+          elevation_gain: workout.elevation_gain
+        },
+        after: preview.correctedWorkout
+      }
+    };
+  });
+
+  app.post("/api/trainer/workouts/:id/gps-fix/apply", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await ensureActivityStreams(
+      workout.user_id as number,
+      workoutId,
+      workout.strava_activity_id as number
+    );
+
+    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams);
+    if (!preview) {
+      return reply.code(400).send({ message: "Явных GPS-скачков не найдено" });
+    }
+
+    await upsertWorkoutCorrection(workoutId, request.user.id, preview);
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
+
+    return {
+      ok: true,
+      workout: correctedView.workout,
+      laps: correctedView.laps,
+      streams: correctedView.streams
+    };
+  });
+
+  app.delete("/api/trainer/workouts/:id/gps-fix", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const workoutId = Number(params.id);
+
+    const ownershipResult = await pool.query(
+      `
+        select w.id
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    if (!ownershipResult.rows[0]) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    await deleteWorkoutCorrection(workoutId);
+    return { ok: true };
   });
 }

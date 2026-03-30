@@ -20,6 +20,20 @@ export type WorkoutData = {
     coach_comment?: string | null;
     athlete_name?: string;
     athlete_id?: number;
+    gps_fix?: {
+      is_corrected: boolean;
+      kind: "gps_autofix";
+      removed_segments: Array<{
+        startIndex: number;
+        endIndex: number;
+        removedDistanceMeters: number;
+        removedTimeSeconds: number;
+        peakSpeedMetersPerSecond: number;
+      }>;
+      created_by_user_id: number;
+      created_at: string;
+      updated_at: string;
+    } | null;
   };
   laps: Array<{
     id: number;

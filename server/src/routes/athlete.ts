@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import { ensureActivityStreams, getStravaAuthUrl, syncLatestActivities } from "../lib/strava.js";
+import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
   beforeDate: z.string().datetime().optional(),
@@ -197,11 +198,15 @@ export async function athleteRoutes(app: FastifyInstance) {
       workoutResult.rows[0].strava_activity_id as number
     );
 
-    return {
-      workout: workoutResult.rows[0],
-      laps: lapsResult.rows,
-      streams
-    };
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(
+      workoutResult.rows[0],
+      lapsResult.rows,
+      streams,
+      correction
+    );
+
+    return correctedView;
   });
 
   app.delete("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
