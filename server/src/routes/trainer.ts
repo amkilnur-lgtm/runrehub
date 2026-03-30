@@ -8,6 +8,7 @@ import { ensureActivityStreams } from "../lib/strava.js";
 import {
   applyWorkoutCorrectionToView,
   buildManualDistancePreview,
+  buildManualTimePreview,
   buildGpsFixPreview,
   deleteWorkoutCorrection,
   getActiveWorkoutCorrection,
@@ -25,6 +26,10 @@ const workoutRenameSchema = z.object({
 
 const workoutDistanceFixSchema = z.object({
   distanceKm: z.coerce.number().positive().max(500)
+});
+
+const workoutTimeFixSchema = z.object({
+  movingTimeSeconds: z.coerce.number().int().positive().max(60 * 60 * 24)
 });
 
 const ATHLETE_WORKOUTS_PAGE_SIZE = 20;
@@ -706,6 +711,135 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_distance", preview);
+    const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
+    const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
+
+    return {
+      ok: true,
+      workout: finalView.workout,
+      laps: finalView.laps,
+      streams: finalView.streams
+    };
+  });
+
+  app.post("/api/trainer/workouts/:id/time-fix/preview", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const body = workoutTimeFixSchema.parse(request.body);
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await ensureActivityStreams(
+      workout.user_id as number,
+      workoutId,
+      workout.strava_activity_id as number
+    );
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
+    const currentWorkout = correctedView.workout as typeof workout & {
+      distance_meters: number;
+      moving_time_seconds: number;
+      elapsed_time_seconds: number;
+      elevation_gain: number;
+      average_speed: number | null;
+      average_heartrate: number | null;
+      max_heartrate: number | null;
+    };
+
+    const preview = buildManualTimePreview(
+      currentWorkout,
+      correctedView.streams,
+      body.movingTimeSeconds
+    );
+    if (!preview) {
+      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕСЃС‚СЂРѕРёС‚СЊ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂ РґР»СЏ РЅРѕРІРѕРіРѕ РІСЂРµРјРµРЅРё" });
+    }
+
+    return {
+      ok: true,
+      preview: {
+        before: {
+          distance_meters: currentWorkout.distance_meters,
+          moving_time_seconds: currentWorkout.moving_time_seconds,
+          average_speed: currentWorkout.average_speed,
+          elevation_gain: currentWorkout.elevation_gain
+        },
+        after: preview.correctedWorkout,
+        splitCount: preview.correctedLaps.length
+      }
+    };
+  });
+
+  app.post("/api/trainer/workouts/:id/time-fix/apply", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const body = workoutTimeFixSchema.parse(request.body);
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await ensureActivityStreams(
+      workout.user_id as number,
+      workoutId,
+      workout.strava_activity_id as number
+    );
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
+    const currentWorkout = correctedView.workout as typeof workout & {
+      distance_meters: number;
+      moving_time_seconds: number;
+      elapsed_time_seconds: number;
+      elevation_gain: number;
+      average_speed: number | null;
+      average_heartrate: number | null;
+      max_heartrate: number | null;
+    };
+
+    const preview = buildManualTimePreview(
+      currentWorkout,
+      correctedView.streams,
+      body.movingTimeSeconds
+    );
+    if (!preview) {
+      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРјРµРЅРёС‚СЊ РЅРѕРІРѕРµ РІСЂРµРјСЏ" });
+    }
+
+    await upsertWorkoutCorrection(workoutId, request.user.id, "manual_time", preview);
     const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
     const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
 
