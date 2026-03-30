@@ -9,7 +9,9 @@ import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
 
-const WorkoutRouteMap = lazy(async () => import("../components/WorkoutRouteMap").then((module) => ({ default: module.WorkoutRouteMap })));
+const WorkoutRouteMap = lazy(async () =>
+  import("../components/WorkoutRouteMap").then((module) => ({ default: module.WorkoutRouteMap }))
+);
 
 function formatLapElevation(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -44,72 +46,13 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
   const [isFixingGps, setIsFixingGps] = useState(false);
+  const [isUpdatingDistance, setIsUpdatingDistance] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
     mode === "trainer" && data?.workout.athlete_id
       ? `/trainer/athletes/${data.workout.athlete_id}`
       : "/athlete";
-
-  async function handleDelete() {
-    if (!data?.workout.id || isDeleting) {
-      return;
-    }
-
-    const confirmed = window.confirm("Удалить эту тренировку? Лапы и графики тоже будут удалены.");
-    if (!confirmed) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setIsMenuOpen(false);
-    try {
-      await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
-      navigate(backHref);
-    } catch (deleteError) {
-      window.alert(
-        deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
-      );
-      setIsDeleting(false);
-    }
-  }
-
-  async function handleRename() {
-    if (!data?.workout.id || isRenaming) {
-      return;
-    }
-
-    setIsMenuOpen(false);
-    const nextName = window.prompt("Новое название пробежки", data.workout.name);
-    if (nextName === null) {
-      return;
-    }
-
-    const trimmedName = nextName.trim();
-    if (!trimmedName) {
-      window.alert("Название не может быть пустым.");
-      return;
-    }
-
-    if (trimmedName === data.workout.name) {
-      return;
-    }
-
-    setIsRenaming(true);
-    try {
-      await api<{ ok: true; name: string }>(`${prefix}${data.workout.id}/name`, {
-        method: "PUT",
-        body: JSON.stringify({ name: trimmedName })
-      });
-      refresh();
-    } catch (renameError) {
-      window.alert(
-        renameError instanceof Error ? renameError.message : "Не удалось переименовать тренировку"
-      );
-    } finally {
-      setIsRenaming(false);
-    }
-  }
 
   const paceChart = useMemo(
     () => preparePaceChart(data?.streams ?? null, data?.workout ?? null),
@@ -151,6 +94,70 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     };
   }, [isMenuOpen]);
 
+  async function handleDelete() {
+    if (!data?.workout.id || isDeleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Удалить эту тренировку? Лапы и графики тоже будут удалены."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setIsMenuOpen(false);
+
+    try {
+      await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
+      navigate(backHref);
+    } catch (deleteError) {
+      window.alert(
+        deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
+      );
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleRename() {
+    if (!data?.workout.id || isRenaming) {
+      return;
+    }
+
+    setIsMenuOpen(false);
+    const nextName = window.prompt("Новое название пробежки", data.workout.name);
+    if (nextName === null) {
+      return;
+    }
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      window.alert("Название не может быть пустым.");
+      return;
+    }
+
+    if (trimmedName === data.workout.name) {
+      return;
+    }
+
+    setIsRenaming(true);
+
+    try {
+      await api<{ ok: true; name: string }>(`${prefix}${data.workout.id}/name`, {
+        method: "PUT",
+        body: JSON.stringify({ name: trimmedName })
+      });
+      refresh();
+    } catch (renameError) {
+      window.alert(
+        renameError instanceof Error ? renameError.message : "Не удалось переименовать тренировку"
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  }
+
   async function handleSaveComment() {
     if (!data?.workout.id || mode !== "trainer" || isSavingComment) {
       return;
@@ -179,7 +186,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   }
 
   async function handlePreviewAndApplyGpsFix() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance) {
       return;
     }
 
@@ -210,7 +217,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
       const { before, after, removedSegments } = preview.preview;
       const confirmed = window.confirm(
-        `Найдено ${removedSegments.length} аномальных сегм.` +
+        `Найдено ${removedSegments.length} аномальных сегментов.` +
           `\nДистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
           `\nВремя: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
           `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +
@@ -235,12 +242,86 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
   }
 
-  async function handleResetGpsFix() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps) {
+  async function handlePreviewAndApplyDistanceFix() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance) {
       return;
     }
 
-    const confirmed = window.confirm("Отменить исправление GPS и вернуть исходные данные Strava?");
+    setIsMenuOpen(false);
+    const nextDistance = window.prompt(
+      "Новая дистанция пробежки в километрах",
+      (data.workout.distance_meters / 1000).toFixed(2)
+    );
+    if (nextDistance === null) {
+      return;
+    }
+
+    const parsedDistance = Number(nextDistance.replace(",", "."));
+    if (!Number.isFinite(parsedDistance) || parsedDistance <= 0) {
+      window.alert("Введите корректную дистанцию в километрах.");
+      return;
+    }
+
+    setIsUpdatingDistance(true);
+
+    try {
+      const preview = await api<{
+        ok: true;
+        preview: {
+          before: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          after: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          splitCount: number;
+        };
+      }>(`/api/trainer/workouts/${data.workout.id}/distance-fix/preview`, {
+        method: "POST",
+        body: JSON.stringify({ distanceKm: parsedDistance })
+      });
+
+      const { before, after, splitCount } = preview.preview;
+      const confirmed = window.confirm(
+        `Дистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
+          `\nВремя: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
+          `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +
+          `\nОтрезки по 1 км: ${splitCount}` +
+          `\n\nПрименить ручную правку дистанции?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await api(`/api/trainer/workouts/${data.workout.id}/distance-fix/apply`, {
+        method: "POST",
+        body: JSON.stringify({ distanceKm: parsedDistance })
+      });
+      refresh();
+    } catch (distanceError) {
+      window.alert(
+        distanceError instanceof Error ? distanceError.message : "Не удалось изменить дистанцию тренировки"
+      );
+    } finally {
+      setIsUpdatingDistance(false);
+    }
+  }
+
+  async function handleResetCorrection() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Отменить исправление и вернуть исходные данные Strava?"
+    );
     if (!confirmed) {
       return;
     }
@@ -255,7 +336,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       refresh();
     } catch (resetError) {
       window.alert(
-        resetError instanceof Error ? resetError.message : "Не удалось отменить исправление GPS"
+        resetError instanceof Error ? resetError.message : "Не удалось отменить исправление"
       );
     } finally {
       setIsFixingGps(false);
@@ -292,7 +373,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         Назад
       </Link>
 
-      <section className={`card workout-summary-card${data.streams?.latlng?.length ? " workout-summary-card-with-route" : ""}`}>
+      <section
+        className={`card workout-summary-card${data.streams?.latlng?.length ? " workout-summary-card-with-route" : ""}`}
+      >
         <div className="workout-summary-panel">
           <div className="workout-summary-header">
             <div className="workout-summary-topbar">
@@ -319,27 +402,39 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 {isMenuOpen ? (
                   <div className="workout-menu-popover">
                     {mode === "trainer" ? (
-                      <button
-                        type="button"
-                        className="workout-menu-item"
-                        disabled={isFixingGps || isRenaming || isDeleting}
-                        onClick={
-                          data.workout.gps_fix?.is_corrected
-                            ? handleResetGpsFix
-                            : handlePreviewAndApplyGpsFix
-                        }
-                      >
-                        {isFixingGps
-                          ? "Обрабатываем..."
-                          : data.workout.gps_fix?.is_corrected
-                            ? "Отменить исправление GPS"
-                            : "Исправить пробежку"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="workout-menu-item"
+                          disabled={isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                          onClick={handlePreviewAndApplyGpsFix}
+                        >
+                          {isFixingGps ? "Обрабатываем..." : "Исправить пробежку"}
+                        </button>
+                        <button
+                          type="button"
+                          className="workout-menu-item"
+                          disabled={isUpdatingDistance || isFixingGps || isRenaming || isDeleting}
+                          onClick={handlePreviewAndApplyDistanceFix}
+                        >
+                          {isUpdatingDistance ? "Пересчитываем..." : "Изменить дистанцию"}
+                        </button>
+                        {data.workout.gps_fix?.is_corrected ? (
+                          <button
+                            type="button"
+                            className="workout-menu-item"
+                            disabled={isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                            onClick={handleResetCorrection}
+                          >
+                            Отменить исправление
+                          </button>
+                        ) : null}
+                      </>
                     ) : null}
                     <button
                       type="button"
                       className="workout-menu-item"
-                      disabled={isRenaming || isDeleting}
+                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance}
                       onClick={handleRename}
                     >
                       {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
@@ -347,7 +442,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <button
                       type="button"
                       className="workout-menu-item workout-menu-item-danger"
-                      disabled={isDeleting || isRenaming}
+                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance}
                       onClick={handleDelete}
                     >
                       {isDeleting ? "Удаляем..." : "Удалить тренировку"}
@@ -364,7 +459,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
               </p>
               {data.workout.gps_fix?.is_corrected ? (
-                <span className="muted workout-gps-fix-badge">GPS исправлено</span>
+                <span className="muted workout-gps-fix-badge">
+                  {data.workout.gps_fix.kind === "manual_distance"
+                    ? "Дистанция исправлена"
+                    : "GPS исправлено"}
+                </span>
               ) : null}
             </div>
           </div>
@@ -393,6 +492,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             <div className="workout-summary-stat workout-summary-stat-placeholder" aria-hidden="true" />
           </div>
         </div>
+
         {data.streams?.latlng?.length ? (
           <div className="workout-route-shell">
             <Suspense
