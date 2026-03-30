@@ -23,14 +23,18 @@ export type WorkoutData = {
     athlete_id?: number;
     gps_fix?: {
       is_corrected: boolean;
-      kind: "gps_autofix";
+      kind: "gps_autofix" | "manual_distance";
       removed_segments: Array<{
         startIndex: number;
         endIndex: number;
         removedDistanceMeters: number;
         removedTimeSeconds: number;
         peakSpeedMetersPerSecond: number;
-      }>;
+      }> | {
+        target_distance_meters: number;
+        source_distance_meters: number;
+        scale_factor: number;
+      };
       created_by_user_id: number;
       created_at: string;
       updated_at: string;

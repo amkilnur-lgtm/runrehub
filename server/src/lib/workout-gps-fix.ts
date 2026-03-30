@@ -13,6 +13,17 @@ type WorkoutSummary = {
   max_heartrate: number | null;
 };
 
+type WorkoutSummaryLike = Pick<
+  WorkoutSummary,
+  | "distance_meters"
+  | "moving_time_seconds"
+  | "elapsed_time_seconds"
+  | "elevation_gain"
+  | "average_speed"
+  | "average_heartrate"
+  | "max_heartrate"
+>;
+
 type WorkoutLapRow = {
   id: number;
   name: string | null;
@@ -31,6 +42,12 @@ type RemovedSegment = {
   removedDistanceMeters: number;
   removedTimeSeconds: number;
   peakSpeedMetersPerSecond: number;
+};
+
+type ManualDistanceMetadata = {
+  target_distance_meters: number;
+  source_distance_meters: number;
+  scale_factor: number;
 };
 
 type CorrectedStreamsPayload = {
@@ -68,9 +85,27 @@ type GpsFixPreview = {
   correctedLaps: CorrectedLapPayload[];
 };
 
+type ManualDistancePreview = {
+  correctedWorkout: {
+    distance_meters: number;
+    moving_time_seconds: number;
+    elapsed_time_seconds: number;
+    elevation_gain: number;
+    average_speed: number | null;
+    average_heartrate: number | null;
+    max_heartrate: number | null;
+  };
+  correctedStreams: CorrectedStreamsPayload;
+  correctedLaps: CorrectedLapPayload[];
+  metadata: ManualDistanceMetadata;
+};
+
+export type WorkoutCorrectionPreview = GpsFixPreview | ManualDistancePreview;
+export type WorkoutCorrectionKind = "gps_autofix" | "manual_distance";
+
 type StoredCorrectionRow = {
   workout_id: number;
-  kind: "gps_autofix";
+  kind: WorkoutCorrectionKind;
   corrected_distance_meters: number;
   corrected_moving_time_seconds: number;
   corrected_elapsed_time_seconds: number;
@@ -95,6 +130,9 @@ const MAX_SUSPECT_GAP = 2;
 const MAX_REALISTIC_CADENCE = 230;
 const MAX_NORMAL_CADENCE = 205;
 const HIGH_INTENSITY_HR_FRACTION = 0.88;
+const MIN_MANUAL_DISTANCE_METERS = 200;
+const MAX_MANUAL_DISTANCE_METERS = 500000;
+const SPLIT_DISTANCE_METERS = 1000;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -134,6 +172,118 @@ function computeAverageHeartRate(heartrate: number[]) {
   }
 
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+function interpolateValue(
+  startDistance: number,
+  endDistance: number,
+  startValue: number,
+  endValue: number,
+  targetDistance: number
+) {
+  const span = endDistance - startDistance;
+  if (!Number.isFinite(span) || span <= 0) {
+    return endValue;
+  }
+
+  const ratio = (targetDistance - startDistance) / span;
+  return startValue + (endValue - startValue) * ratio;
+}
+
+function timeAtDistance(distance: number[], time: number[], targetDistance: number) {
+  if (!distance.length || !time.length) {
+    return 0;
+  }
+
+  if (targetDistance <= distance[0]) {
+    return time[0] ?? 0;
+  }
+
+  const lastIndex = Math.min(distance.length, time.length) - 1;
+  if (targetDistance >= distance[lastIndex]) {
+    return time[lastIndex] ?? 0;
+  }
+
+  for (let index = 1; index <= lastIndex; index += 1) {
+    const previousDistance = toFiniteNumber(distance[index - 1]);
+    const currentDistance = toFiniteNumber(distance[index]);
+    if (targetDistance > currentDistance) {
+      continue;
+    }
+
+    return interpolateValue(
+      previousDistance,
+      currentDistance,
+      toFiniteNumber(time[index - 1]),
+      toFiniteNumber(time[index]),
+      targetDistance
+    );
+  }
+
+  return time[lastIndex] ?? 0;
+}
+
+function collectIndicesForDistanceRange(distance: number[], startDistance: number, endDistance: number) {
+  const indices: number[] = [];
+
+  for (let index = 0; index < distance.length; index += 1) {
+    const currentDistance = toFiniteNumber(distance[index]);
+    if (currentDistance >= startDistance && currentDistance <= endDistance) {
+      indices.push(index);
+    }
+  }
+
+  return indices;
+}
+
+function buildKilometerSplits(streams: CorrectedStreamsPayload) {
+  const totalDistance = toFiniteNumber(streams.distance[streams.distance.length - 1]);
+  const totalTime = toFiniteNumber(streams.time[streams.time.length - 1]);
+  if (totalDistance <= 0 || totalTime <= 0) {
+    return [] as CorrectedLapPayload[];
+  }
+
+  const splits: CorrectedLapPayload[] = [];
+  let lapIndex = 1;
+  let startDistance = 0;
+  let startTime = 0;
+
+  while (startDistance < totalDistance - 1e-6) {
+    const endDistance = Math.min(startDistance + SPLIT_DISTANCE_METERS, totalDistance);
+    const endTime = timeAtDistance(streams.distance, streams.time, endDistance);
+    const elapsedTimeSeconds = Math.max(0, endTime - startTime);
+    const distanceMeters = Math.max(0, endDistance - startDistance);
+
+    if (distanceMeters <= 0 || elapsedTimeSeconds <= 0) {
+      break;
+    }
+
+    const splitIndices = collectIndicesForDistanceRange(streams.distance, startDistance, endDistance);
+    const heartRates = splitIndices
+      .map((index) => streams.heartrate[index])
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const altitude = splitIndices
+      .map((index) => streams.altitude[index])
+      .filter((value) => Number.isFinite(value));
+
+    splits.push({
+      id: lapIndex,
+      name: null,
+      distance_meters: distanceMeters,
+      elapsed_time_seconds: Math.round(elapsedTimeSeconds),
+      average_speed: distanceMeters / elapsedTimeSeconds,
+      average_heartrate: heartRates.length
+        ? heartRates.reduce((sum, value) => sum + value, 0) / heartRates.length
+        : null,
+      elevation_gain: altitude.length ? computePositiveElevationGain(altitude) : null
+    });
+
+    lapIndex += 1;
+    startDistance = endDistance;
+    startTime = endTime;
+  }
+
+  return splits;
 }
 
 function buildSegments(suspectSteps: number[], distance: number[], time: number[]) {
@@ -486,6 +636,73 @@ export function buildGpsFixPreview(
   } satisfies GpsFixPreview;
 }
 
+export function buildManualDistancePreview(
+  workout: WorkoutSummaryLike,
+  streams: ActivityStreams | CorrectedStreamsPayload | null,
+  targetDistanceMeters: number
+) {
+  if (!streams?.distance?.length || !streams.time?.length) {
+    return null;
+  }
+
+  const currentDistanceMeters = toFiniteNumber(streams.distance[streams.distance.length - 1]);
+  const movingTimeSeconds = Math.round(toFiniteNumber(streams.time[streams.time.length - 1]));
+  if (
+    currentDistanceMeters <= 0 ||
+    movingTimeSeconds <= 0 ||
+    targetDistanceMeters < MIN_MANUAL_DISTANCE_METERS ||
+    targetDistanceMeters > MAX_MANUAL_DISTANCE_METERS
+  ) {
+    return null;
+  }
+
+  const scaleFactor = targetDistanceMeters / currentDistanceMeters;
+  if (!Number.isFinite(scaleFactor) || Math.abs(scaleFactor - 1) < 0.005) {
+    return null;
+  }
+
+  const correctedStreams = {
+    distance: streams.distance.map((value) => Math.max(0, toFiniteNumber(value) * scaleFactor)),
+    time: streams.time.map((value) => Math.max(0, toFiniteNumber(value))),
+    heartrate: streams.heartrate.map((value) => toFiniteNumber(value, NaN)),
+    cadence: streams.cadence.map((value) => toFiniteNumber(value, NaN)),
+    altitude: streams.altitude.map((value) => toFiniteNumber(value, NaN)),
+    velocity_smooth: streams.velocity_smooth.map((value) =>
+      Number.isFinite(value) ? toFiniteNumber(value) * scaleFactor : NaN
+    ),
+    latlng: streams.latlng.filter(
+      (point): point is [number, number] =>
+        Array.isArray(point) &&
+        point.length >= 2 &&
+        Number.isFinite(point[0]) &&
+        Number.isFinite(point[1])
+    )
+  } satisfies CorrectedStreamsPayload;
+
+  const validHeartRates = correctedStreams.heartrate.filter((value) => Number.isFinite(value) && value > 0);
+
+  return {
+    correctedWorkout: {
+      distance_meters: targetDistanceMeters,
+      moving_time_seconds: movingTimeSeconds,
+      elapsed_time_seconds: Math.round(
+        toFiniteNumber(workout.elapsed_time_seconds, movingTimeSeconds)
+      ),
+      elevation_gain: toFiniteNumber(workout.elevation_gain),
+      average_speed: movingTimeSeconds > 0 ? targetDistanceMeters / movingTimeSeconds : null,
+      average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
+      max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
+    },
+    correctedStreams,
+    correctedLaps: buildKilometerSplits(correctedStreams),
+    metadata: {
+      target_distance_meters: targetDistanceMeters,
+      source_distance_meters: currentDistanceMeters,
+      scale_factor: scaleFactor
+    }
+  } satisfies ManualDistancePreview;
+}
+
 export async function getActiveWorkoutCorrection(workoutId: number) {
   const result = await pool.query<StoredCorrectionRow>(
     `
@@ -561,7 +778,8 @@ export function applyWorkoutCorrectionToView(
 export async function upsertWorkoutCorrection(
   workoutId: number,
   createdByUserId: number,
-  preview: GpsFixPreview
+  kind: WorkoutCorrectionKind,
+  preview: WorkoutCorrectionPreview
 ) {
   await pool.query(
     `
@@ -582,8 +800,8 @@ export async function upsertWorkoutCorrection(
         updated_at
       )
       values (
-        $1, 'gps_autofix', $2, $3, $4, $5, $6, $7, $8,
-        $9::jsonb, $10::jsonb, $11::jsonb, $12, now()
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10::jsonb, $11::jsonb, $12::jsonb, $13, now()
       )
       on conflict (workout_id) do update
       set kind = excluded.kind,
@@ -602,6 +820,7 @@ export async function upsertWorkoutCorrection(
     `,
     [
       workoutId,
+      kind,
       preview.correctedWorkout.distance_meters,
       preview.correctedWorkout.moving_time_seconds,
       preview.correctedWorkout.elapsed_time_seconds,
@@ -609,7 +828,7 @@ export async function upsertWorkoutCorrection(
       preview.correctedWorkout.average_speed,
       preview.correctedWorkout.average_heartrate,
       preview.correctedWorkout.max_heartrate,
-      JSON.stringify(preview.removedSegments),
+      JSON.stringify("removedSegments" in preview ? preview.removedSegments : preview.metadata),
       JSON.stringify(preview.correctedStreams),
       JSON.stringify(preview.correctedLaps),
       createdByUserId
