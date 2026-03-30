@@ -47,6 +47,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
   const [isFixingGps, setIsFixingGps] = useState(false);
   const [isUpdatingDistance, setIsUpdatingDistance] = useState(false);
+  const [isUpdatingTime, setIsUpdatingTime] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
@@ -243,7 +244,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   }
 
   async function handlePreviewAndApplyDistanceFix() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
       return;
     }
 
@@ -314,8 +315,110 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
   }
 
+  function parseDurationInput(value: string) {
+    const parts = value.trim().split(":").map((part) => part.trim()).filter(Boolean);
+    if (!parts.length || parts.some((part) => !/^\d+$/.test(part))) {
+      return null;
+    }
+
+    if (parts.length === 1) {
+      const minutes = Number(parts[0]);
+      return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 : null;
+    }
+
+    if (parts.length === 2) {
+      const [minutes, seconds] = parts.map(Number);
+      if (seconds >= 60) {
+        return null;
+      }
+      return minutes * 60 + seconds;
+    }
+
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts.map(Number);
+      if (minutes >= 60 || seconds >= 60) {
+        return null;
+      }
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    return null;
+  }
+
+  async function handlePreviewAndApplyTimeFix() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
+      return;
+    }
+
+    setIsMenuOpen(false);
+    const nextTime = window.prompt(
+      "Новое общее время пробежки в формате мм:сс или чч:мм:сс",
+      formatDuration(data.workout.moving_time_seconds)
+    );
+    if (nextTime === null) {
+      return;
+    }
+
+    const parsedTimeSeconds = parseDurationInput(nextTime);
+    if (!parsedTimeSeconds || parsedTimeSeconds <= 0) {
+      window.alert("Введите корректное время в формате мм:сс или чч:мм:сс.");
+      return;
+    }
+
+    setIsUpdatingTime(true);
+
+    try {
+      const preview = await api<{
+        ok: true;
+        preview: {
+          before: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          after: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          splitCount: number;
+        };
+      }>(`/api/trainer/workouts/${data.workout.id}/time-fix/preview`, {
+        method: "POST",
+        body: JSON.stringify({ movingTimeSeconds: parsedTimeSeconds })
+      });
+
+      const { before, after, splitCount } = preview.preview;
+      const confirmed = window.confirm(
+        `Время: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
+          `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +
+          `\nДистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
+          `\nОтрезки по 1 км: ${splitCount}` +
+          `\n\nПрименить ручную правку времени?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await api(`/api/trainer/workouts/${data.workout.id}/time-fix/apply`, {
+        method: "POST",
+        body: JSON.stringify({ movingTimeSeconds: parsedTimeSeconds })
+      });
+      refresh();
+    } catch (timeError) {
+      window.alert(
+        timeError instanceof Error ? timeError.message : "Не удалось изменить общее время тренировки"
+      );
+    } finally {
+      setIsUpdatingTime(false);
+    }
+  }
+
   async function handleResetCorrection() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
       return;
     }
 
@@ -406,7 +509,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         <button
                           type="button"
                           className="workout-menu-item"
-                          disabled={isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                          disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
                           onClick={handlePreviewAndApplyGpsFix}
                         >
                           {isFixingGps ? "Обрабатываем..." : "Исправить пробежку"}
@@ -414,16 +517,24 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         <button
                           type="button"
                           className="workout-menu-item"
-                          disabled={isUpdatingDistance || isFixingGps || isRenaming || isDeleting}
+                          disabled={isUpdatingDistance || isFixingGps || isUpdatingTime || isRenaming || isDeleting}
                           onClick={handlePreviewAndApplyDistanceFix}
                         >
                           {isUpdatingDistance ? "Пересчитываем..." : "Изменить дистанцию"}
+                        </button>
+                        <button
+                          type="button"
+                          className="workout-menu-item"
+                          disabled={isUpdatingTime || isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                          onClick={handlePreviewAndApplyTimeFix}
+                        >
+                          {isUpdatingTime ? "Пересчитываем..." : "Изменить время"}
                         </button>
                         {data.workout.gps_fix?.is_corrected ? (
                           <button
                             type="button"
                             className="workout-menu-item"
-                            disabled={isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                            disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
                             onClick={handleResetCorrection}
                           >
                             Отменить исправление
@@ -434,7 +545,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <button
                       type="button"
                       className="workout-menu-item"
-                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance}
+                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance || isUpdatingTime}
                       onClick={handleRename}
                     >
                       {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
@@ -442,7 +553,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <button
                       type="button"
                       className="workout-menu-item workout-menu-item-danger"
-                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance}
+                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance || isUpdatingTime}
                       onClick={handleDelete}
                     >
                       {isDeleting ? "Удаляем..." : "Удалить тренировку"}
@@ -462,7 +573,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 <span className="muted workout-gps-fix-badge">
                   {data.workout.gps_fix.kind === "manual_distance"
                     ? "Дистанция исправлена"
-                    : "GPS исправлено"}
+                    : data.workout.gps_fix.kind === "manual_time"
+                      ? "Время исправлено"
+                      : "GPS исправлено"}
                 </span>
               ) : null}
             </div>

@@ -50,6 +50,12 @@ type ManualDistanceMetadata = {
   scale_factor: number;
 };
 
+type ManualTimeMetadata = {
+  target_moving_time_seconds: number;
+  source_moving_time_seconds: number;
+  scale_factor: number;
+};
+
 type CorrectedStreamsPayload = {
   distance: number[];
   time: number[];
@@ -100,8 +106,23 @@ type ManualDistancePreview = {
   metadata: ManualDistanceMetadata;
 };
 
-export type WorkoutCorrectionPreview = GpsFixPreview | ManualDistancePreview;
-export type WorkoutCorrectionKind = "gps_autofix" | "manual_distance";
+type ManualTimePreview = {
+  correctedWorkout: {
+    distance_meters: number;
+    moving_time_seconds: number;
+    elapsed_time_seconds: number;
+    elevation_gain: number;
+    average_speed: number | null;
+    average_heartrate: number | null;
+    max_heartrate: number | null;
+  };
+  correctedStreams: CorrectedStreamsPayload;
+  correctedLaps: CorrectedLapPayload[];
+  metadata: ManualTimeMetadata;
+};
+
+export type WorkoutCorrectionPreview = GpsFixPreview | ManualDistancePreview | ManualTimePreview;
+export type WorkoutCorrectionKind = "gps_autofix" | "manual_distance" | "manual_time";
 
 type StoredCorrectionRow = {
   workout_id: number;
@@ -132,6 +153,8 @@ const MAX_NORMAL_CADENCE = 205;
 const HIGH_INTENSITY_HR_FRACTION = 0.88;
 const MIN_MANUAL_DISTANCE_METERS = 200;
 const MAX_MANUAL_DISTANCE_METERS = 500000;
+const MIN_MANUAL_TIME_SECONDS = 60;
+const MAX_MANUAL_TIME_SECONDS = 60 * 60 * 24;
 const SPLIT_DISTANCE_METERS = 1000;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
@@ -701,6 +724,73 @@ export function buildManualDistancePreview(
       scale_factor: scaleFactor
     }
   } satisfies ManualDistancePreview;
+}
+
+export function buildManualTimePreview(
+  workout: WorkoutSummaryLike,
+  streams: ActivityStreams | CorrectedStreamsPayload | null,
+  targetMovingTimeSeconds: number
+) {
+  if (!streams?.distance?.length || !streams.time?.length) {
+    return null;
+  }
+
+  const currentDistanceMeters = toFiniteNumber(streams.distance[streams.distance.length - 1]);
+  const currentMovingTimeSeconds = Math.round(toFiniteNumber(streams.time[streams.time.length - 1]));
+  if (
+    currentDistanceMeters <= 0 ||
+    currentMovingTimeSeconds <= 0 ||
+    targetMovingTimeSeconds < MIN_MANUAL_TIME_SECONDS ||
+    targetMovingTimeSeconds > MAX_MANUAL_TIME_SECONDS
+  ) {
+    return null;
+  }
+
+  const scaleFactor = targetMovingTimeSeconds / currentMovingTimeSeconds;
+  if (!Number.isFinite(scaleFactor) || Math.abs(scaleFactor - 1) < 0.005) {
+    return null;
+  }
+
+  const correctedStreams = {
+    distance: streams.distance.map((value) => Math.max(0, toFiniteNumber(value))),
+    time: streams.time.map((value) => Math.max(0, toFiniteNumber(value) * scaleFactor)),
+    heartrate: streams.heartrate.map((value) => toFiniteNumber(value, NaN)),
+    cadence: streams.cadence.map((value) => toFiniteNumber(value, NaN)),
+    altitude: streams.altitude.map((value) => toFiniteNumber(value, NaN)),
+    velocity_smooth: streams.velocity_smooth.map((value) =>
+      Number.isFinite(value) && scaleFactor > 0 ? toFiniteNumber(value) / scaleFactor : NaN
+    ),
+    latlng: streams.latlng.filter(
+      (point): point is [number, number] =>
+        Array.isArray(point) &&
+        point.length >= 2 &&
+        Number.isFinite(point[0]) &&
+        Number.isFinite(point[1])
+    )
+  } satisfies CorrectedStreamsPayload;
+
+  const validHeartRates = correctedStreams.heartrate.filter((value) => Number.isFinite(value) && value > 0);
+
+  return {
+    correctedWorkout: {
+      distance_meters: currentDistanceMeters,
+      moving_time_seconds: targetMovingTimeSeconds,
+      elapsed_time_seconds: Math.round(
+        toFiniteNumber(workout.elapsed_time_seconds, currentMovingTimeSeconds) * scaleFactor
+      ),
+      elevation_gain: toFiniteNumber(workout.elevation_gain),
+      average_speed: targetMovingTimeSeconds > 0 ? currentDistanceMeters / targetMovingTimeSeconds : null,
+      average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
+      max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
+    },
+    correctedStreams,
+    correctedLaps: buildKilometerSplits(correctedStreams),
+    metadata: {
+      target_moving_time_seconds: targetMovingTimeSeconds,
+      source_moving_time_seconds: currentMovingTimeSeconds,
+      scale_factor: scaleFactor
+    }
+  } satisfies ManualTimePreview;
 }
 
 export async function getActiveWorkoutCorrection(workoutId: number) {
