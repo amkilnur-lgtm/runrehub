@@ -470,6 +470,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     );
   }
 
+  const hasSyntheticCorrectedSplits =
+    data.workout.gps_fix?.is_corrected &&
+    data.workout.gps_fix.kind !== "gps_autofix" &&
+    !Array.isArray(data.workout.gps_fix.removed_segments) &&
+    data.workout.gps_fix.removed_segments.split_strategy === "synthetic_even";
+
   return (
     <div className="stack">
       <Link to={backHref} className="inline-link workout-back-link">
@@ -624,6 +630,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       <section className="grid workout-layout">
         <div className="card">
           <h2>Отрезки</h2>
+          {hasSyntheticCorrectedSplits ? (
+            <p className="muted">Сплиты восстановлены приближённо по исправленной сводке тренировки.</p>
+          ) : null}
           {data.laps.length ? (
             <div className="lap-report-wrap">
               <table className="lap-report-table" aria-label="Статистика по кругам">

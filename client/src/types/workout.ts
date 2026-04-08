@@ -34,10 +34,12 @@ export type WorkoutData = {
         target_distance_meters: number;
         source_distance_meters: number;
         scale_factor: number;
+        split_strategy: "stream" | "synthetic_even";
       } | {
         target_moving_time_seconds: number;
         source_moving_time_seconds: number;
         scale_factor: number;
+        split_strategy: "stream" | "synthetic_even";
       };
       created_by_user_id: number;
       created_at: string;
