@@ -7,6 +7,7 @@ import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import { ensureActivityStreams } from "../lib/strava.js";
 import {
   applyWorkoutCorrectionToView,
+  buildAthleteCadenceProfile,
   buildManualDistancePreview,
   buildManualTimePreview,
   buildGpsFixPreview,
@@ -502,8 +503,9 @@ export async function trainerRoutes(app: FastifyInstance) {
       workoutId,
       workout.strava_activity_id as number
     );
+    const athleteProfile = await buildAthleteCadenceProfile(workout.user_id as number, workoutId);
 
-    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams);
+    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams, athleteProfile);
     if (!preview) {
       return reply.code(400).send({ message: "Явных GPS-скачков не найдено" });
     }
@@ -552,8 +554,9 @@ export async function trainerRoutes(app: FastifyInstance) {
       workoutId,
       workout.strava_activity_id as number
     );
+    const athleteProfile = await buildAthleteCadenceProfile(workout.user_id as number, workoutId);
 
-    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams);
+    const preview = buildGpsFixPreview(workout, lapsResult.rows, streams, athleteProfile);
     if (!preview) {
       return reply.code(400).send({ message: "Явных GPS-скачков не найдено" });
     }
