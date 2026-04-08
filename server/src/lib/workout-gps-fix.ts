@@ -48,13 +48,17 @@ type ManualDistanceMetadata = {
   target_distance_meters: number;
   source_distance_meters: number;
   scale_factor: number;
+  split_strategy: SplitStrategy;
 };
 
 type ManualTimeMetadata = {
   target_moving_time_seconds: number;
   source_moving_time_seconds: number;
   scale_factor: number;
+  split_strategy: SplitStrategy;
 };
+
+type SplitStrategy = "stream" | "synthetic_even";
 
 type CorrectedStreamsPayload = {
   distance: number[];
@@ -156,6 +160,8 @@ const MAX_MANUAL_DISTANCE_METERS = 500000;
 const MIN_MANUAL_TIME_SECONDS = 60;
 const MAX_MANUAL_TIME_SECONDS = 60 * 60 * 24;
 const SPLIT_DISTANCE_METERS = 1000;
+const MIN_REALISTIC_SPLIT_PACE_SECONDS = 150;
+const MIN_STREAM_SPLIT_DISTANCE_METERS = 3000;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -307,6 +313,149 @@ function buildKilometerSplits(streams: CorrectedStreamsPayload) {
   }
 
   return splits;
+}
+
+function buildSyntheticEvenKilometerSplits(
+  workout: WorkoutSummaryLike,
+  streams: ActivityStreams | CorrectedStreamsPayload | null,
+  totalDistanceMeters: number,
+  totalMovingTimeSeconds: number
+) {
+  if (totalDistanceMeters <= 0 || totalMovingTimeSeconds <= 0) {
+    return [] as CorrectedLapPayload[];
+  }
+
+  const splitCount = Math.ceil(totalDistanceMeters / SPLIT_DISTANCE_METERS);
+  const validHeartRates =
+    streams?.heartrate?.filter((value) => Number.isFinite(value) && value > 0) ?? [];
+  const averageHeartRate = validHeartRates.length
+    ? validHeartRates.reduce((sum, value) => sum + value, 0) / validHeartRates.length
+    : toFiniteNumber(workout.average_heartrate, NaN);
+  const totalElevationGain = Math.max(0, toFiniteNumber(workout.elevation_gain));
+  const laps: CorrectedLapPayload[] = [];
+  let assignedTimeSeconds = 0;
+
+  for (let index = 0; index < splitCount; index += 1) {
+    const remainingDistanceMeters = Math.max(
+      0,
+      totalDistanceMeters - index * SPLIT_DISTANCE_METERS
+    );
+    const distanceMeters = Math.min(SPLIT_DISTANCE_METERS, remainingDistanceMeters);
+    if (distanceMeters <= 0) {
+      break;
+    }
+
+    const remainingSplits = splitCount - index;
+    const rawSplitTime =
+      index === splitCount - 1
+        ? totalMovingTimeSeconds - assignedTimeSeconds
+        : (totalMovingTimeSeconds * distanceMeters) / totalDistanceMeters;
+    const elapsedTimeSeconds = Math.max(
+      1,
+      remainingSplits === 1
+        ? totalMovingTimeSeconds - assignedTimeSeconds
+        : Math.round(rawSplitTime)
+    );
+    assignedTimeSeconds += elapsedTimeSeconds;
+
+    laps.push({
+      id: index + 1,
+      name: null,
+      distance_meters: distanceMeters,
+      elapsed_time_seconds: elapsedTimeSeconds,
+      average_speed: elapsedTimeSeconds > 0 ? distanceMeters / elapsedTimeSeconds : null,
+      average_heartrate: Number.isFinite(averageHeartRate) ? averageHeartRate : null,
+      elevation_gain:
+        totalElevationGain > 0
+          ? (totalElevationGain * distanceMeters) / totalDistanceMeters
+          : null
+    });
+  }
+
+  if (laps.length) {
+    const totalAssigned = laps.reduce((sum, lap) => sum + lap.elapsed_time_seconds, 0);
+    const delta = totalMovingTimeSeconds - totalAssigned;
+    if (delta !== 0) {
+      const lastLap = laps[laps.length - 1]!;
+      lastLap.elapsed_time_seconds = Math.max(1, lastLap.elapsed_time_seconds + delta);
+      lastLap.average_speed =
+        lastLap.elapsed_time_seconds > 0
+          ? lastLap.distance_meters / lastLap.elapsed_time_seconds
+          : null;
+    }
+  }
+
+  return laps;
+}
+
+function chooseSplitStrategy(
+  workout: WorkoutSummaryLike,
+  streams: CorrectedStreamsPayload
+): SplitStrategy {
+  const totalDistanceMeters = toFiniteNumber(streams.distance[streams.distance.length - 1]);
+  const totalMovingTimeSeconds = toFiniteNumber(streams.time[streams.time.length - 1]);
+  if (
+    totalDistanceMeters < MIN_STREAM_SPLIT_DISTANCE_METERS ||
+    totalMovingTimeSeconds <= 0
+  ) {
+    return "stream";
+  }
+
+  const splits = buildKilometerSplits(streams);
+  if (!splits.length) {
+    return "synthetic_even";
+  }
+
+  const unrealisticFastSplits = splits.filter((lap) => {
+    if (lap.distance_meters < SPLIT_DISTANCE_METERS * 0.9 || lap.elapsed_time_seconds <= 0) {
+      return false;
+    }
+
+    const paceSeconds = (lap.elapsed_time_seconds / lap.distance_meters) * SPLIT_DISTANCE_METERS;
+    return Number.isFinite(paceSeconds) && paceSeconds < MIN_REALISTIC_SPLIT_PACE_SECONDS;
+  }).length;
+
+  const overallAverageSpeed =
+    totalMovingTimeSeconds > 0 ? totalDistanceMeters / totalMovingTimeSeconds : null;
+  const overallPaceSeconds =
+    overallAverageSpeed && overallAverageSpeed > 0
+      ? SPLIT_DISTANCE_METERS / overallAverageSpeed
+      : null;
+
+  if (unrealisticFastSplits > 0) {
+    return "synthetic_even";
+  }
+
+  if (
+    overallPaceSeconds !== null &&
+    overallPaceSeconds < MIN_REALISTIC_SPLIT_PACE_SECONDS &&
+    !Number.isFinite(workout.average_heartrate)
+  ) {
+    return "synthetic_even";
+  }
+
+  return "stream";
+}
+
+function buildCorrectedSplits(
+  workout: WorkoutSummaryLike,
+  correctedStreams: CorrectedStreamsPayload,
+  totalDistanceMeters: number,
+  totalMovingTimeSeconds: number
+) {
+  const splitStrategy = chooseSplitStrategy(workout, correctedStreams);
+  return {
+    splitStrategy,
+    correctedLaps:
+      splitStrategy === "stream"
+        ? buildKilometerSplits(correctedStreams)
+        : buildSyntheticEvenKilometerSplits(
+            workout,
+            correctedStreams,
+            totalDistanceMeters,
+            totalMovingTimeSeconds
+          )
+  };
 }
 
 function buildSegments(suspectSteps: number[], distance: number[], time: number[]) {
@@ -703,6 +852,12 @@ export function buildManualDistancePreview(
   } satisfies CorrectedStreamsPayload;
 
   const validHeartRates = correctedStreams.heartrate.filter((value) => Number.isFinite(value) && value > 0);
+  const { splitStrategy, correctedLaps } = buildCorrectedSplits(
+    workout,
+    correctedStreams,
+    targetDistanceMeters,
+    movingTimeSeconds
+  );
 
   return {
     correctedWorkout: {
@@ -717,11 +872,12 @@ export function buildManualDistancePreview(
       max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
     },
     correctedStreams,
-    correctedLaps: buildKilometerSplits(correctedStreams),
+    correctedLaps,
     metadata: {
       target_distance_meters: targetDistanceMeters,
       source_distance_meters: currentDistanceMeters,
-      scale_factor: scaleFactor
+      scale_factor: scaleFactor,
+      split_strategy: splitStrategy
     }
   } satisfies ManualDistancePreview;
 }
@@ -770,6 +926,12 @@ export function buildManualTimePreview(
   } satisfies CorrectedStreamsPayload;
 
   const validHeartRates = correctedStreams.heartrate.filter((value) => Number.isFinite(value) && value > 0);
+  const { splitStrategy, correctedLaps } = buildCorrectedSplits(
+    workout,
+    correctedStreams,
+    currentDistanceMeters,
+    targetMovingTimeSeconds
+  );
 
   return {
     correctedWorkout: {
@@ -784,11 +946,12 @@ export function buildManualTimePreview(
       max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
     },
     correctedStreams,
-    correctedLaps: buildKilometerSplits(correctedStreams),
+    correctedLaps,
     metadata: {
       target_moving_time_seconds: targetMovingTimeSeconds,
       source_moving_time_seconds: currentMovingTimeSeconds,
-      scale_factor: scaleFactor
+      scale_factor: scaleFactor,
+      split_strategy: splitStrategy
     }
   } satisfies ManualTimePreview;
 }
