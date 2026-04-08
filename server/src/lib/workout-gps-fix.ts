@@ -36,6 +36,20 @@ type WorkoutLapRow = {
   end_index: number | null;
 };
 
+type AthleteCadenceProfileBin = {
+  cadence: number;
+  median_pace_seconds_per_km: number;
+  median_heartrate: number | null;
+  sample_count: number;
+};
+
+export type AthleteCadenceProfile = {
+  bins: AthleteCadenceProfileBin[];
+  median_pace_seconds_per_km: number | null;
+  median_heartrate: number | null;
+  sample_count: number;
+};
+
 type RemovedSegment = {
   startIndex: number;
   endIndex: number;
@@ -162,6 +176,19 @@ const MAX_MANUAL_TIME_SECONDS = 60 * 60 * 24;
 const SPLIT_DISTANCE_METERS = 1000;
 const MIN_REALISTIC_SPLIT_PACE_SECONDS = 150;
 const MIN_STREAM_SPLIT_DISTANCE_METERS = 3000;
+const PROFILE_MIN_CADENCE = 110;
+const PROFILE_MAX_CADENCE = 220;
+const PROFILE_MIN_SEGMENT_SECONDS = 2;
+const PROFILE_MAX_SEGMENT_SECONDS = 20;
+const PROFILE_MAX_SEGMENT_DISTANCE_METERS = 120;
+const PROFILE_MIN_PACE_SECONDS = 160;
+const PROFILE_MAX_PACE_SECONDS = 900;
+const PROFILE_BIN_SIZE = 5;
+const PROFILE_MIN_TOTAL_SAMPLES = 30;
+const PROFILE_MIN_BIN_SAMPLES = 6;
+const PROFILE_FAST_MISMATCH_FACTOR = 1.85;
+const PROFILE_STRONG_FAST_MISMATCH_FACTOR = 2.3;
+const PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO = 0.42;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -201,6 +228,20 @@ function computeAverageHeartRate(heartrate: number[]) {
   }
 
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+function median(values: number[]) {
+  if (!values.length) {
+    return null;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1]! + sorted[middle]!) / 2;
+  }
+
+  return sorted[middle]!;
 }
 
 function interpolateValue(
@@ -458,6 +499,234 @@ function buildCorrectedSplits(
   };
 }
 
+function estimatePaceFromProfile(
+  profile: AthleteCadenceProfile | null,
+  cadence: number,
+  heartrate: number
+) {
+  if (!profile || profile.sample_count < PROFILE_MIN_TOTAL_SAMPLES || !profile.bins.length) {
+    return null;
+  }
+
+  const usableCadence = Number.isFinite(cadence) ? cadence : NaN;
+  const usableHeartrate = Number.isFinite(heartrate) ? heartrate : NaN;
+  let chosenBin: AthleteCadenceProfileBin | null = null;
+
+  if (Number.isFinite(usableCadence)) {
+    for (const bin of profile.bins) {
+      if (bin.sample_count < PROFILE_MIN_BIN_SAMPLES) {
+        continue;
+      }
+
+      if (!chosenBin || Math.abs(bin.cadence - usableCadence) < Math.abs(chosenBin.cadence - usableCadence)) {
+        chosenBin = bin;
+      }
+    }
+  }
+
+  const basePaceSeconds =
+    chosenBin?.median_pace_seconds_per_km ?? profile.median_pace_seconds_per_km;
+  if (!Number.isFinite(basePaceSeconds)) {
+    return null;
+  }
+
+  let estimatedPaceSeconds = Number(basePaceSeconds);
+  const referenceHeartRate = chosenBin?.median_heartrate ?? profile.median_heartrate;
+  if (Number.isFinite(usableHeartrate) && Number.isFinite(referenceHeartRate)) {
+    const heartRateDelta = usableHeartrate - Number(referenceHeartRate);
+    const boundedAdjustment = Math.max(-0.12, Math.min(0.12, heartRateDelta / 80));
+    estimatedPaceSeconds *= 1 - boundedAdjustment;
+  }
+
+  return Math.max(PROFILE_MIN_PACE_SECONDS, Math.min(PROFILE_MAX_PACE_SECONDS, estimatedPaceSeconds));
+}
+
+function rebuildStreamsFromAthleteProfile(
+  workout: WorkoutSummaryLike,
+  streams: ActivityStreams,
+  profile: AthleteCadenceProfile
+) {
+  const size = Math.min(
+    streams.distance.length,
+    streams.time.length,
+    streams.heartrate.length || streams.time.length,
+    streams.cadence.length || streams.time.length,
+    streams.altitude.length || streams.time.length,
+    streams.velocity_smooth.length || streams.time.length
+  );
+
+  if (size < 3) {
+    return null;
+  }
+
+  const correctedDistance: number[] = [];
+  const correctedTime: number[] = [];
+  const correctedHeartrate: number[] = [];
+  const correctedCadence: number[] = [];
+  const correctedAltitude: number[] = [];
+  const correctedVelocity: number[] = [];
+  const correctedLatLng: [number, number][] = [];
+
+  let cumulativeDistance = 0;
+
+  for (let index = 0; index < size; index += 1) {
+    const currentTime = Math.max(0, toFiniteNumber(streams.time[index]));
+    const previousTime = index > 0 ? Math.max(0, toFiniteNumber(streams.time[index - 1])) : 0;
+    const dt = index > 0 ? Math.max(0, currentTime - previousTime) : 0;
+    const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
+    const heartRateValue = toFiniteNumber(streams.heartrate[index], NaN);
+    const estimatedPaceSeconds = estimatePaceFromProfile(profile, cadenceValue, heartRateValue);
+    const fallbackPaceSeconds =
+      profile.median_pace_seconds_per_km ??
+      (toFiniteNumber(workout.average_speed, 0) > 0
+        ? SPLIT_DISTANCE_METERS / toFiniteNumber(workout.average_speed, 0)
+        : 360);
+    const selectedPaceSeconds = estimatedPaceSeconds ?? fallbackPaceSeconds;
+    const estimatedSpeed = selectedPaceSeconds > 0 ? SPLIT_DISTANCE_METERS / selectedPaceSeconds : 0;
+
+    if (index > 0 && dt > 0) {
+      cumulativeDistance += estimatedSpeed * dt;
+    }
+
+    correctedDistance.push(cumulativeDistance);
+    correctedTime.push(currentTime);
+    correctedHeartrate.push(heartRateValue);
+    correctedCadence.push(cadenceValue);
+    correctedAltitude.push(toFiniteNumber(streams.altitude[index], NaN));
+    correctedVelocity.push(estimatedSpeed > 0 ? estimatedSpeed : NaN);
+
+    const latLngPoint = streams.latlng[index];
+    if (Array.isArray(latLngPoint) && latLngPoint.length >= 2) {
+      correctedLatLng.push([latLngPoint[0], latLngPoint[1]]);
+    }
+  }
+
+  const normalizedLatLng = correctedLatLng.filter(
+    (point): point is [number, number] =>
+      Number.isFinite(point[0]) && Number.isFinite(point[1])
+  );
+
+  return {
+    distance: correctedDistance,
+    time: correctedTime,
+    heartrate: correctedHeartrate,
+    cadence: correctedCadence,
+    altitude: correctedAltitude,
+    velocity_smooth: correctedVelocity,
+    latlng: normalizedLatLng
+  } satisfies CorrectedStreamsPayload;
+}
+
+export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutId: number) {
+  const result = await pool.query<{
+    distance_stream: number[] | null;
+    time_stream: number[] | null;
+    heartrate_stream: number[] | null;
+    cadence_stream: number[] | null;
+  }>(
+    `
+      select
+        ws.distance_stream,
+        ws.time_stream,
+        ws.heartrate_stream,
+        ws.cadence_stream
+      from workouts w
+      join workout_streams ws on ws.workout_id = w.id
+      left join workout_corrections wc on wc.workout_id = w.id
+      where w.user_id = $1
+        and w.id <> $2
+        and w.sport_type ilike '%run%'
+        and wc.workout_id is null
+        and w.distance_meters >= 2000
+        and w.moving_time_seconds >= 600
+        and coalesce(w.average_speed, 0) > 0
+        and (1000 / nullif(w.average_speed, 0)) between $3 and $4
+        and jsonb_array_length(ws.cadence_stream) > 0
+      order by w.start_date desc
+      limit 20
+    `,
+    [userId, excludeWorkoutId, PROFILE_MIN_PACE_SECONDS, PROFILE_MAX_PACE_SECONDS]
+  );
+
+  const paceBuckets = new Map<number, number[]>();
+  const heartRateBuckets = new Map<number, number[]>();
+  const allPaces: number[] = [];
+  const allHeartRates: number[] = [];
+
+  for (const row of result.rows) {
+    const distance = Array.isArray(row.distance_stream) ? row.distance_stream : [];
+    const time = Array.isArray(row.time_stream) ? row.time_stream : [];
+    const heartrate = Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [];
+    const cadence = Array.isArray(row.cadence_stream) ? row.cadence_stream : [];
+    const size = Math.min(distance.length, time.length, cadence.length || time.length, heartrate.length || time.length);
+
+    for (let index = 1; index < size; index += 1) {
+      const dt = toFiniteNumber(time[index]) - toFiniteNumber(time[index - 1]);
+      const dd = toFiniteNumber(distance[index]) - toFiniteNumber(distance[index - 1]);
+      const cadenceValue = toFiniteNumber(cadence[index], NaN);
+      const heartRateValue = toFiniteNumber(heartrate[index], NaN);
+      if (
+        dt < PROFILE_MIN_SEGMENT_SECONDS ||
+        dt > PROFILE_MAX_SEGMENT_SECONDS ||
+        dd <= 0 ||
+        dd > PROFILE_MAX_SEGMENT_DISTANCE_METERS ||
+        !Number.isFinite(cadenceValue) ||
+        cadenceValue < PROFILE_MIN_CADENCE ||
+        cadenceValue > PROFILE_MAX_CADENCE
+      ) {
+        continue;
+      }
+
+      const paceSeconds = (dt / dd) * SPLIT_DISTANCE_METERS;
+      if (
+        !Number.isFinite(paceSeconds) ||
+        paceSeconds < PROFILE_MIN_PACE_SECONDS ||
+        paceSeconds > PROFILE_MAX_PACE_SECONDS
+      ) {
+        continue;
+      }
+
+      const cadenceBin = Math.round(cadenceValue / PROFILE_BIN_SIZE) * PROFILE_BIN_SIZE;
+      const bucket = paceBuckets.get(cadenceBin) ?? [];
+      bucket.push(paceSeconds);
+      paceBuckets.set(cadenceBin, bucket);
+      allPaces.push(paceSeconds);
+
+      if (Number.isFinite(heartRateValue) && heartRateValue > 0) {
+        const heartBucket = heartRateBuckets.get(cadenceBin) ?? [];
+        heartBucket.push(heartRateValue);
+        heartRateBuckets.set(cadenceBin, heartBucket);
+        allHeartRates.push(heartRateValue);
+      }
+    }
+  }
+
+  if (allPaces.length < PROFILE_MIN_TOTAL_SAMPLES) {
+    return null;
+  }
+
+  const bins = [...paceBuckets.entries()]
+    .map(([cadenceBin, paceValues]) => ({
+      cadence: cadenceBin,
+      median_pace_seconds_per_km: median(paceValues) ?? 0,
+      median_heartrate: median(heartRateBuckets.get(cadenceBin) ?? []),
+      sample_count: paceValues.length
+    }))
+    .filter((bin) => bin.sample_count >= PROFILE_MIN_BIN_SAMPLES)
+    .sort((left, right) => left.cadence - right.cadence);
+
+  if (!bins.length) {
+    return null;
+  }
+
+  return {
+    bins,
+    median_pace_seconds_per_km: median(allPaces),
+    median_heartrate: median(allHeartRates),
+    sample_count: allPaces.length
+  } satisfies AthleteCadenceProfile;
+}
+
 function buildSegments(suspectSteps: number[], distance: number[], time: number[]) {
   if (!suspectSteps.length) {
     return [] as RemovedSegment[];
@@ -662,7 +931,8 @@ function rebuildCorrectedLaps(
 export function buildGpsFixPreview(
   workout: WorkoutSummary,
   laps: WorkoutLapRow[],
-  streams: ActivityStreams | null
+  streams: ActivityStreams | null,
+  athleteProfile: AthleteCadenceProfile | null = null
 ) {
   if (!streams?.distance?.length || !streams.time?.length) {
     return null;
@@ -680,6 +950,8 @@ export function buildGpsFixPreview(
   }
 
   const suspectSteps: number[] = [];
+  let profileComparableSamples = 0;
+  let profileMismatchSamples = 0;
   const hrHighThreshold = (() => {
     const maxHr = toFiniteNumber(workout.max_heartrate, 0);
     if (maxHr > 0) {
@@ -731,6 +1003,25 @@ export function buildGpsFixPreview(
       heartRateValue > 0 &&
       hrHighThreshold > 0 &&
       heartRateValue >= hrHighThreshold;
+    const expectedPaceSeconds = estimatePaceFromProfile(athleteProfile, cadenceValue, heartRateValue);
+    const expectedSpeed = expectedPaceSeconds ? SPLIT_DISTANCE_METERS / expectedPaceSeconds : null;
+    const profileMismatch =
+      expectedSpeed !== null &&
+      expectedSpeed > 0 &&
+      (recordedSpeed > expectedSpeed * PROFILE_FAST_MISMATCH_FACTOR ||
+        geoSpeed > expectedSpeed * PROFILE_FAST_MISMATCH_FACTOR);
+    const strongProfileMismatch =
+      expectedSpeed !== null &&
+      expectedSpeed > 0 &&
+      (recordedSpeed > expectedSpeed * PROFILE_STRONG_FAST_MISMATCH_FACTOR ||
+        geoSpeed > expectedSpeed * PROFILE_STRONG_FAST_MISMATCH_FACTOR);
+
+    if (expectedSpeed !== null && expectedSpeed > 0) {
+      profileComparableSamples += 1;
+      if (profileMismatch) {
+        profileMismatchSamples += 1;
+      }
+    }
 
     const cadenceHrSupport =
       cadenceLooksBroken ||
@@ -747,13 +1038,81 @@ export function buildGpsFixPreview(
       distanceJump ||
       geoJump ||
       strongRawSignal ||
+      strongProfileMismatch ||
       (
         (recordedSpeed > MAX_RUN_SPEED_MPS || geoSpeed > MAX_GEO_SPEED_MPS) &&
-        !heartRateLooksHigh &&
-        cadenceHrSupport
+        (!heartRateLooksHigh && cadenceHrSupport || profileMismatch)
       )
     ) {
       suspectSteps.push(index);
+    }
+  }
+
+  const shouldRebuildWholeWorkoutFromProfile =
+    athleteProfile &&
+    profileComparableSamples >= PROFILE_MIN_TOTAL_SAMPLES / 2 &&
+    (
+      profileMismatchSamples / profileComparableSamples >= PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO ||
+      (
+        Number.isFinite(toFiniteNumber(workout.average_speed, NaN)) &&
+        Number.isFinite(athleteProfile.median_pace_seconds_per_km) &&
+        toFiniteNumber(workout.average_speed, 0) > 0 &&
+        SPLIT_DISTANCE_METERS / toFiniteNumber(workout.average_speed, 0) <
+          athleteProfile.median_pace_seconds_per_km! * 0.55
+      )
+    );
+
+  if (shouldRebuildWholeWorkoutFromProfile) {
+    const correctedStreams = rebuildStreamsFromAthleteProfile(workout, streams, athleteProfile);
+    if (correctedStreams) {
+      const correctedDistanceMeters = correctedStreams.distance[correctedStreams.distance.length - 1] ?? 0;
+      const correctedMovingTimeSeconds = Math.round(
+        correctedStreams.time[correctedStreams.time.length - 1] ?? 0
+      );
+      const validHeartRates = correctedStreams.heartrate.filter((value) => Number.isFinite(value) && value > 0);
+      const { correctedLaps } = buildCorrectedSplits(
+        workout,
+        correctedStreams,
+        correctedDistanceMeters,
+        correctedMovingTimeSeconds
+      );
+
+      if (
+        correctedDistanceMeters > 0 &&
+        correctedMovingTimeSeconds > 0 &&
+        correctedDistanceMeters < toFiniteNumber(workout.distance_meters)
+      ) {
+        return {
+          removedSegments: [
+            {
+              startIndex: 1,
+              endIndex: size - 1,
+              removedDistanceMeters: Math.max(
+                0,
+                toFiniteNumber(workout.distance_meters) - correctedDistanceMeters
+              ),
+              removedTimeSeconds: 0,
+              peakSpeedMetersPerSecond: toFiniteNumber(workout.average_speed)
+            }
+          ],
+          correctedWorkout: {
+            distance_meters: correctedDistanceMeters,
+            moving_time_seconds: correctedMovingTimeSeconds,
+            elapsed_time_seconds: correctedMovingTimeSeconds,
+            elevation_gain: correctedStreams.altitude.length
+              ? computePositiveElevationGain(correctedStreams.altitude)
+              : workout.elevation_gain,
+            average_speed:
+              correctedMovingTimeSeconds > 0
+                ? correctedDistanceMeters / correctedMovingTimeSeconds
+                : null,
+            average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
+            max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : null
+          },
+          correctedStreams,
+          correctedLaps
+        } satisfies GpsFixPreview;
+      }
     }
   }
 
