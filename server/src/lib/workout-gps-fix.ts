@@ -189,6 +189,9 @@ const PROFILE_MIN_BIN_SAMPLES = 6;
 const PROFILE_FAST_MISMATCH_FACTOR = 1.85;
 const PROFILE_STRONG_FAST_MISMATCH_FACTOR = 2.3;
 const PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO = 0.42;
+const PROFILE_MIN_COMPARABLE_SAMPLES = 8;
+const PROFILE_PRIMARY_WHOLE_WORKOUT_RATIO = 0.25;
+const PROFILE_AVERAGE_PACE_OVERRIDE_FACTOR = 0.72;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -950,6 +953,10 @@ export function buildGpsFixPreview(
   }
 
   const suspectSteps: number[] = [];
+  const hasUsableAthleteProfile =
+    athleteProfile !== null &&
+    athleteProfile.sample_count >= PROFILE_MIN_TOTAL_SAMPLES &&
+    athleteProfile.bins.length > 0;
   let profileComparableSamples = 0;
   let profileMismatchSamples = 0;
   const hrHighThreshold = (() => {
@@ -1039,6 +1046,7 @@ export function buildGpsFixPreview(
       geoJump ||
       strongRawSignal ||
       strongProfileMismatch ||
+      (hasUsableAthleteProfile && profileMismatch) ||
       (
         (recordedSpeed > MAX_RUN_SPEED_MPS || geoSpeed > MAX_GEO_SPEED_MPS) &&
         (!heartRateLooksHigh && cadenceHrSupport || profileMismatch)
@@ -1049,21 +1057,27 @@ export function buildGpsFixPreview(
   }
 
   const shouldRebuildWholeWorkoutFromProfile =
-    athleteProfile &&
-    profileComparableSamples >= PROFILE_MIN_TOTAL_SAMPLES / 2 &&
+    hasUsableAthleteProfile &&
     (
-      profileMismatchSamples / profileComparableSamples >= PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO ||
+      (
+        profileComparableSamples >= PROFILE_MIN_COMPARABLE_SAMPLES &&
+        profileMismatchSamples / profileComparableSamples >= PROFILE_PRIMARY_WHOLE_WORKOUT_RATIO
+      ) ||
+      (
+        profileComparableSamples >= PROFILE_MIN_TOTAL_SAMPLES / 2 &&
+        profileMismatchSamples / profileComparableSamples >= PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO
+      ) ||
       (
         Number.isFinite(toFiniteNumber(workout.average_speed, NaN)) &&
-        Number.isFinite(athleteProfile.median_pace_seconds_per_km) &&
+        Number.isFinite(athleteProfile!.median_pace_seconds_per_km) &&
         toFiniteNumber(workout.average_speed, 0) > 0 &&
         SPLIT_DISTANCE_METERS / toFiniteNumber(workout.average_speed, 0) <
-          athleteProfile.median_pace_seconds_per_km! * 0.55
+          athleteProfile!.median_pace_seconds_per_km! * PROFILE_AVERAGE_PACE_OVERRIDE_FACTOR
       )
     );
 
   if (shouldRebuildWholeWorkoutFromProfile) {
-    const correctedStreams = rebuildStreamsFromAthleteProfile(workout, streams, athleteProfile);
+    const correctedStreams = rebuildStreamsFromAthleteProfile(workout, streams, athleteProfile!);
     if (correctedStreams) {
       const correctedDistanceMeters = correctedStreams.distance[correctedStreams.distance.length - 1] ?? 0;
       const correctedMovingTimeSeconds = Math.round(
