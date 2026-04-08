@@ -184,14 +184,16 @@ const PROFILE_MAX_SEGMENT_DISTANCE_METERS = 120;
 const PROFILE_MIN_PACE_SECONDS = 160;
 const PROFILE_MAX_PACE_SECONDS = 900;
 const PROFILE_BIN_SIZE = 5;
-const PROFILE_MIN_TOTAL_SAMPLES = 30;
-const PROFILE_MIN_BIN_SAMPLES = 6;
+const PROFILE_MIN_TOTAL_SAMPLES = 12;
+const PROFILE_MIN_BIN_SAMPLES = 3;
 const PROFILE_FAST_MISMATCH_FACTOR = 1.85;
 const PROFILE_STRONG_FAST_MISMATCH_FACTOR = 2.3;
 const PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO = 0.42;
-const PROFILE_MIN_COMPARABLE_SAMPLES = 8;
+const PROFILE_MIN_COMPARABLE_SAMPLES = 4;
 const PROFILE_PRIMARY_WHOLE_WORKOUT_RATIO = 0.25;
 const PROFILE_AVERAGE_PACE_OVERRIDE_FACTOR = 0.72;
+const PROFILE_ABSURD_PACE_OVERRIDE_SECONDS = 120;
+const PROFILE_ABSURD_SPEED_OVERRIDE_MPS = 10;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -957,6 +959,9 @@ export function buildGpsFixPreview(
     athleteProfile !== null &&
     athleteProfile.sample_count >= PROFILE_MIN_TOTAL_SAMPLES &&
     athleteProfile.bins.length > 0;
+  const workoutAverageSpeed = toFiniteNumber(workout.average_speed, 0);
+  const workoutAveragePaceSeconds =
+    workoutAverageSpeed > 0 ? SPLIT_DISTANCE_METERS / workoutAverageSpeed : null;
   let profileComparableSamples = 0;
   let profileMismatchSamples = 0;
   const hrHighThreshold = (() => {
@@ -1060,6 +1065,13 @@ export function buildGpsFixPreview(
     hasUsableAthleteProfile &&
     (
       (
+        workoutAveragePaceSeconds !== null &&
+        (
+          workoutAveragePaceSeconds < PROFILE_ABSURD_PACE_OVERRIDE_SECONDS ||
+          workoutAverageSpeed > PROFILE_ABSURD_SPEED_OVERRIDE_MPS
+        )
+      ) ||
+      (
         profileComparableSamples >= PROFILE_MIN_COMPARABLE_SAMPLES &&
         profileMismatchSamples / profileComparableSamples >= PROFILE_PRIMARY_WHOLE_WORKOUT_RATIO
       ) ||
@@ -1068,10 +1080,9 @@ export function buildGpsFixPreview(
         profileMismatchSamples / profileComparableSamples >= PROFILE_WHOLE_WORKOUT_MISMATCH_RATIO
       ) ||
       (
-        Number.isFinite(toFiniteNumber(workout.average_speed, NaN)) &&
+        workoutAveragePaceSeconds !== null &&
         Number.isFinite(athleteProfile!.median_pace_seconds_per_km) &&
-        toFiniteNumber(workout.average_speed, 0) > 0 &&
-        SPLIT_DISTANCE_METERS / toFiniteNumber(workout.average_speed, 0) <
+        workoutAveragePaceSeconds <
           athleteProfile!.median_pace_seconds_per_km! * PROFILE_AVERAGE_PACE_OVERRIDE_FACTOR
       )
     );
