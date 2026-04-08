@@ -194,6 +194,8 @@ const PROFILE_PRIMARY_WHOLE_WORKOUT_RATIO = 0.25;
 const PROFILE_AVERAGE_PACE_OVERRIDE_FACTOR = 0.72;
 const PROFILE_ABSURD_PACE_OVERRIDE_SECONDS = 120;
 const PROFILE_ABSURD_SPEED_OVERRIDE_MPS = 10;
+const HALF_CADENCE_MIN = 55;
+const HALF_CADENCE_MAX = 110;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -233,6 +235,26 @@ function computeAverageHeartRate(heartrate: number[]) {
   }
 
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+function normalizeCadenceValue(value: number | null | undefined) {
+  const cadence = toFiniteNumber(value, NaN);
+  if (!Number.isFinite(cadence) || cadence <= 0) {
+    return NaN;
+  }
+
+  if (cadence >= PROFILE_MIN_CADENCE && cadence <= PROFILE_MAX_CADENCE) {
+    return cadence;
+  }
+
+  if (cadence >= HALF_CADENCE_MIN && cadence <= HALF_CADENCE_MAX) {
+    const doubled = cadence * 2;
+    if (doubled >= PROFILE_MIN_CADENCE && doubled <= PROFILE_MAX_CADENCE) {
+      return doubled;
+    }
+  }
+
+  return cadence;
 }
 
 function median(values: number[]) {
@@ -513,7 +535,7 @@ function estimatePaceFromProfile(
     return null;
   }
 
-  const usableCadence = Number.isFinite(cadence) ? cadence : NaN;
+  const usableCadence = normalizeCadenceValue(cadence);
   const usableHeartrate = Number.isFinite(heartrate) ? heartrate : NaN;
   let chosenBin: AthleteCadenceProfileBin | null = null;
 
@@ -579,8 +601,9 @@ function rebuildStreamsFromAthleteProfile(
     const previousTime = index > 0 ? Math.max(0, toFiniteNumber(streams.time[index - 1])) : 0;
     const dt = index > 0 ? Math.max(0, currentTime - previousTime) : 0;
     const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
+    const normalizedCadence = normalizeCadenceValue(cadenceValue);
     const heartRateValue = toFiniteNumber(streams.heartrate[index], NaN);
-    const estimatedPaceSeconds = estimatePaceFromProfile(profile, cadenceValue, heartRateValue);
+    const estimatedPaceSeconds = estimatePaceFromProfile(profile, normalizedCadence, heartRateValue);
     const fallbackPaceSeconds =
       profile.median_pace_seconds_per_km ??
       (toFiniteNumber(workout.average_speed, 0) > 0
@@ -596,7 +619,7 @@ function rebuildStreamsFromAthleteProfile(
     correctedDistance.push(cumulativeDistance);
     correctedTime.push(currentTime);
     correctedHeartrate.push(heartRateValue);
-    correctedCadence.push(cadenceValue);
+    correctedCadence.push(normalizedCadence);
     correctedAltitude.push(toFiniteNumber(streams.altitude[index], NaN));
     correctedVelocity.push(estimatedSpeed > 0 ? estimatedSpeed : NaN);
 
@@ -668,7 +691,7 @@ export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutI
     for (let index = 1; index < size; index += 1) {
       const dt = toFiniteNumber(time[index]) - toFiniteNumber(time[index - 1]);
       const dd = toFiniteNumber(distance[index]) - toFiniteNumber(distance[index - 1]);
-      const cadenceValue = toFiniteNumber(cadence[index], NaN);
+      const cadenceValue = normalizeCadenceValue(cadence[index]);
       const heartRateValue = toFiniteNumber(heartrate[index], NaN);
       if (
         dt < PROFILE_MIN_SEGMENT_SECONDS ||
@@ -997,14 +1020,15 @@ export function buildGpsFixPreview(
     const distanceJump = distanceDelta > MAX_STEP_DISTANCE_METERS && dt < 12;
     const geoJump = geoDistance > MAX_STEP_GEO_DISTANCE_METERS && dt < 12;
     const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
+    const normalizedCadence = normalizeCadenceValue(cadenceValue);
     const heartRateValue = toFiniteNumber(streams.heartrate[index], NaN);
     const cadenceLooksNormal =
-      Number.isFinite(cadenceValue) &&
-      cadenceValue > 0 &&
-      cadenceValue <= MAX_NORMAL_CADENCE;
+      Number.isFinite(normalizedCadence) &&
+      normalizedCadence > 0 &&
+      normalizedCadence <= MAX_NORMAL_CADENCE;
     const cadenceLooksBroken =
-      Number.isFinite(cadenceValue) &&
-      cadenceValue > MAX_REALISTIC_CADENCE;
+      Number.isFinite(normalizedCadence) &&
+      normalizedCadence > MAX_REALISTIC_CADENCE;
     const heartRateLooksModerate =
       Number.isFinite(heartRateValue) &&
       heartRateValue > 0 &&
@@ -1015,7 +1039,11 @@ export function buildGpsFixPreview(
       heartRateValue > 0 &&
       hrHighThreshold > 0 &&
       heartRateValue >= hrHighThreshold;
-    const expectedPaceSeconds = estimatePaceFromProfile(athleteProfile, cadenceValue, heartRateValue);
+    const expectedPaceSeconds = estimatePaceFromProfile(
+      athleteProfile,
+      normalizedCadence,
+      heartRateValue
+    );
     const expectedSpeed = expectedPaceSeconds ? SPLIT_DISTANCE_METERS / expectedPaceSeconds : null;
     const profileMismatch =
       expectedSpeed !== null &&
