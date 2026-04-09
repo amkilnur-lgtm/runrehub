@@ -690,17 +690,102 @@ function rebuildStreamsFromAthleteProfile(
   } satisfies CorrectedStreamsPayload;
 }
 
+function collectProfileSamplesFromStreams(input: {
+  distance: number[];
+  time: number[];
+  cadence: number[];
+  heartrate: number[];
+}) {
+  const normalizedCadence = input.cadence.map((value) =>
+    normalizeCadenceValue(toFiniteNumber(value, NaN))
+  );
+  const smoothedCadence = rollingMedian(normalizedCadence, 2);
+  const smoothedHeartrate = rollingMedian(
+    input.heartrate.map((value) => toFiniteNumber(value, NaN)),
+    2
+  );
+  const paceSamples: Array<{ cadenceBin: number; paceSeconds: number; heartRate: number | null }> = [];
+
+  let segmentStart = 0;
+  for (let index = 1; index < Math.min(input.distance.length, input.time.length, smoothedCadence.length); index += 1) {
+    const elapsedSeconds =
+      toFiniteNumber(input.time[index]) - toFiniteNumber(input.time[segmentStart]);
+    const segmentDistance =
+      toFiniteNumber(input.distance[index]) - toFiniteNumber(input.distance[segmentStart]);
+    const reachedWindow =
+      elapsedSeconds >= PROFILE_MAX_SEGMENT_SECONDS ||
+      segmentDistance >= PROFILE_MAX_SEGMENT_DISTANCE_METERS;
+
+    if (!reachedWindow) {
+      continue;
+    }
+
+    if (
+      elapsedSeconds <= 0 ||
+      segmentDistance <= 0 ||
+      elapsedSeconds > PROFILE_MAX_SEGMENT_SECONDS * 1.6 ||
+      segmentDistance > PROFILE_MAX_SEGMENT_DISTANCE_METERS * 1.6
+    ) {
+      segmentStart = index;
+      continue;
+    }
+
+    const paceSeconds = (elapsedSeconds / segmentDistance) * SPLIT_DISTANCE_METERS;
+    if (
+      !Number.isFinite(paceSeconds) ||
+      paceSeconds < PROFILE_MIN_PACE_SECONDS ||
+      paceSeconds > PROFILE_MAX_PACE_SECONDS
+    ) {
+      segmentStart = index;
+      continue;
+    }
+
+    const cadenceWindow = smoothedCadence
+      .slice(segmentStart, index + 1)
+      .filter(
+        (value): value is number =>
+          Number.isFinite(value) &&
+          value >= PROFILE_MIN_CADENCE &&
+          value <= PROFILE_MAX_CADENCE
+      );
+    if (!cadenceWindow.length) {
+      segmentStart = index;
+      continue;
+    }
+
+    const averageCadence =
+      cadenceWindow.reduce((sum, value) => sum + value, 0) / cadenceWindow.length;
+    const cadenceBin = Math.round(averageCadence / PROFILE_BIN_SIZE) * PROFILE_BIN_SIZE;
+
+    const heartRateWindow = smoothedHeartrate
+      .slice(segmentStart, index + 1)
+      .filter((value): value is number => Number.isFinite(value) && value > 0);
+    const averageHeartRate = heartRateWindow.length
+      ? heartRateWindow.reduce((sum, value) => sum + value, 0) / heartRateWindow.length
+      : null;
+
+    paceSamples.push({
+      cadenceBin,
+      paceSeconds,
+      heartRate: averageHeartRate
+    });
+    segmentStart = index;
+  }
+
+  return paceSamples;
+}
+
 export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutId: number) {
   const result = await pool.query<{
-    average_speed: number | null;
-    average_heartrate: number | null;
+    distance_stream: number[] | null;
+    time_stream: number[] | null;
     heartrate_stream: number[] | null;
     cadence_stream: number[] | null;
   }>(
     `
       select
-        w.average_speed,
-        w.average_heartrate,
+        ws.distance_stream,
+        ws.time_stream,
         ws.heartrate_stream,
         ws.cadence_stream
       from workouts w
@@ -727,52 +812,29 @@ export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutI
   const allHeartRates: number[] = [];
 
   for (const row of result.rows) {
+    const distance = Array.isArray(row.distance_stream) ? row.distance_stream : [];
+    const time = Array.isArray(row.time_stream) ? row.time_stream : [];
     const heartrate = Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [];
     const cadence = Array.isArray(row.cadence_stream) ? row.cadence_stream : [];
-    const cadenceValues = cadence
-      .map((value) => normalizeCadenceValue(value))
-      .filter(
-        (value): value is number =>
-          Number.isFinite(value) &&
-          value >= PROFILE_MIN_CADENCE &&
-          value <= PROFILE_MAX_CADENCE
-      );
-    const averageCadence = cadenceValues.length
-      ? cadenceValues.reduce((sum, value) => sum + value, 0) / cadenceValues.length
-      : NaN;
-    const paceSeconds =
-      toFiniteNumber(row.average_speed, 0) > 0
-        ? SPLIT_DISTANCE_METERS / toFiniteNumber(row.average_speed, 0)
-        : NaN;
-    const heartRateValues = heartrate.filter(
-      (value): value is number => Number.isFinite(value) && value > 0
-    );
-    const averageHeartRate = heartRateValues.length
-      ? heartRateValues.reduce((sum, value) => sum + value, 0) / heartRateValues.length
-      : toFiniteNumber(row.average_heartrate, NaN);
+    const samples = collectProfileSamplesFromStreams({
+      distance,
+      time,
+      cadence,
+      heartrate
+    });
 
-    if (
-      !Number.isFinite(averageCadence) ||
-      averageCadence < PROFILE_MIN_CADENCE ||
-      averageCadence > PROFILE_MAX_CADENCE ||
-      !Number.isFinite(paceSeconds) ||
-      paceSeconds < PROFILE_MIN_PACE_SECONDS ||
-      paceSeconds > PROFILE_MAX_PACE_SECONDS
-    ) {
-      continue;
-    }
+    for (const sample of samples) {
+      const bucket = paceBuckets.get(sample.cadenceBin) ?? [];
+      bucket.push(sample.paceSeconds);
+      paceBuckets.set(sample.cadenceBin, bucket);
+      allPaces.push(sample.paceSeconds);
 
-    const cadenceBin = Math.round(averageCadence / PROFILE_BIN_SIZE) * PROFILE_BIN_SIZE;
-    const bucket = paceBuckets.get(cadenceBin) ?? [];
-    bucket.push(paceSeconds);
-    paceBuckets.set(cadenceBin, bucket);
-    allPaces.push(paceSeconds);
-
-    if (Number.isFinite(averageHeartRate) && averageHeartRate > 0) {
-      const heartBucket = heartRateBuckets.get(cadenceBin) ?? [];
-      heartBucket.push(averageHeartRate);
-      heartRateBuckets.set(cadenceBin, heartBucket);
-      allHeartRates.push(averageHeartRate);
+      if (sample.heartRate !== null && Number.isFinite(sample.heartRate) && sample.heartRate > 0) {
+        const heartBucket = heartRateBuckets.get(sample.cadenceBin) ?? [];
+        heartBucket.push(sample.heartRate);
+        heartRateBuckets.set(sample.cadenceBin, heartBucket);
+        allHeartRates.push(sample.heartRate);
+      }
     }
   }
 
