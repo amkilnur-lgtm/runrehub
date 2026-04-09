@@ -199,6 +199,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         ok: true;
         preview: {
           removedSegments: Array<{ removedDistanceMeters: number; removedTimeSeconds: number }>;
+          metadata: {
+            mode: "segment_cleanup" | "full_rebuild";
+            confidence: "medium" | "high";
+            reason: "catastrophic_gps_failure" | "profile_mismatch" | "segment_spikes";
+          };
           before: {
             distance_meters: number;
             moving_time_seconds: number;
@@ -216,9 +221,22 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         method: "POST"
       });
 
-      const { before, after, removedSegments } = preview.preview;
+      const { before, after, removedSegments, metadata } = preview.preview;
+      const modeLabel =
+        metadata.mode === "full_rebuild"
+          ? "Полная реконструкция дистанции"
+          : "Локальная очистка GPS-сегментов";
+      const reasonLabel =
+        metadata.reason === "catastrophic_gps_failure"
+          ? "обнаружен сильный сбой GPS"
+          : metadata.reason === "profile_mismatch"
+            ? "трек конфликтует с профилем спортсмена"
+            : "найдены аномальные GPS-скачки";
       const confirmed = window.confirm(
-        `Найдено ${removedSegments.length} аномальных сегментов.` +
+        `${modeLabel}.` +
+          `\nПричина: ${reasonLabel}` +
+          `\nУверенность: ${metadata.confidence === "high" ? "высокая" : "средняя"}` +
+          `\nЗатронуто сегментов: ${removedSegments.length}` +
           `\nДистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
           `\nВремя: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
           `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +

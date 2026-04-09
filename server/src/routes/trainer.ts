@@ -514,6 +514,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       ok: true,
       preview: {
         removedSegments: preview.removedSegments,
+        metadata: preview.metadata,
         before: {
           distance_meters: workout.distance_meters,
           moving_time_seconds: workout.moving_time_seconds,
