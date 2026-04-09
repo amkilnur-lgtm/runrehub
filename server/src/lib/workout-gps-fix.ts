@@ -178,7 +178,8 @@ const MIN_REALISTIC_SPLIT_PACE_SECONDS = 150;
 const MIN_STREAM_SPLIT_DISTANCE_METERS = 3000;
 const PROFILE_MIN_CADENCE = 110;
 const PROFILE_MAX_CADENCE = 220;
-const PROFILE_MIN_SEGMENT_SECONDS = 2;
+const PROFILE_TARGET_WINDOW_SECONDS = 5;
+const PROFILE_MIN_WINDOW_SECONDS = 3;
 const PROFILE_MAX_SEGMENT_SECONDS = 20;
 const PROFILE_MAX_SEGMENT_DISTANCE_METERS = 120;
 const PROFILE_MIN_PACE_SECONDS = 160;
@@ -359,9 +360,6 @@ function buildKilometerSplits(streams: CorrectedStreamsPayload) {
     const heartRates = splitIndices
       .map((index) => streams.heartrate[index])
       .filter((value) => Number.isFinite(value) && value > 0);
-    const altitude = splitIndices
-      .map((index) => streams.altitude[index])
-      .filter((value) => Number.isFinite(value));
 
     splits.push({
       id: lapIndex,
@@ -372,7 +370,7 @@ function buildKilometerSplits(streams: CorrectedStreamsPayload) {
       average_heartrate: heartRates.length
         ? heartRates.reduce((sum, value) => sum + value, 0) / heartRates.length
         : null,
-      elevation_gain: altitude.length ? computePositiveElevationGain(altitude) : null
+      elevation_gain: 0
     });
 
     lapIndex += 1;
@@ -399,7 +397,6 @@ function buildSyntheticEvenKilometerSplits(
   const averageHeartRate = validHeartRates.length
     ? validHeartRates.reduce((sum, value) => sum + value, 0) / validHeartRates.length
     : toFiniteNumber(workout.average_heartrate, NaN);
-  const totalElevationGain = Math.max(0, toFiniteNumber(workout.elevation_gain));
   const laps: CorrectedLapPayload[] = [];
   let assignedTimeSeconds = 0;
 
@@ -433,10 +430,7 @@ function buildSyntheticEvenKilometerSplits(
       elapsed_time_seconds: elapsedTimeSeconds,
       average_speed: elapsedTimeSeconds > 0 ? distanceMeters / elapsedTimeSeconds : null,
       average_heartrate: Number.isFinite(averageHeartRate) ? averageHeartRate : null,
-      elevation_gain:
-        totalElevationGain > 0
-          ? (totalElevationGain * distanceMeters) / totalDistanceMeters
-          : null
+      elevation_gain: 0
     });
   }
 
@@ -561,7 +555,7 @@ function estimatePaceFromProfile(
   const referenceHeartRate = chosenBin?.median_heartrate ?? profile.median_heartrate;
   if (Number.isFinite(usableHeartrate) && Number.isFinite(referenceHeartRate)) {
     const heartRateDelta = usableHeartrate - Number(referenceHeartRate);
-    const boundedAdjustment = Math.max(-0.12, Math.min(0.12, heartRateDelta / 80));
+    const boundedAdjustment = Math.max(-0.2, Math.min(0.2, heartRateDelta / 50));
     estimatedPaceSeconds *= 1 - boundedAdjustment;
   }
 
@@ -688,13 +682,40 @@ export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutI
     const cadence = Array.isArray(row.cadence_stream) ? row.cadence_stream : [];
     const size = Math.min(distance.length, time.length, cadence.length || time.length, heartrate.length || time.length);
 
-    for (let index = 1; index < size; index += 1) {
-      const dt = toFiniteNumber(time[index]) - toFiniteNumber(time[index - 1]);
-      const dd = toFiniteNumber(distance[index]) - toFiniteNumber(distance[index - 1]);
-      const cadenceValue = normalizeCadenceValue(cadence[index]);
-      const heartRateValue = toFiniteNumber(heartrate[index], NaN);
+    for (let startIndex = 0; startIndex < size - 1; ) {
+      let endIndex = startIndex + 1;
+      while (
+        endIndex < size - 1 &&
+        toFiniteNumber(time[endIndex]) - toFiniteNumber(time[startIndex]) < PROFILE_TARGET_WINDOW_SECONDS
+      ) {
+        endIndex += 1;
+      }
+
+      const dt = toFiniteNumber(time[endIndex]) - toFiniteNumber(time[startIndex]);
+      const dd = toFiniteNumber(distance[endIndex]) - toFiniteNumber(distance[startIndex]);
+      const cadenceSlice: number[] = [];
+      const heartRateSlice: number[] = [];
+
+      for (let index = startIndex + 1; index <= endIndex; index += 1) {
+        const cadenceValue = normalizeCadenceValue(cadence[index]);
+        if (Number.isFinite(cadenceValue) && cadenceValue > 0) {
+          cadenceSlice.push(cadenceValue);
+        }
+
+        const heartRateValue = toFiniteNumber(heartrate[index], NaN);
+        if (Number.isFinite(heartRateValue) && heartRateValue > 0) {
+          heartRateSlice.push(heartRateValue);
+        }
+      }
+
+      const cadenceValue = cadenceSlice.length
+        ? cadenceSlice.reduce((sum, value) => sum + value, 0) / cadenceSlice.length
+        : NaN;
+      const heartRateValue = heartRateSlice.length
+        ? heartRateSlice.reduce((sum, value) => sum + value, 0) / heartRateSlice.length
+        : NaN;
       if (
-        dt < PROFILE_MIN_SEGMENT_SECONDS ||
+        dt < PROFILE_MIN_WINDOW_SECONDS ||
         dt > PROFILE_MAX_SEGMENT_SECONDS ||
         dd <= 0 ||
         dd > PROFILE_MAX_SEGMENT_DISTANCE_METERS ||
@@ -726,6 +747,8 @@ export async function buildAthleteCadenceProfile(userId: number, excludeWorkoutI
         heartRateBuckets.set(cadenceBin, heartBucket);
         allHeartRates.push(heartRateValue);
       }
+
+      startIndex = Math.max(startIndex + 1, endIndex);
     }
   }
 
@@ -949,7 +972,7 @@ function rebuildCorrectedLaps(
       average_heartrate: lapHeartRateValues.length
         ? lapHeartRateValues.reduce((sum, value) => sum + value, 0) / lapHeartRateValues.length
         : null,
-      elevation_gain: lapAltitudeValues.length ? computePositiveElevationGain(lapAltitudeValues) : null
+      elevation_gain: 0
     });
   }
 
@@ -1152,9 +1175,7 @@ export function buildGpsFixPreview(
             distance_meters: correctedDistanceMeters,
             moving_time_seconds: correctedMovingTimeSeconds,
             elapsed_time_seconds: correctedMovingTimeSeconds,
-            elevation_gain: correctedStreams.altitude.length
-              ? computePositiveElevationGain(correctedStreams.altitude)
-              : workout.elevation_gain,
+            elevation_gain: 0,
             average_speed:
               correctedMovingTimeSeconds > 0
                 ? correctedDistanceMeters / correctedMovingTimeSeconds
@@ -1206,8 +1227,8 @@ export function buildGpsFixPreview(
       moving_time_seconds: correctedMovingTimeSeconds,
       elapsed_time_seconds: correctedMovingTimeSeconds,
       elevation_gain: correctedStreams.altitude.length
-        ? computePositiveElevationGain(correctedStreams.altitude)
-        : workout.elevation_gain,
+        ? 0
+        : 0,
       average_speed:
         correctedMovingTimeSeconds > 0
           ? correctedDistanceMeters / correctedMovingTimeSeconds
@@ -1278,7 +1299,7 @@ export function buildManualDistancePreview(
       elapsed_time_seconds: Math.round(
         toFiniteNumber(workout.elapsed_time_seconds, movingTimeSeconds)
       ),
-      elevation_gain: toFiniteNumber(workout.elevation_gain),
+      elevation_gain: 0,
       average_speed: movingTimeSeconds > 0 ? targetDistanceMeters / movingTimeSeconds : null,
       average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
       max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
@@ -1352,7 +1373,7 @@ export function buildManualTimePreview(
       elapsed_time_seconds: Math.round(
         toFiniteNumber(workout.elapsed_time_seconds, currentMovingTimeSeconds) * scaleFactor
       ),
-      elevation_gain: toFiniteNumber(workout.elevation_gain),
+      elevation_gain: 0,
       average_speed: targetMovingTimeSeconds > 0 ? currentDistanceMeters / targetMovingTimeSeconds : null,
       average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
       max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : workout.max_heartrate
