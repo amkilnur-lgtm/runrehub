@@ -96,6 +96,14 @@ type CorrectedLapPayload = {
 
 type GpsFixPreview = {
   removedSegments: RemovedSegment[];
+  metadata: {
+    mode: "segment_cleanup" | "full_rebuild";
+    confidence: "medium" | "high";
+    reason:
+      | "catastrophic_gps_failure"
+      | "profile_mismatch"
+      | "segment_spikes";
+  };
   correctedWorkout: {
     distance_meters: number;
     moving_time_seconds: number;
@@ -195,6 +203,11 @@ const PROFILE_ABSURD_PACE_OVERRIDE_SECONDS = 120;
 const PROFILE_ABSURD_SPEED_OVERRIDE_MPS = 10;
 const HALF_CADENCE_MIN = 55;
 const HALF_CADENCE_MAX = 110;
+const MAX_GPS_DISTANCE_DISAGREEMENT_RATIO = 0.55;
+const MIN_GPS_DISTANCE_DISAGREEMENT_METERS = 35;
+const CATASTROPHIC_FAILURE_SCORE = 0.58;
+const CATASTROPHIC_LONGEST_RUN_RATIO = 0.1;
+const PROFILE_REBUILD_SMOOTHING_ALPHA = 0.35;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -268,6 +281,31 @@ function median(values: number[]) {
   }
 
   return sorted[middle]!;
+}
+
+function rollingMedian(values: number[], radius: number) {
+  if (radius <= 0 || values.length <= 2) {
+    return [...values];
+  }
+
+  return values.map((value, index) => {
+    if (!Number.isFinite(value)) {
+      return value;
+    }
+
+    const windowValues: number[] = [];
+    const start = Math.max(0, index - radius);
+    const end = Math.min(values.length - 1, index + radius);
+
+    for (let cursor = start; cursor <= end; cursor += 1) {
+      const candidate = values[cursor];
+      if (Number.isFinite(candidate)) {
+        windowValues.push(candidate);
+      }
+    }
+
+    return median(windowValues) ?? value;
+  });
 }
 
 function interpolateValue(
@@ -553,7 +591,7 @@ function estimatePaceFromProfile(
   const referenceHeartRate = chosenBin?.median_heartrate ?? profile.median_heartrate;
   if (Number.isFinite(usableHeartrate) && Number.isFinite(referenceHeartRate)) {
     const heartRateDelta = usableHeartrate - Number(referenceHeartRate);
-    const boundedAdjustment = Math.max(-0.2, Math.min(0.2, heartRateDelta / 50));
+    const boundedAdjustment = Math.max(-0.12, Math.min(0.12, heartRateDelta / 80));
     estimatedPaceSeconds *= 1 - boundedAdjustment;
   }
 
@@ -585,16 +623,24 @@ function rebuildStreamsFromAthleteProfile(
   const correctedAltitude: number[] = [];
   const correctedVelocity: number[] = [];
   const correctedLatLng: [number, number][] = [];
+  const smoothedCadence = rollingMedian(
+    streams.cadence.map((value) => normalizeCadenceValue(toFiniteNumber(value, NaN))),
+    2
+  );
+  const smoothedHeartrate = rollingMedian(
+    streams.heartrate.map((value) => toFiniteNumber(value, NaN)),
+    2
+  );
 
   let cumulativeDistance = 0;
+  let previousEstimatedSpeed: number | null = null;
 
   for (let index = 0; index < size; index += 1) {
     const currentTime = Math.max(0, toFiniteNumber(streams.time[index]));
     const previousTime = index > 0 ? Math.max(0, toFiniteNumber(streams.time[index - 1])) : 0;
     const dt = index > 0 ? Math.max(0, currentTime - previousTime) : 0;
-    const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
-    const normalizedCadence = normalizeCadenceValue(cadenceValue);
-    const heartRateValue = toFiniteNumber(streams.heartrate[index], NaN);
+    const normalizedCadence = smoothedCadence[index] ?? NaN;
+    const heartRateValue = smoothedHeartrate[index] ?? NaN;
     const estimatedPaceSeconds = estimatePaceFromProfile(profile, normalizedCadence, heartRateValue);
     const fallbackPaceSeconds =
       profile.median_pace_seconds_per_km ??
@@ -602,7 +648,12 @@ function rebuildStreamsFromAthleteProfile(
         ? SPLIT_DISTANCE_METERS / toFiniteNumber(workout.average_speed, 0)
         : 360);
     const selectedPaceSeconds = estimatedPaceSeconds ?? fallbackPaceSeconds;
-    const estimatedSpeed = selectedPaceSeconds > 0 ? SPLIT_DISTANCE_METERS / selectedPaceSeconds : 0;
+    const rawEstimatedSpeed = selectedPaceSeconds > 0 ? SPLIT_DISTANCE_METERS / selectedPaceSeconds : 0;
+    const estimatedSpeed: number =
+      previousEstimatedSpeed === null
+        ? rawEstimatedSpeed
+        : previousEstimatedSpeed +
+          (rawEstimatedSpeed - previousEstimatedSpeed) * PROFILE_REBUILD_SMOOTHING_ALPHA;
 
     if (index > 0 && dt > 0) {
       cumulativeDistance += estimatedSpeed * dt;
@@ -619,6 +670,8 @@ function rebuildStreamsFromAthleteProfile(
     if (Array.isArray(latLngPoint) && latLngPoint.length >= 2) {
       correctedLatLng.push([latLngPoint[0], latLngPoint[1]]);
     }
+
+    previousEstimatedSpeed = estimatedSpeed > 0 ? estimatedSpeed : previousEstimatedSpeed;
   }
 
   const normalizedLatLng = correctedLatLng.filter(
@@ -807,6 +860,27 @@ function buildSegments(suspectSteps: number[], distance: number[], time: number[
   return segments;
 }
 
+function getLongestConsecutiveSuspectRun(suspectSteps: number[]) {
+  if (!suspectSteps.length) {
+    return 0;
+  }
+
+  let longest = 1;
+  let current = 1;
+
+  for (let index = 1; index < suspectSteps.length; index += 1) {
+    if (suspectSteps[index]! - suspectSteps[index - 1]! <= MAX_SUSPECT_GAP + 1) {
+      current += 1;
+      longest = Math.max(longest, current);
+      continue;
+    }
+
+    current = 1;
+  }
+
+  return longest;
+}
+
 function createKeepMask(length: number, removedSegments: RemovedSegment[]) {
   const keepMask = Array.from({ length }, () => true);
 
@@ -981,6 +1055,8 @@ export function buildGpsFixPreview(
     workoutAverageSpeed > 0 ? SPLIT_DISTANCE_METERS / workoutAverageSpeed : null;
   let profileComparableSamples = 0;
   let profileMismatchSamples = 0;
+  let gpsDisagreementSamples = 0;
+  let rawAnomalySamples = 0;
   const hrHighThreshold = (() => {
     const maxHr = toFiniteNumber(workout.max_heartrate, 0);
     if (maxHr > 0) {
@@ -1011,6 +1087,9 @@ export function buildGpsFixPreview(
     }
 
     const geoSpeed = geoDistance / dt;
+    const gpsDistanceDisagreement =
+      Math.abs(distanceDelta - geoDistance) /
+      Math.max(distanceDelta, geoDistance, 1);
     const distanceJump = distanceDelta > MAX_STEP_DISTANCE_METERS && dt < 12;
     const geoJump = geoDistance > MAX_STEP_GEO_DISTANCE_METERS && dt < 12;
     const cadenceValue = toFiniteNumber(streams.cadence[index], NaN);
@@ -1067,10 +1146,22 @@ export function buildGpsFixPreview(
       geoSpeed > MAX_GEO_SPEED_MPS + 1.4 ||
       distanceDelta > MAX_STEP_DISTANCE_METERS * 1.8 ||
       geoDistance > MAX_STEP_GEO_DISTANCE_METERS * 1.8;
+    const gpsSourcesConflict =
+      Math.abs(distanceDelta - geoDistance) > MIN_GPS_DISTANCE_DISAGREEMENT_METERS &&
+      gpsDistanceDisagreement >= MAX_GPS_DISTANCE_DISAGREEMENT_RATIO;
+
+    if (gpsSourcesConflict) {
+      gpsDisagreementSamples += 1;
+    }
+
+    if (distanceJump || geoJump || strongRawSignal) {
+      rawAnomalySamples += 1;
+    }
 
     if (
       distanceJump ||
       geoJump ||
+      gpsSourcesConflict ||
       strongRawSignal ||
       strongProfileMismatch ||
       (hasUsableAthleteProfile && profileMismatch) ||
@@ -1083,9 +1174,28 @@ export function buildGpsFixPreview(
     }
   }
 
+  const suspectRatio = suspectSteps.length / Math.max(size - 1, 1);
+  const rawAnomalyRatio = rawAnomalySamples / Math.max(size - 1, 1);
+  const gpsDisagreementRatio = gpsDisagreementSamples / Math.max(size - 1, 1);
+  const profileMismatchRatio =
+    profileComparableSamples > 0 ? profileMismatchSamples / profileComparableSamples : 0;
+  const longestSuspectRunRatio =
+    getLongestConsecutiveSuspectRun(suspectSteps) / Math.max(size - 1, 1);
+  const catastrophicFailureScore =
+    rawAnomalyRatio * 0.38 +
+    gpsDisagreementRatio * 0.24 +
+    suspectRatio * 0.2 +
+    profileMismatchRatio * 0.18;
+  const hasCatastrophicGpsFailure =
+    rawAnomalyRatio >= 0.16 ||
+    gpsDisagreementRatio >= 0.18 ||
+    longestSuspectRunRatio >= CATASTROPHIC_LONGEST_RUN_RATIO ||
+    catastrophicFailureScore >= CATASTROPHIC_FAILURE_SCORE;
+
   const shouldRebuildWholeWorkoutFromProfile =
     hasUsableAthleteProfile &&
     (
+      hasCatastrophicGpsFailure ||
       (
         workoutAveragePaceSeconds !== null &&
         (
@@ -1142,6 +1252,11 @@ export function buildGpsFixPreview(
               peakSpeedMetersPerSecond: toFiniteNumber(workout.average_speed)
             }
           ],
+          metadata: {
+            mode: "full_rebuild",
+            confidence: hasCatastrophicGpsFailure ? "high" : "medium",
+            reason: hasCatastrophicGpsFailure ? "catastrophic_gps_failure" : "profile_mismatch"
+          },
           correctedWorkout: {
             distance_meters: correctedDistanceMeters,
             moving_time_seconds: correctedMovingTimeSeconds,
@@ -1193,6 +1308,11 @@ export function buildGpsFixPreview(
 
   return {
     removedSegments,
+    metadata: {
+      mode: "segment_cleanup",
+      confidence: removedSegments.length >= 2 || suspectRatio >= 0.08 ? "high" : "medium",
+      reason: "segment_spikes"
+    },
     correctedWorkout: {
       distance_meters: correctedDistanceMeters,
       moving_time_seconds: correctedMovingTimeSeconds,
