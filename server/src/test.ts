@@ -11,6 +11,7 @@ process.env.STRAVA_TOKEN_ENCRYPTION_KEY ??= "test-encryption-key-1234567890";
 const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
 const dbModule = await import("./lib/db.js");
+const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 
 async function runTest(name: string, fn: () => void | Promise<void>) {
   try {
@@ -95,6 +96,18 @@ await runTest("syncLatestActivities returns already_running when advisory lock i
   } finally {
     queryMock.mock.restore();
   }
+});
+
+await runTest("weekly telegram report week start switches after Sunday 20:00 UTC+5", () => {
+  const beforeSend = telegramNotificationsModule.getLatestEligibleWeeklyReportWeekStart(
+    new Date("2026-04-12T14:59:00.000Z")
+  );
+  const afterSend = telegramNotificationsModule.getLatestEligibleWeeklyReportWeekStart(
+    new Date("2026-04-12T15:01:00.000Z")
+  );
+
+  assert.equal(beforeSend.toISOString(), "2026-03-29T19:00:00.000Z");
+  assert.equal(afterSend.toISOString(), "2026-04-05T19:00:00.000Z");
 });
 
 console.log("All server tests passed.");
