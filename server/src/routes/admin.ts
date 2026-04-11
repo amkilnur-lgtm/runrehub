@@ -5,7 +5,11 @@ import { hashPassword, requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import { isTelegramConfigured } from "../lib/telegram.js";
-import { sendTelegramTestMessage } from "../lib/telegram-notifications.js";
+import {
+  getWeeklyReportWeekStartForDate,
+  sendTelegramTestMessage,
+  sendWeeklyTelegramTestMessages
+} from "../lib/telegram-notifications.js";
 
 const createUserSchema = z.object({
   username: z.string().min(3),
@@ -22,6 +26,10 @@ const stravaEventsQuerySchema = z.object({
 const updateTrainerTelegramSchema = z.object({
   chatId: z.string().trim().max(128).nullable(),
   notificationsEnabled: z.boolean()
+});
+
+const weeklyTelegramTestSchema = z.object({
+  weekDate: z.string().trim().min(10).max(32)
 });
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -179,4 +187,48 @@ export async function adminRoutes(app: FastifyInstance) {
     await sendTelegramTestMessage(trainer.telegram_chat_id, trainer.full_name);
     return { ok: true };
   });
+
+  app.post(
+    "/api/admin/trainers/:id/telegram/weekly-test",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      requireRole(request, ["admin"]);
+
+      if (!isTelegramConfigured()) {
+        return reply.code(400).send({ message: "Telegram bot is not configured" });
+      }
+
+      const params = request.params as { id: string };
+      const trainerId = parseInt(params.id, 10);
+      const body = weeklyTelegramTestSchema.parse(request.body);
+
+      try {
+        const result = await sendWeeklyTelegramTestMessages(trainerId, body.weekDate);
+        return {
+          ok: true,
+          weekStart: result.reportWeekStart,
+          sent: result.sent,
+          skipped: result.skipped
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+
+        if (message === "TRAINER_NOT_FOUND") {
+          return reply.code(404).send({ message: "Trainer not found" });
+        }
+
+        if (message === "TELEGRAM_CHAT_ID_EMPTY") {
+          return reply.code(400).send({ message: "Telegram chat id is empty" });
+        }
+
+        if (message === "INVALID_REPORT_WEEK_START") {
+          return reply.code(400).send({
+            message: `Invalid week date. Resolved week start: ${getWeeklyReportWeekStartForDate(new Date())}`
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
 }
