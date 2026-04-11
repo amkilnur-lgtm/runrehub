@@ -53,6 +53,14 @@ function formatLogLine(entry: StravaEvent) {
   return `${prefix} ${entry.message}${details}`;
 }
 
+function getTodayDateInputValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
@@ -74,6 +82,8 @@ export function AdminPage() {
   >({});
   const [savingTrainerId, setSavingTrainerId] = useState<number | null>(null);
   const [testingTrainerId, setTestingTrainerId] = useState<number | null>(null);
+  const [weeklyTestingTrainerId, setWeeklyTestingTrainerId] = useState<number | null>(null);
+  const [weeklyWeekDates, setWeeklyWeekDates] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
@@ -87,6 +97,16 @@ export function AdminPage() {
     );
 
     setTelegramDrafts(nextDrafts);
+  }, [telegramApi.data]);
+
+  useEffect(() => {
+    setWeeklyWeekDates((current) => {
+      const next = { ...current };
+      for (const trainer of telegramApi.data?.trainers ?? []) {
+        next[trainer.id] ||= getTodayDateInputValue();
+      }
+      return next;
+    });
   }, [telegramApi.data]);
 
   async function onSubmit(event: FormEvent) {
@@ -159,6 +179,31 @@ export function AdminPage() {
       alert(`Ошибка тестового сообщения: ${err.message}`);
     } finally {
       setTestingTrainerId(null);
+    }
+  }
+
+  async function sendWeeklyTelegramTest(trainerId: number) {
+    const weekDate = weeklyWeekDates[trainerId] ?? getTodayDateInputValue();
+    setWeeklyTestingTrainerId(trainerId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        weekStart: string;
+        sent: number;
+        skipped: number;
+      }>(`/api/admin/trainers/${trainerId}/telegram/weekly-test`, {
+        method: "POST",
+        body: JSON.stringify({ weekDate })
+      });
+      alert(
+        `Weekly report отправлен.\nНеделя: ${result.weekStart}\nОтправлено: ${result.sent}\nПропущено без тренировок: ${result.skipped}`
+      );
+      eventsApi.refresh();
+      telegramApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка weekly report: ${err.message}`);
+    } finally {
+      setWeeklyTestingTrainerId(null);
     }
   }
 
@@ -286,6 +331,29 @@ export function AdminPage() {
                     disabled={testingTrainerId === trainer.id || !draft.chatId.trim()}
                   >
                     {testingTrainerId === trainer.id ? "Отправляю..." : "Тест"}
+                  </button>
+                </div>
+                <div className="admin-telegram-actions">
+                  <label className="admin-telegram-field" style={{ marginBottom: 0 }}>
+                    Дата недели
+                    <input
+                      type="date"
+                      value={weeklyWeekDates[trainer.id] ?? getTodayDateInputValue()}
+                      onChange={(event) =>
+                        setWeeklyWeekDates((current) => ({
+                          ...current,
+                          [trainer.id]: event.target.value
+                        }))
+                      }
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => sendWeeklyTelegramTest(trainer.id)}
+                    disabled={weeklyTestingTrainerId === trainer.id || !draft.chatId.trim()}
+                  >
+                    {weeklyTestingTrainerId === trainer.id ? "Отправляю weekly..." : "Weekly test"}
                   </button>
                 </div>
               </div>
