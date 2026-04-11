@@ -97,6 +97,41 @@ function isRunningActivity(activity: Pick<StravaActivity, "sport_type">) {
   return RUN_SPORT_TYPES.has(normalizedSportType);
 }
 
+export async function markStravaActivityDeleted(userId: number, stravaActivityId: number) {
+  await pool.query(
+    `
+      insert into deleted_strava_activities (user_id, strava_activity_id)
+      values ($1, $2)
+      on conflict (user_id, strava_activity_id) do update
+      set deleted_at = now()
+    `,
+    [userId, stravaActivityId]
+  );
+}
+
+async function filterOutDeletedActivities(userId: number, activities: StravaActivity[]) {
+  if (!activities.length) {
+    return activities;
+  }
+
+  const { rows } = await pool.query<{ strava_activity_id: string | number }>(
+    `
+      select strava_activity_id
+      from deleted_strava_activities
+      where user_id = $1
+        and strava_activity_id = any($2::bigint[])
+    `,
+    [userId, activities.map((activity) => activity.id)]
+  );
+
+  if (!rows.length) {
+    return activities;
+  }
+
+  const deletedIds = new Set(rows.map((row) => Number(row.strava_activity_id)));
+  return activities.filter((activity) => !deletedIds.has(activity.id));
+}
+
 export function getTokenEncryptionKey() {
   if (!config.STRAVA_TOKEN_ENCRYPTION_KEY) {
     return null;
@@ -771,7 +806,8 @@ export async function syncLatestActivities(userId: number): Promise<SyncLatestAc
 
     const activities = (await activityResponse.json()) as StravaActivity[];
     const runningActivities = activities.filter(isRunningActivity);
-    for (const activity of runningActivities) {
+    const importableActivities = await filterOutDeletedActivities(userId, runningActivities);
+    for (const activity of importableActivities) {
       await syncSingleActivity(userId, token, activity);
     }
 
@@ -780,7 +816,7 @@ export async function syncLatestActivities(userId: number): Promise<SyncLatestAc
 
     return {
       synced: true,
-      imported: runningActivities.length,
+      imported: importableActivities.length,
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString()
     };

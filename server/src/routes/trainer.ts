@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
-import { ensureActivityStreams } from "../lib/strava.js";
+import { ensureActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
 import {
   applyWorkoutCorrectionToView,
   buildAthleteCadenceProfile,
@@ -400,6 +400,31 @@ export async function trainerRoutes(app: FastifyInstance) {
     requireRole(request, ["trainer"]);
     const params = request.params as { id: string };
     const workoutId = Number(params.id);
+
+    const existingWorkoutResult = await pool.query(
+      `
+        select w.user_id, w.strava_activity_id
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1
+          and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+    const existingWorkout = existingWorkoutResult.rows[0] as
+      | { user_id: number; strava_activity_id: number | null }
+      | undefined;
+
+    if (!existingWorkout) {
+      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+    }
+
+    if (existingWorkout.strava_activity_id) {
+      await markStravaActivityDeleted(
+        Number(existingWorkout.user_id),
+        Number(existingWorkout.strava_activity_id)
+      );
+    }
 
     const { rowCount } = await pool.query(
       `
