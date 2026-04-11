@@ -230,6 +230,28 @@ async function claimPendingJob() {
 
     const { rows } = await client.query<PendingTelegramJob>(
       `
+        with candidate_job as (
+          select
+            job.id,
+            job.kind,
+            job.workout_id,
+            job.coach_user_id,
+            job.athlete_user_id,
+            job.report_week_start
+          from telegram_notification_jobs job
+          where (
+            job.status = 'pending'
+            or (job.status = 'failed' and job.attempts < $1)
+            or (
+              job.status = 'processing'
+              and job.attempts < $1
+              and job.updated_at < now() - interval '10 minutes'
+            )
+          )
+          order by job.created_at asc
+          limit 1
+          for update skip locked
+        )
         select
           job.id,
           job.kind,
@@ -242,29 +264,17 @@ async function claimPendingJob() {
           workout.distance_meters,
           workout.average_speed,
           workout.average_heartrate
-        from telegram_notification_jobs job
+        from candidate_job job
         join users coach on coach.id = job.coach_user_id
         left join workouts workout on workout.id = job.workout_id
         left join users workout_athlete on workout_athlete.id = workout.user_id
         left join users report_athlete on report_athlete.id = job.athlete_user_id
-        where (
-          job.status = 'pending'
-          or (job.status = 'failed' and job.attempts < $1)
-          or (
-            job.status = 'processing'
-            and job.attempts < $1
-            and job.updated_at < now() - interval '10 minutes'
-          )
-        )
-          and coach.telegram_notifications_enabled = true
+        where coach.telegram_notifications_enabled = true
           and nullif(trim(coach.telegram_chat_id), '') is not null
           and (
             (job.kind = 'new_workout' and workout.id is not null)
             or (job.kind = 'weekly_report' and report_athlete.id is not null and job.report_week_start is not null)
           )
-        order by job.created_at asc
-        limit 1
-        for update skip locked
       `,
       [MAX_TELEGRAM_ATTEMPTS]
     );
