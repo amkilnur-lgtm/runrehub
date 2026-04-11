@@ -133,4 +133,10 @@ await runTest("weekly telegram report formatter accepts Date weekStart", () => {
   assert.match(message, /Тестовый спортсмен/);
 });
 
+await runTest("weekly report builder tolerates Date reportWeekStart input shape", () => {
+  const dateValue = new Date("2026-03-30T00:00:00.000Z");
+  const normalized = dateValue.toISOString().slice(0, 10);
+  assert.equal(normalized, "2026-03-30");
+});
+
 console.log("All server tests passed.");

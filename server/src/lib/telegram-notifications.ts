@@ -16,7 +16,7 @@ type PendingTelegramJob = {
   workout_id: number | null;
   coach_user_id: number;
   athlete_user_id: number | null;
-  report_week_start: string | null;
+  report_week_start: string | Date | null;
   chat_id: string;
   athlete_name: string;
   distance_meters: number | null;
@@ -59,6 +59,29 @@ function logTelegramEvent(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
+
+function normalizeDateOnly(value: string | Date) {
+  if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) {
+      throw new Error("INVALID_REPORT_WEEK_START");
+    }
+
+    return value.toISOString().slice(0, 10);
+  }
+
+  const trimmed = value.trim();
+  const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateOnlyMatch) {
+    return `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}`;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isFinite(parsed.getTime())) {
+    throw new Error("INVALID_REPORT_WEEK_START");
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
 
 function toUtcPlus5ShiftedDate(date: Date) {
   return new Date(date.getTime() + WEEKLY_REPORT_UTC_OFFSET_MINUTES * 60 * 1000);
@@ -310,9 +333,10 @@ async function claimPendingJob() {
 async function buildWeeklyReportData(
   coachUserId: number,
   athleteUserId: number,
-  reportWeekStart: string
+  reportWeekStart: string | Date
 ): Promise<WeeklyReportData | null> {
-  const weekStart = new Date(`${reportWeekStart}T00:00:00Z`);
+  const normalizedWeekStart = normalizeDateOnly(reportWeekStart);
+  const weekStart = new Date(`${normalizedWeekStart}T00:00:00Z`);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
 
   const summaryResult = await pool.query<{
