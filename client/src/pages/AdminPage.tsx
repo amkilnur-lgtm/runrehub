@@ -35,6 +35,29 @@ type StravaEvent = {
   details?: Record<string, unknown>;
 };
 
+type WeeklyPreviewItem = {
+  athleteUserId: number;
+  athleteName: string;
+  workoutCount: number;
+  totalDistanceMeters: number;
+  totalMovingTimeSeconds: number;
+  averageSpeed: number | null;
+  averageHeartrate: number | null;
+  zonePercentages: {
+    under130: number;
+    from130To150: number;
+    from150To162: number;
+    from162Plus: number;
+  };
+};
+
+type WeeklyPreviewState = {
+  weekStart: string;
+  skipped: number;
+  trainerHasChatId: boolean;
+  reports: WeeklyPreviewItem[];
+};
+
 function formatEventTime(value: string) {
   return new Date(value).toLocaleString("ru-RU", {
     day: "2-digit",
@@ -47,9 +70,8 @@ function formatEventTime(value: string) {
 
 function formatLogLine(entry: StravaEvent) {
   const prefix = `[${formatEventTime(entry.timestamp)}] [${entry.source.toUpperCase()}] [${entry.level.toUpperCase()}]`;
-  const details = entry.details && Object.keys(entry.details).length > 0
-    ? ` ${JSON.stringify(entry.details)}`
-    : "";
+  const details =
+    entry.details && Object.keys(entry.details).length > 0 ? ` ${JSON.stringify(entry.details)}` : "";
   return `${prefix} ${entry.message}${details}`;
 }
 
@@ -59,6 +81,42 @@ function getTodayDateInputValue() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatDistanceKm(distanceMeters: number) {
+  return `${(distanceMeters / 1000).toFixed(2)} км`;
+}
+
+function formatDuration(seconds: number) {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function formatPace(averageSpeed: number | null) {
+  if (!averageSpeed || !Number.isFinite(averageSpeed) || averageSpeed <= 0) {
+    return "—";
+  }
+
+  const totalSeconds = Math.round(1000 / averageSpeed);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}/км`;
+}
+
+function formatHeartRate(averageHeartrate: number | null) {
+  if (!averageHeartrate || !Number.isFinite(averageHeartrate)) {
+    return "—";
+  }
+
+  return `${Math.round(averageHeartrate)} уд/мин`;
 }
 
 export function AdminPage() {
@@ -82,8 +140,10 @@ export function AdminPage() {
   >({});
   const [savingTrainerId, setSavingTrainerId] = useState<number | null>(null);
   const [testingTrainerId, setTestingTrainerId] = useState<number | null>(null);
+  const [previewingTrainerId, setPreviewingTrainerId] = useState<number | null>(null);
   const [weeklyTestingTrainerId, setWeeklyTestingTrainerId] = useState<number | null>(null);
   const [weeklyWeekDates, setWeeklyWeekDates] = useState<Record<number, string>>({});
+  const [weeklyPreviews, setWeeklyPreviews] = useState<Record<number, WeeklyPreviewState>>({});
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
@@ -95,7 +155,6 @@ export function AdminPage() {
         }
       ])
     );
-
     setTelegramDrafts(nextDrafts);
   }, [telegramApi.data]);
 
@@ -136,6 +195,7 @@ export function AdminPage() {
     if (!window.confirm(`Вы уверены, что хотите удалить пользователя @${username}? Это необратимо.`)) {
       return;
     }
+
     try {
       await api(`/api/admin/users/${id}`, { method: "DELETE" });
       usersApi.refresh();
@@ -182,6 +242,37 @@ export function AdminPage() {
     }
   }
 
+  async function previewWeeklyTelegramTest(trainerId: number) {
+    const weekDate = weeklyWeekDates[trainerId] ?? getTodayDateInputValue();
+    setPreviewingTrainerId(trainerId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        weekStart: string;
+        skipped: number;
+        trainerHasChatId: boolean;
+        reports: WeeklyPreviewItem[];
+      }>(`/api/admin/trainers/${trainerId}/telegram/weekly-preview`, {
+        method: "POST",
+        body: JSON.stringify({ weekDate })
+      });
+
+      setWeeklyPreviews((current) => ({
+        ...current,
+        [trainerId]: {
+          weekStart: result.weekStart,
+          skipped: result.skipped,
+          trainerHasChatId: result.trainerHasChatId,
+          reports: result.reports
+        }
+      }));
+    } catch (err: any) {
+      alert(`Ошибка preview weekly report: ${err.message}`);
+    } finally {
+      setPreviewingTrainerId(null);
+    }
+  }
+
   async function sendWeeklyTelegramTest(trainerId: number) {
     const weekDate = weeklyWeekDates[trainerId] ?? getTodayDateInputValue();
     setWeeklyTestingTrainerId(trainerId);
@@ -220,7 +311,8 @@ export function AdminPage() {
           <div>
             <h2>Strava Логи</h2>
             <p className="muted">
-              Последние серверные события webhook и cron. Используй обновление, чтобы увидеть новые срабатывания.
+              Последние серверные события webhook и cron. Обновляй список, чтобы видеть новые
+              срабатывания.
             </p>
           </div>
           <button type="button" className="ghost-button" onClick={eventsApi.refresh}>
@@ -232,7 +324,7 @@ export function AdminPage() {
           {eventsApi.loading ? <div className="muted">Загрузка логов...</div> : null}
           {eventsApi.error ? <div className="error-box">{eventsApi.error}</div> : null}
           {!eventsApi.loading && !eventsApi.error && events.length === 0 ? (
-            <div className="muted">Пока нет событий. Логи начнут появляться после webhook или cron-тиков.</div>
+            <div className="muted">Пока нет событий. Логи появятся после webhook или cron-тиков.</div>
           ) : null}
           {!eventsApi.loading && !eventsApi.error && events.length > 0 ? (
             <textarea className="admin-log-output" value={logText} readOnly spellCheck={false} />
@@ -245,7 +337,8 @@ export function AdminPage() {
           <div>
             <h2>Telegram тренеров</h2>
             <p className="muted">
-              Здесь можно задать chat id, включить уведомления о новых пробежках и отправить тест.
+              Здесь можно задать chat id, включить уведомления, проверить обычный тест и посмотреть
+              preview недельного отчета перед отправкой.
             </p>
           </div>
           <button type="button" className="ghost-button" onClick={telegramApi.refresh}>
@@ -255,8 +348,8 @@ export function AdminPage() {
 
         {telegramApi.data && !telegramApi.data.configured ? (
           <div className="admin-telegram-hint">
-            Telegram bot не настроен на сервере. Добавь <code>TELEGRAM_BOT_TOKEN</code> в
-            окружение, чтобы включить отправку.
+            Telegram bot не настроен на сервере. Добавь <code>TELEGRAM_BOT_TOKEN</code> в окружение,
+            чтобы включить отправку.
           </div>
         ) : null}
 
@@ -268,6 +361,7 @@ export function AdminPage() {
               chatId: trainer.telegram_chat_id ?? "",
               notificationsEnabled: trainer.telegram_notifications_enabled
             };
+            const weeklyPreview = weeklyPreviews[trainer.id];
 
             return (
               <div key={trainer.id} className="admin-telegram-row inset-card">
@@ -333,6 +427,7 @@ export function AdminPage() {
                     {testingTrainerId === trainer.id ? "Отправляю..." : "Тест"}
                   </button>
                 </div>
+
                 <div className="admin-telegram-actions">
                   <label className="admin-telegram-field" style={{ marginBottom: 0 }}>
                     Дата недели
@@ -350,12 +445,58 @@ export function AdminPage() {
                   <button
                     type="button"
                     className="ghost-button"
+                    onClick={() => previewWeeklyTelegramTest(trainer.id)}
+                    disabled={previewingTrainerId === trainer.id}
+                  >
+                    {previewingTrainerId === trainer.id ? "Готовлю preview..." : "Preview"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
                     onClick={() => sendWeeklyTelegramTest(trainer.id)}
                     disabled={weeklyTestingTrainerId === trainer.id || !draft.chatId.trim()}
                   >
                     {weeklyTestingTrainerId === trainer.id ? "Отправляю weekly..." : "Weekly test"}
                   </button>
                 </div>
+
+                {weeklyPreview ? (
+                  <div className="admin-log-card">
+                    <div className="muted" style={{ marginBottom: 12 }}>
+                      Неделя: {weeklyPreview.weekStart} · отчетов: {weeklyPreview.reports.length} ·
+                      пропущено без тренировок: {weeklyPreview.skipped}
+                      {!weeklyPreview.trainerHasChatId ? " · chat id не задан" : ""}
+                    </div>
+                    {weeklyPreview.reports.length === 0 ? (
+                      <div className="muted">Для выбранной недели нет спортсменов с тренировками.</div>
+                    ) : (
+                      <div className="list">
+                        {weeklyPreview.reports.map((report) => (
+                          <div key={report.athleteUserId} className="list-row">
+                            <div>
+                              <strong>{report.athleteName}</strong>
+                              <div className="muted">
+                                Тренировок: {report.workoutCount} · Объем:{" "}
+                                {formatDistanceKm(report.totalDistanceMeters)} · Время:{" "}
+                                {formatDuration(report.totalMovingTimeSeconds)}
+                              </div>
+                              <div className="muted">
+                                Темп: {formatPace(report.averageSpeed)} · Пульс:{" "}
+                                {formatHeartRate(report.averageHeartrate)}
+                              </div>
+                              <div className="muted">
+                                Зоны: до 130 {report.zonePercentages.under130}% · 130-150{" "}
+                                {report.zonePercentages.from130To150}% · 150-162{" "}
+                                {report.zonePercentages.from150To162}% · 162+{" "}
+                                {report.zonePercentages.from162Plus}%
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -371,7 +512,7 @@ export function AdminPage() {
               <input
                 required
                 value={form.fullName}
-                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                onChange={(event) => setForm({ ...form, fullName: event.target.value })}
               />
             </label>
             <label>
@@ -379,7 +520,7 @@ export function AdminPage() {
               <input
                 required
                 value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                onChange={(event) => setForm({ ...form, username: event.target.value })}
               />
             </label>
             <label>
@@ -387,14 +528,14 @@ export function AdminPage() {
               <input
                 required
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
               />
             </label>
             <label>
               Роль
               <select
                 value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value, coachId: "" })}
+                onChange={(event) => setForm({ ...form, role: event.target.value, coachId: "" })}
               >
                 <option value="trainer">Тренер</option>
                 <option value="athlete">Спортсмен</option>
@@ -405,7 +546,7 @@ export function AdminPage() {
                 Тренер
                 <select
                   value={form.coachId}
-                  onChange={(e) => setForm({ ...form, coachId: e.target.value })}
+                  onChange={(event) => setForm({ ...form, coachId: event.target.value })}
                 >
                   <option value="">Выбери тренера</option>
                   {trainers.map((trainer) => (
@@ -422,7 +563,11 @@ export function AdminPage() {
 
         <section className={usersApi.loading ? "card skeleton-card" : "card"}>
           <h2>Пользователи {usersApi.loading ? "(Загрузка...)" : ""}</h2>
-          {usersApi.error && <p className="muted" style={{ color: "red" }}>{usersApi.error}</p>}
+          {usersApi.error ? (
+            <p className="muted" style={{ color: "red" }}>
+              {usersApi.error}
+            </p>
+          ) : null}
           <div className="list">
             {users.map((user) => (
               <div key={user.id} className="list-row">
@@ -440,7 +585,7 @@ export function AdminPage() {
                       marginBottom: "4px"
                     }}
                   >
-                    {user.role !== "admin" && (
+                    {user.role !== "admin" ? (
                       <button
                         type="button"
                         className="ghost-button"
@@ -454,7 +599,7 @@ export function AdminPage() {
                       >
                         Удалить
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
                 </div>

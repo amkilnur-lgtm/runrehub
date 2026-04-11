@@ -39,6 +39,10 @@ type WeeklyReportData = {
   };
 };
 
+export type WeeklyReportPreviewItem = WeeklyReportData & {
+  athleteUserId: number;
+};
+
 const MAX_TELEGRAM_ATTEMPTS = 5;
 const WEEKLY_REPORT_UTC_OFFSET_MINUTES = 5 * 60;
 const WEEKLY_REPORT_SEND_HOUR = 20;
@@ -127,6 +131,62 @@ function getWeekStartDateString(date: Date) {
 
 export function getWeeklyReportWeekStartForDate(value: string | Date) {
   return getWeekStartDateString(getUtcPlus5WeekStart(parseDateInput(value)));
+}
+
+export async function getWeeklyTelegramPreview(trainerId: number, weekDate: string | Date) {
+  const { rows } = await pool.query<{
+    full_name: string;
+    telegram_chat_id: string | null;
+  }>(
+    `
+      select full_name, telegram_chat_id
+      from users
+      where id = $1
+        and role = 'trainer'
+    `,
+    [trainerId]
+  );
+
+  const trainer = rows[0];
+  if (!trainer) {
+    throw new Error("TRAINER_NOT_FOUND");
+  }
+
+  const reportWeekStart = getWeeklyReportWeekStartForDate(weekDate);
+  const athleteResult = await pool.query<{ id: number }>(
+    `
+      select id
+      from users
+      where role = 'athlete'
+        and coach_id = $1
+      order by full_name asc
+    `,
+    [trainerId]
+  );
+
+  const reports: WeeklyReportPreviewItem[] = [];
+  let skipped = 0;
+
+  for (const athlete of athleteResult.rows) {
+    const report = await buildWeeklyReportData(trainerId, athlete.id, reportWeekStart);
+    if (!report) {
+      skipped += 1;
+      continue;
+    }
+
+    reports.push({
+      athleteUserId: athlete.id,
+      ...report
+    });
+  }
+
+  return {
+    trainerName: trainer.full_name,
+    trainerHasChatId: Boolean(trainer.telegram_chat_id?.trim()),
+    reportWeekStart,
+    reports,
+    skipped
+  };
 }
 
 function getHeartRateZoneIndex(heartRate: number) {
@@ -613,55 +673,26 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
     throw new Error("TELEGRAM_NOT_CONFIGURED");
   }
 
-  const { rows } = await pool.query<{
-    full_name: string;
-    telegram_chat_id: string | null;
-  }>(
-    `
-      select full_name, telegram_chat_id
-      from users
-      where id = $1
-        and role = 'trainer'
-    `,
+  const preview = await getWeeklyTelegramPreview(trainerId, weekDate);
+
+  const { rows } = await pool.query<{ telegram_chat_id: string | null }>(
+    `select telegram_chat_id from users where id = $1 and role = 'trainer'`,
     [trainerId]
   );
+  const chatId = rows[0]?.telegram_chat_id?.trim() ?? "";
 
-  const trainer = rows[0];
-  if (!trainer) {
-    throw new Error("TRAINER_NOT_FOUND");
-  }
-
-  if (!trainer.telegram_chat_id?.trim()) {
+  if (!chatId) {
     throw new Error("TELEGRAM_CHAT_ID_EMPTY");
   }
 
-  const reportWeekStart = getWeeklyReportWeekStartForDate(weekDate);
-  const athleteResult = await pool.query<{ id: number }>(
-    `
-      select id
-      from users
-      where role = 'athlete'
-        and coach_id = $1
-      order by full_name asc
-    `,
-    [trainerId]
-  );
-
   let sent = 0;
-  let skipped = 0;
 
-  for (const athlete of athleteResult.rows) {
-    const report = await buildWeeklyReportData(trainerId, athlete.id, reportWeekStart);
-    if (!report) {
-      skipped += 1;
-      continue;
-    }
-
+  for (const report of preview.reports) {
     await sendTelegramMessage(
-      trainer.telegram_chat_id,
+      chatId,
       formatTelegramWeeklyReportMessage({
         athleteName: report.athleteName,
-        weekStart: reportWeekStart,
+        weekStart: preview.reportWeekStart,
         totalDistanceMeters: report.totalDistanceMeters,
         totalMovingTimeSeconds: report.totalMovingTimeSeconds,
         averageSpeed: report.averageSpeed,
@@ -674,9 +705,9 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
   }
 
   return {
-    trainerName: trainer.full_name,
-    reportWeekStart,
+    trainerName: preview.trainerName,
+    reportWeekStart: preview.reportWeekStart,
     sent,
-    skipped
+    skipped: preview.skipped
   };
 }

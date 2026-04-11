@@ -6,6 +6,7 @@ import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import { isTelegramConfigured } from "../lib/telegram.js";
 import {
+  getWeeklyTelegramPreview,
   getWeeklyReportWeekStartForDate,
   sendTelegramTestMessage,
   sendWeeklyTelegramTestMessages
@@ -187,6 +188,52 @@ export async function adminRoutes(app: FastifyInstance) {
     await sendTelegramTestMessage(trainer.telegram_chat_id, trainer.full_name);
     return { ok: true };
   });
+
+  app.post(
+    "/api/admin/trainers/:id/telegram/weekly-preview",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      requireRole(request, ["admin"]);
+
+      const params = request.params as { id: string };
+      const trainerId = parseInt(params.id, 10);
+      const body = weeklyTelegramTestSchema.parse(request.body);
+
+      try {
+        const result = await getWeeklyTelegramPreview(trainerId, body.weekDate);
+        return {
+          ok: true,
+          weekStart: result.reportWeekStart,
+          skipped: result.skipped,
+          trainerHasChatId: result.trainerHasChatId,
+          reports: result.reports.map((report) => ({
+            athleteUserId: report.athleteUserId,
+            athleteName: report.athleteName,
+            workoutCount: report.workoutCount,
+            totalDistanceMeters: report.totalDistanceMeters,
+            totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+            averageSpeed: report.averageSpeed,
+            averageHeartrate: report.averageHeartrate,
+            zonePercentages: report.zonePercentages
+          }))
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+
+        if (message === "TRAINER_NOT_FOUND") {
+          return reply.code(404).send({ message: "Trainer not found" });
+        }
+
+        if (message === "INVALID_REPORT_WEEK_START") {
+          return reply.code(400).send({
+            message: `Invalid week date. Resolved week start: ${getWeeklyReportWeekStartForDate(new Date())}`
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
 
   app.post(
     "/api/admin/trainers/:id/telegram/weekly-test",
