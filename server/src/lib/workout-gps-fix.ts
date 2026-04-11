@@ -211,6 +211,8 @@ const CATASTROPHIC_FAILURE_SCORE = 0.58;
 const CATASTROPHIC_LONGEST_RUN_RATIO = 0.1;
 const PROFILE_REBUILD_SMOOTHING_ALPHA = 0.35;
 const PROFILE_STRIDE_BLEND_WEIGHT = 0.65;
+const PROFILE_WORKOUT_INTENSITY_BOOST_CAP = 0.08;
+const PROFILE_WORKOUT_INTENSITY_BOOST_THRESHOLD = 6;
 
 function toFiniteNumber(value: number | null | undefined, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -563,6 +565,11 @@ function cadenceToStepsPerSecond(cadence: number) {
   return cadence > 0 ? cadence / 120 : 0;
 }
 
+function medianOfPrefix(values: number[], count: number) {
+  const prefix = values.filter((value) => Number.isFinite(value) && value > 0).slice(0, count);
+  return median(prefix);
+}
+
 function estimatePaceFromProfile(
   profile: AthleteCadenceProfile | null,
   cadence: number,
@@ -694,6 +701,8 @@ function rebuildStreamsFromAthleteProfile(
     streams.heartrate.map((value) => toFiniteNumber(value, NaN)),
     2
   );
+  const cadenceBaseline = medianOfPrefix(smoothedCadence, 24);
+  const heartRateBaseline = medianOfPrefix(smoothedHeartrate, 24);
 
   let cumulativeDistance = 0;
   let previousEstimatedSpeed: number | null = null;
@@ -715,7 +724,27 @@ function rebuildStreamsFromAthleteProfile(
         : profile.median_pace_seconds_per_km && profile.median_pace_seconds_per_km > 0
           ? SPLIT_DISTANCE_METERS / profile.median_pace_seconds_per_km
           : 1000 / 360;
-    const rawEstimatedSpeed = estimatedSpeedFromProfile ?? fallbackSpeed;
+    let rawEstimatedSpeed = estimatedSpeedFromProfile ?? fallbackSpeed;
+
+    if (
+      Number.isFinite(heartRateBaseline) &&
+      Number.isFinite(heartRateValue) &&
+      Number.isFinite(cadenceBaseline) &&
+      Number.isFinite(normalizedCadence) &&
+      normalizedCadence > 0
+    ) {
+      const heartRateDelta = heartRateValue - Number(heartRateBaseline);
+      const cadenceSupport = Math.max(0.35, Math.min(1.05, normalizedCadence / Number(cadenceBaseline)));
+      const workoutIntensityBoost = Math.max(
+        0,
+        Math.min(
+          PROFILE_WORKOUT_INTENSITY_BOOST_CAP,
+          ((heartRateDelta - PROFILE_WORKOUT_INTENSITY_BOOST_THRESHOLD) / 28) * cadenceSupport
+        )
+      );
+      rawEstimatedSpeed *= 1 + workoutIntensityBoost;
+    }
+
     const estimatedSpeed: number =
       previousEstimatedSpeed === null
         ? rawEstimatedSpeed
