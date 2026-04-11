@@ -11,6 +11,7 @@ process.env.STRAVA_TOKEN_ENCRYPTION_KEY ??= "test-encryption-key-1234567890";
 const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
 const dbModule = await import("./lib/db.js");
+const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 
 async function runTest(name: string, fn: () => void | Promise<void>) {
@@ -108,6 +109,28 @@ await runTest("weekly telegram report week start switches after Sunday 20:00 UTC
 
   assert.equal(beforeSend.toISOString(), "2026-03-29T19:00:00.000Z");
   assert.equal(afterSend.toISOString(), "2026-04-05T19:00:00.000Z");
+});
+
+await runTest("weekly telegram report formatter accepts Date weekStart", () => {
+  const message = telegramModule.formatTelegramWeeklyReportMessage({
+    athleteName: "Тестовый спортсмен",
+    weekStart: new Date("2026-03-30T00:00:00.000Z"),
+    totalDistanceMeters: 42195,
+    totalMovingTimeSeconds: 13500,
+    averageSpeed: 3.1255555556,
+    averageHeartrate: 149.4,
+    workoutCount: 4,
+    zonePercentages: {
+      under130: 18,
+      from130To150: 46,
+      from150To162: 28,
+      from162Plus: 8
+    }
+  });
+
+  assert.match(message, /31 марта|30 марта/);
+  assert.match(message, /5 апреля/);
+  assert.match(message, /Тестовый спортсмен/);
 });
 
 console.log("All server tests passed.");
