@@ -84,11 +84,17 @@ export type ActivityStreams = {
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
 const STRAVA_SYNC_LOCK_NAMESPACE = 4271;
 const ENCRYPTED_TOKEN_PREFIX = "enc:v1:";
+const RUN_SPORT_TYPES = new Set(["run", "trailrun", "virtualrun"]);
 
 function assertStravaConfigured() {
   if (!config.STRAVA_CLIENT_ID || !config.STRAVA_CLIENT_SECRET) {
     throw new Error("STRAVA_NOT_CONFIGURED");
   }
+}
+
+function isRunningActivity(activity: Pick<StravaActivity, "sport_type">) {
+  const normalizedSportType = activity.sport_type.trim().toLowerCase();
+  return RUN_SPORT_TYPES.has(normalizedSportType);
 }
 
 export function getTokenEncryptionKey() {
@@ -764,7 +770,8 @@ export async function syncLatestActivities(userId: number): Promise<SyncLatestAc
     }
 
     const activities = (await activityResponse.json()) as StravaActivity[];
-    for (const activity of activities) {
+    const runningActivities = activities.filter(isRunningActivity);
+    for (const activity of runningActivities) {
       await syncSingleActivity(userId, token, activity);
     }
 
@@ -773,7 +780,7 @@ export async function syncLatestActivities(userId: number): Promise<SyncLatestAc
 
     return {
       synced: true,
-      imported: activities.length,
+      imported: runningActivities.length,
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString()
     };
