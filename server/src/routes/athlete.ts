@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
-import { ensureActivityStreams, getStravaAuthUrl, syncLatestActivities } from "../lib/strava.js";
+import { ensureActivityStreams, getStravaAuthUrl, markStravaActivityDeleted, syncLatestActivities } from "../lib/strava.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
@@ -232,6 +232,22 @@ export async function athleteRoutes(app: FastifyInstance) {
     requireRole(request, ["athlete"]);
     const params = request.params as { id: string };
     const workoutId = Number(params.id);
+
+    const existingWorkoutResult = await pool.query(
+      `select strava_activity_id from workouts where id = $1 and user_id = $2`,
+      [workoutId, request.user.id]
+    );
+    const existingWorkout = existingWorkoutResult.rows[0] as
+      | { strava_activity_id: number | null }
+      | undefined;
+
+    if (!existingWorkout) {
+      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+    }
+
+    if (existingWorkout.strava_activity_id) {
+      await markStravaActivityDeleted(request.user.id, Number(existingWorkout.strava_activity_id));
+    }
 
     const { rowCount } = await pool.query(
       `delete from workouts where id = $1 and user_id = $2`,
