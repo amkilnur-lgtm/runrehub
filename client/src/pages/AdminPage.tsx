@@ -41,6 +41,7 @@ type WeeklyPreviewItem = {
   workoutCount: number;
   totalDistanceMeters: number;
   totalMovingTimeSeconds: number;
+  totalElevationGain: number;
   averageSpeed: number | null;
   averageHeartrate: number | null;
   zonePercentages: {
@@ -478,7 +479,8 @@ export function AdminPage() {
                               <div className="muted">
                                 Тренировок: {report.workoutCount} · Объем:{" "}
                                 {formatDistanceKm(report.totalDistanceMeters)} · Время:{" "}
-                                {formatDuration(report.totalMovingTimeSeconds)}
+                                {formatDuration(report.totalMovingTimeSeconds)} · Набор:{" "}
+                                {Math.round(report.totalElevationGain)} м
                               </div>
                               <div className="muted">
                                 Темп: {formatPace(report.averageSpeed)} · Пульс:{" "}

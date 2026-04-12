@@ -117,6 +117,7 @@ await runTest("weekly telegram report formatter accepts Date weekStart", () => {
     weekStart: new Date("2026-03-30T00:00:00.000Z"),
     totalDistanceMeters: 42195,
     totalMovingTimeSeconds: 13500,
+    totalElevationGain: 420,
     averageSpeed: 3.1255555556,
     averageHeartrate: 149.4,
     workoutCount: 4,
