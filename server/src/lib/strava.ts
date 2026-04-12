@@ -801,7 +801,10 @@ export async function syncLatestActivities(userId: number): Promise<SyncLatestAc
     );
 
     if (!activityResponse.ok) {
-      throw new Error("STRAVA_ACTIVITIES_FAILED");
+      const errorBody = (await activityResponse.text()).slice(0, 500);
+      throw new Error(
+        `STRAVA_ACTIVITIES_FAILED status=${activityResponse.status} ${activityResponse.statusText} body=${errorBody}`
+      );
     }
 
     const activities = (await activityResponse.json()) as StravaActivity[];
