@@ -145,6 +145,8 @@ export function AdminPage() {
   const [weeklyTestingTrainerId, setWeeklyTestingTrainerId] = useState<number | null>(null);
   const [weeklyWeekDates, setWeeklyWeekDates] = useState<Record<number, string>>({});
   const [weeklyPreviews, setWeeklyPreviews] = useState<Record<number, WeeklyPreviewState>>({});
+  const [athleteWeeklyPeriods, setAthleteWeeklyPeriods] = useState<Record<number, "current" | "previous">>({});
+  const [sendingAthleteWeeklyId, setSendingAthleteWeeklyId] = useState<number | null>(null);
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
@@ -168,6 +170,18 @@ export function AdminPage() {
       return next;
     });
   }, [telegramApi.data]);
+
+  useEffect(() => {
+    setAthleteWeeklyPeriods((current) => {
+      const next = { ...current };
+      for (const user of usersApi.data?.users ?? []) {
+        if (user.role === "athlete") {
+          next[user.id] ||= "current";
+        }
+      }
+      return next;
+    });
+  }, [usersApi.data]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -296,6 +310,30 @@ export function AdminPage() {
       alert(`Ошибка weekly report: ${err.message}`);
     } finally {
       setWeeklyTestingTrainerId(null);
+    }
+  }
+
+  async function sendAthleteWeeklyReport(athleteId: number) {
+    const period = athleteWeeklyPeriods[athleteId] ?? "current";
+    setSendingAthleteWeeklyId(athleteId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        athleteName: string;
+        coachName: string;
+        weekStart: string;
+      }>(`/api/admin/athletes/${athleteId}/telegram/weekly-send`, {
+        method: "POST",
+        body: JSON.stringify({ period })
+      });
+      alert(
+        `Недельный отчет отправлен.\nСпортсмен: ${result.athleteName}\nТренер: ${result.coachName}\nНеделя: ${result.weekStart}`
+      );
+      eventsApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка отправки weekly report: ${err.message}`);
+    } finally {
+      setSendingAthleteWeeklyId(null);
     }
   }
 
@@ -587,6 +625,36 @@ export function AdminPage() {
                       marginBottom: "4px"
                     }}
                   >
+                    {user.role === "athlete" ? (
+                      <>
+                        <select
+                          value={athleteWeeklyPeriods[user.id] ?? "current"}
+                          onChange={(event) =>
+                            setAthleteWeeklyPeriods((current) => ({
+                              ...current,
+                              [user.id]: event.target.value as "current" | "previous"
+                            }))
+                          }
+                          style={{ minHeight: "32px" }}
+                        >
+                          <option value="current">Текущая</option>
+                          <option value="previous">Прошлая</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            minHeight: "auto"
+                          }}
+                          onClick={() => sendAthleteWeeklyReport(user.id)}
+                          disabled={sendingAthleteWeeklyId === user.id}
+                        >
+                          {sendingAthleteWeeklyId === user.id ? "Отправляю..." : "Weekly"}
+                        </button>
+                      </>
+                    ) : null}
                     {user.role !== "admin" ? (
                       <button
                         type="button"

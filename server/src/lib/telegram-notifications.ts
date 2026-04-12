@@ -134,6 +134,12 @@ export function getWeeklyReportWeekStartForDate(value: string | Date) {
   return getWeekStartDateString(getUtcPlus5WeekStart(parseDateInput(value)));
 }
 
+function addDays(dateString: string, days: number) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function getWeeklyTelegramPreview(trainerId: number, weekDate: string | Date) {
   const { rows } = await pool.query<{
     full_name: string;
@@ -716,5 +722,79 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
     reportWeekStart: preview.reportWeekStart,
     sent,
     skipped: preview.skipped
+  };
+}
+
+export async function sendAthleteWeeklyTelegramReport(
+  athleteId: number,
+  period: "current" | "previous",
+  now = new Date()
+) {
+  if (!isTelegramConfigured()) {
+    throw new Error("TELEGRAM_NOT_CONFIGURED");
+  }
+
+  const { rows } = await pool.query<{
+    athlete_name: string;
+    coach_id: number | null;
+    coach_name: string | null;
+    telegram_chat_id: string | null;
+  }>(
+    `
+      select
+        athlete.full_name as athlete_name,
+        athlete.coach_id,
+        coach.full_name as coach_name,
+        coach.telegram_chat_id
+      from users athlete
+      left join users coach on coach.id = athlete.coach_id
+      where athlete.id = $1
+        and athlete.role = 'athlete'
+    `,
+    [athleteId]
+  );
+
+  const athlete = rows[0];
+  if (!athlete) {
+    throw new Error("ATHLETE_NOT_FOUND");
+  }
+
+  if (!athlete.coach_id) {
+    throw new Error("ATHLETE_COACH_NOT_FOUND");
+  }
+
+  const chatId = athlete.telegram_chat_id?.trim() ?? "";
+  if (!chatId) {
+    throw new Error("TELEGRAM_CHAT_ID_EMPTY");
+  }
+
+  const currentWeekStart = getWeeklyReportWeekStartForDate(now);
+  const targetWeekStart = period === "current" ? currentWeekStart : addDays(currentWeekStart, -7);
+  const preview = await getWeeklyTelegramPreview(athlete.coach_id, targetWeekStart);
+  const report = preview.reports.find((item) => item.athleteUserId === athleteId);
+
+  if (!report) {
+    throw new Error("WEEKLY_REPORT_NOT_FOUND");
+  }
+
+  await sendTelegramMessage(
+    chatId,
+    formatTelegramWeeklyReportMessage({
+      athleteName: report.athleteName,
+      weekStart: preview.reportWeekStart,
+      totalDistanceMeters: report.totalDistanceMeters,
+      totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+      totalElevationGain: report.totalElevationGain,
+      averageSpeed: report.averageSpeed,
+      averageHeartrate: report.averageHeartrate,
+      workoutCount: report.workoutCount,
+      zonePercentages: report.zonePercentages
+    })
+  );
+
+  return {
+    athleteName: athlete.athlete_name,
+    coachName: athlete.coach_name,
+    weekStart: preview.reportWeekStart
   };
 }
