@@ -131,6 +131,7 @@ export function formatTelegramWeeklyReportMessage(input: {
   weekStart: string | Date;
   totalDistanceMeters: number;
   totalMovingTimeSeconds: number;
+  totalElevationGain: number;
   averageSpeed: number | null;
   averageHeartrate: number | null;
   workoutCount: number;
@@ -160,6 +161,7 @@ export function formatTelegramWeeklyReportMessage(input: {
     `Тренировок: <b>${input.workoutCount}</b>`,
     `Объем: <b>${formatDistanceKm(input.totalDistanceMeters)} км</b>`,
     `Время: <b>${escapeTelegramHtml(formatDuration(input.totalMovingTimeSeconds))}</b>`,
+    `Набор: <b>${Math.round(input.totalElevationGain)} м</b>`,
     `Средний темп: <b>${escapeTelegramHtml(formatPace(input.averageSpeed))}</b>`,
     `Средний пульс: <b>${escapeTelegramHtml(averageHeartRateText)}</b>`,
     "",

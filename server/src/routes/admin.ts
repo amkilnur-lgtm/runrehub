@@ -212,6 +212,7 @@ export async function adminRoutes(app: FastifyInstance) {
             workoutCount: report.workoutCount,
             totalDistanceMeters: report.totalDistanceMeters,
             totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+            totalElevationGain: report.totalElevationGain,
             averageSpeed: report.averageSpeed,
             averageHeartrate: report.averageHeartrate,
             zonePercentages: report.zonePercentages

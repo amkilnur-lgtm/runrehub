@@ -29,6 +29,7 @@ type WeeklyReportData = {
   workoutCount: number;
   totalDistanceMeters: number;
   totalMovingTimeSeconds: number;
+  totalElevationGain: number;
   averageSpeed: number | null;
   averageHeartrate: number | null;
   zonePercentages: {
@@ -412,6 +413,7 @@ async function buildWeeklyReportData(
     workout_count: number | string;
     total_distance_meters: number | string | null;
     total_moving_time_seconds: number | string | null;
+    total_elevation_gain: number | string | null;
     weighted_heartrate_sum: number | string | null;
     heartrate_time_seconds: number | string | null;
   }>(
@@ -421,6 +423,7 @@ async function buildWeeklyReportData(
         count(w.id)::int as workout_count,
         coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0) as total_distance_meters,
         coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)), 0) as total_moving_time_seconds,
+        coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)), 0) as total_elevation_gain,
         coalesce(sum(
           coalesce(wc.corrected_average_heartrate, w.average_heartrate)
           * coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)
@@ -510,6 +513,7 @@ async function buildWeeklyReportData(
 
   const totalDistanceMeters = Number(summary.total_distance_meters ?? 0);
   const totalMovingTimeSeconds = Number(summary.total_moving_time_seconds ?? 0);
+  const totalElevationGain = Number(summary.total_elevation_gain ?? 0);
   const heartrateTimeSeconds = Number(summary.heartrate_time_seconds ?? 0);
   const weightedHeartrateSum = Number(summary.weighted_heartrate_sum ?? 0);
 
@@ -518,6 +522,7 @@ async function buildWeeklyReportData(
     workoutCount: Number(summary.workout_count ?? 0),
     totalDistanceMeters,
     totalMovingTimeSeconds,
+    totalElevationGain,
     averageSpeed:
       totalMovingTimeSeconds > 0 ? totalDistanceMeters / totalMovingTimeSeconds : null,
     averageHeartrate:
@@ -574,6 +579,7 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           weekStart: job.report_week_start,
           totalDistanceMeters: report.totalDistanceMeters,
           totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+          totalElevationGain: report.totalElevationGain,
           averageSpeed: report.averageSpeed,
           averageHeartrate: report.averageHeartrate,
           workoutCount: report.workoutCount,
@@ -695,6 +701,7 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
         weekStart: preview.reportWeekStart,
         totalDistanceMeters: report.totalDistanceMeters,
         totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+        totalElevationGain: report.totalElevationGain,
         averageSpeed: report.averageSpeed,
         averageHeartrate: report.averageHeartrate,
         workoutCount: report.workoutCount,
