@@ -6,9 +6,13 @@ import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import { isTelegramConfigured } from "../lib/telegram.js";
 import {
+  getMonthlyTelegramPreview,
+  getMonthlyReportMonthStartForDate,
   getWeeklyTelegramPreview,
   getWeeklyReportWeekStartForDate,
+  sendAthleteMonthlyTelegramReport,
   sendAthleteWeeklyTelegramReport,
+  sendMonthlyTelegramTestMessages,
   sendTelegramTestMessage,
   sendWeeklyTelegramTestMessages
 } from "../lib/telegram-notifications.js";
@@ -32,6 +36,10 @@ const updateTrainerTelegramSchema = z.object({
 
 const weeklyTelegramTestSchema = z.object({
   weekDate: z.string().trim().min(10).max(32)
+});
+
+const monthlyTelegramTestSchema = z.object({
+  monthDate: z.string().trim().min(7).max(32)
 });
 
 const athleteWeeklyReportSchema = z.object({
@@ -241,6 +249,52 @@ export async function adminRoutes(app: FastifyInstance) {
   );
 
   app.post(
+    "/api/admin/athletes/:id/telegram/monthly-send",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      requireRole(request, ["admin"]);
+
+      if (!isTelegramConfigured()) {
+        return reply.code(400).send({ message: "Telegram bot is not configured" });
+      }
+
+      const params = request.params as { id: string };
+      const athleteId = parseInt(params.id, 10);
+      const body = athleteWeeklyReportSchema.parse(request.body);
+
+      try {
+        const result = await sendAthleteMonthlyTelegramReport(athleteId, body.period);
+        return {
+          ok: true,
+          athleteName: result.athleteName,
+          coachName: result.coachName,
+          monthStart: result.monthStart
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+
+        if (message === "ATHLETE_NOT_FOUND") {
+          return reply.code(404).send({ message: "Athlete not found" });
+        }
+
+        if (message === "ATHLETE_COACH_NOT_FOUND") {
+          return reply.code(400).send({ message: "Athlete has no coach" });
+        }
+
+        if (message === "TELEGRAM_CHAT_ID_EMPTY") {
+          return reply.code(400).send({ message: "Coach Telegram chat id is empty" });
+        }
+
+        if (message === "MONTHLY_REPORT_NOT_FOUND") {
+          return reply.code(400).send({ message: "No workouts for the selected month" });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.post(
     "/api/admin/trainers/:id/telegram/weekly-preview",
     { preHandler: requireAuth },
     async (request, reply) => {
@@ -323,6 +377,97 @@ export async function adminRoutes(app: FastifyInstance) {
         if (message === "INVALID_REPORT_WEEK_START") {
           return reply.code(400).send({
             message: `Invalid week date. Resolved week start: ${getWeeklyReportWeekStartForDate(new Date())}`
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.post(
+    "/api/admin/trainers/:id/telegram/monthly-preview",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      requireRole(request, ["admin"]);
+
+      const params = request.params as { id: string };
+      const trainerId = parseInt(params.id, 10);
+      const body = monthlyTelegramTestSchema.parse(request.body);
+
+      try {
+        const result = await getMonthlyTelegramPreview(trainerId, body.monthDate);
+        return {
+          ok: true,
+          monthStart: result.reportMonthStart,
+          skipped: result.skipped,
+          trainerHasChatId: result.trainerHasChatId,
+          reports: result.reports.map((report) => ({
+            athleteUserId: report.athleteUserId,
+            athleteName: report.athleteName,
+            workoutCount: report.workoutCount,
+            totalDistanceMeters: report.totalDistanceMeters,
+            totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+            totalElevationGain: report.totalElevationGain,
+            averageSpeed: report.averageSpeed,
+            averageHeartrate: report.averageHeartrate,
+            zonePercentages: report.zonePercentages
+          }))
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+
+        if (message === "TRAINER_NOT_FOUND") {
+          return reply.code(404).send({ message: "Trainer not found" });
+        }
+
+        if (message === "INVALID_REPORT_WEEK_START" || message === "INVALID_REPORT_MONTH_START") {
+          return reply.code(400).send({
+            message: `Invalid month date. Resolved month start: ${getMonthlyReportMonthStartForDate(new Date())}`
+          });
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  app.post(
+    "/api/admin/trainers/:id/telegram/monthly-test",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      requireRole(request, ["admin"]);
+
+      if (!isTelegramConfigured()) {
+        return reply.code(400).send({ message: "Telegram bot is not configured" });
+      }
+
+      const params = request.params as { id: string };
+      const trainerId = parseInt(params.id, 10);
+      const body = monthlyTelegramTestSchema.parse(request.body);
+
+      try {
+        const result = await sendMonthlyTelegramTestMessages(trainerId, body.monthDate);
+        return {
+          ok: true,
+          monthStart: result.reportMonthStart,
+          sent: result.sent,
+          skipped: result.skipped
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+
+        if (message === "TRAINER_NOT_FOUND") {
+          return reply.code(404).send({ message: "Trainer not found" });
+        }
+
+        if (message === "TELEGRAM_CHAT_ID_EMPTY") {
+          return reply.code(400).send({ message: "Telegram chat id is empty" });
+        }
+
+        if (message === "INVALID_REPORT_WEEK_START" || message === "INVALID_REPORT_MONTH_START") {
+          return reply.code(400).send({
+            message: `Invalid month date. Resolved month start: ${getMonthlyReportMonthStartForDate(new Date())}`
           });
         }
 

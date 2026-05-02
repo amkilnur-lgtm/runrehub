@@ -111,6 +111,18 @@ await runTest("weekly telegram report week start switches after Sunday 20:00 UTC
   assert.equal(afterSend.toISOString(), "2026-04-05T19:00:00.000Z");
 });
 
+await runTest("monthly telegram report month start switches after first day 20:00 UTC+5", () => {
+  const beforeSend = telegramNotificationsModule.getLatestEligibleMonthlyReportMonthStart(
+    new Date("2026-05-01T14:59:00.000Z")
+  );
+  const afterSend = telegramNotificationsModule.getLatestEligibleMonthlyReportMonthStart(
+    new Date("2026-05-01T15:01:00.000Z")
+  );
+
+  assert.equal(beforeSend.toISOString(), "2026-02-28T19:00:00.000Z");
+  assert.equal(afterSend.toISOString(), "2026-03-31T19:00:00.000Z");
+});
+
 await runTest("weekly telegram report formatter accepts Date weekStart", () => {
   const message = telegramModule.formatTelegramWeeklyReportMessage({
     athleteName: "Тестовый спортсмен",
@@ -138,6 +150,29 @@ await runTest("weekly report builder tolerates Date reportWeekStart input shape"
   const dateValue = new Date("2026-03-30T00:00:00.000Z");
   const normalized = dateValue.toISOString().slice(0, 10);
   assert.equal(normalized, "2026-03-30");
+});
+
+await runTest("monthly telegram report formatter accepts Date monthStart", () => {
+  const message = telegramModule.formatTelegramMonthlyReportMessage({
+    athleteName: "Test athlete",
+    monthStart: new Date("2026-04-01T00:00:00.000Z"),
+    totalDistanceMeters: 120000,
+    totalMovingTimeSeconds: 36000,
+    totalElevationGain: 900,
+    averageSpeed: 3.3333333333,
+    averageHeartrate: 142.2,
+    workoutCount: 12,
+    zonePercentages: {
+      under130: 30,
+      from130To150: 45,
+      from150To162: 20,
+      from162Plus: 5
+    }
+  });
+
+  assert.match(message, /Test athlete/);
+  assert.match(message, /2026/);
+  assert.match(message, /120.00/);
 });
 
 console.log("All server tests passed.");

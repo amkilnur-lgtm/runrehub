@@ -98,6 +98,17 @@ function formatDateUtcPlus5(dateValue: string | Date) {
   }).format(utcDate);
 }
 
+function formatMonthUtcPlus5(dateValue: string | Date) {
+  const [year, month] = toDateOnlyString(dateValue).split("-").map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, 1, 5, 0, 0));
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Yekaterinburg",
+    month: "long",
+    year: "numeric"
+  }).format(utcDate);
+}
+
 export function formatTelegramWorkoutMessage(input: {
   athleteName: string;
   distanceMeters: number;
@@ -157,6 +168,48 @@ export function formatTelegramWeeklyReportMessage(input: {
   return [
     `<b>${athleteName}</b>`,
     `Неделя: ${escapeTelegramHtml(weekRange)}`,
+    "",
+    `Тренировок: <b>${input.workoutCount}</b>`,
+    `Объем: <b>${formatDistanceKm(input.totalDistanceMeters)} км</b>`,
+    `Время: <b>${escapeTelegramHtml(formatDuration(input.totalMovingTimeSeconds))}</b>`,
+    `Набор: <b>${Math.round(input.totalElevationGain)} м</b>`,
+    `Средний темп: <b>${escapeTelegramHtml(formatPace(input.averageSpeed))}</b>`,
+    `Средний пульс: <b>${escapeTelegramHtml(averageHeartRateText)}</b>`,
+    "",
+    "<b>Зоны пульса</b>",
+    `До 130: <b>${input.zonePercentages.under130}%</b>`,
+    `130-150: <b>${input.zonePercentages.from130To150}%</b>`,
+    `150-162: <b>${input.zonePercentages.from150To162}%</b>`,
+    `162+: <b>${input.zonePercentages.from162Plus}%</b>`
+  ].join("\n");
+}
+
+export function formatTelegramMonthlyReportMessage(input: {
+  athleteName: string;
+  monthStart: string | Date;
+  totalDistanceMeters: number;
+  totalMovingTimeSeconds: number;
+  totalElevationGain: number;
+  averageSpeed: number | null;
+  averageHeartrate: number | null;
+  workoutCount: number;
+  zonePercentages: {
+    under130: number;
+    from130To150: number;
+    from150To162: number;
+    from162Plus: number;
+  };
+}) {
+  const athleteName = escapeTelegramHtml(input.athleteName);
+  const monthLabel = formatMonthUtcPlus5(input.monthStart);
+  const averageHeartRateText =
+    input.averageHeartrate && Number.isFinite(input.averageHeartrate)
+      ? `${Math.round(input.averageHeartrate)} уд/мин`
+      : "-";
+
+  return [
+    `<b>${athleteName}</b>`,
+    `Месяц: ${escapeTelegramHtml(monthLabel)}`,
     "",
     `Тренировок: <b>${input.workoutCount}</b>`,
     `Объем: <b>${formatDistanceKm(input.totalDistanceMeters)} км</b>`,
