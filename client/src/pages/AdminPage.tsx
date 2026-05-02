@@ -59,6 +59,13 @@ type WeeklyPreviewState = {
   reports: WeeklyPreviewItem[];
 };
 
+type MonthlyPreviewState = {
+  monthStart: string;
+  skipped: number;
+  trainerHasChatId: boolean;
+  reports: WeeklyPreviewItem[];
+};
+
 function formatEventTime(value: string) {
   return new Date(value).toLocaleString("ru-RU", {
     day: "2-digit",
@@ -82,6 +89,13 @@ function getTodayDateInputValue() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthInputValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 function formatDistanceKm(distanceMeters: number) {
@@ -143,10 +157,15 @@ export function AdminPage() {
   const [testingTrainerId, setTestingTrainerId] = useState<number | null>(null);
   const [previewingTrainerId, setPreviewingTrainerId] = useState<number | null>(null);
   const [weeklyTestingTrainerId, setWeeklyTestingTrainerId] = useState<number | null>(null);
+  const [monthlyTestingTrainerId, setMonthlyTestingTrainerId] = useState<number | null>(null);
   const [weeklyWeekDates, setWeeklyWeekDates] = useState<Record<number, string>>({});
+  const [monthlyMonthDates, setMonthlyMonthDates] = useState<Record<number, string>>({});
   const [weeklyPreviews, setWeeklyPreviews] = useState<Record<number, WeeklyPreviewState>>({});
+  const [monthlyPreviews, setMonthlyPreviews] = useState<Record<number, MonthlyPreviewState>>({});
   const [athleteWeeklyPeriods, setAthleteWeeklyPeriods] = useState<Record<number, "current" | "previous">>({});
+  const [athleteMonthlyPeriods, setAthleteMonthlyPeriods] = useState<Record<number, "current" | "previous">>({});
   const [sendingAthleteWeeklyId, setSendingAthleteWeeklyId] = useState<number | null>(null);
+  const [sendingAthleteMonthlyId, setSendingAthleteMonthlyId] = useState<number | null>(null);
 
   useEffect(() => {
     const nextDrafts = Object.fromEntries(
@@ -172,7 +191,29 @@ export function AdminPage() {
   }, [telegramApi.data]);
 
   useEffect(() => {
+    setMonthlyMonthDates((current) => {
+      const next = { ...current };
+      for (const trainer of telegramApi.data?.trainers ?? []) {
+        next[trainer.id] ||= getCurrentMonthInputValue();
+      }
+      return next;
+    });
+  }, [telegramApi.data]);
+
+  useEffect(() => {
     setAthleteWeeklyPeriods((current) => {
+      const next = { ...current };
+      for (const user of usersApi.data?.users ?? []) {
+        if (user.role === "athlete") {
+          next[user.id] ||= "current";
+        }
+      }
+      return next;
+    });
+  }, [usersApi.data]);
+
+  useEffect(() => {
+    setAthleteMonthlyPeriods((current) => {
       const next = { ...current };
       for (const user of usersApi.data?.users ?? []) {
         if (user.role === "athlete") {
@@ -313,6 +354,62 @@ export function AdminPage() {
     }
   }
 
+  async function previewMonthlyTelegramTest(trainerId: number) {
+    const monthDate = monthlyMonthDates[trainerId] ?? getCurrentMonthInputValue();
+    setPreviewingTrainerId(trainerId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        monthStart: string;
+        skipped: number;
+        trainerHasChatId: boolean;
+        reports: WeeklyPreviewItem[];
+      }>(`/api/admin/trainers/${trainerId}/telegram/monthly-preview`, {
+        method: "POST",
+        body: JSON.stringify({ monthDate })
+      });
+
+      setMonthlyPreviews((current) => ({
+        ...current,
+        [trainerId]: {
+          monthStart: result.monthStart,
+          skipped: result.skipped,
+          trainerHasChatId: result.trainerHasChatId,
+          reports: result.reports
+        }
+      }));
+    } catch (err: any) {
+      alert(`Ошибка preview monthly report: ${err.message}`);
+    } finally {
+      setPreviewingTrainerId(null);
+    }
+  }
+
+  async function sendMonthlyTelegramTest(trainerId: number) {
+    const monthDate = monthlyMonthDates[trainerId] ?? getCurrentMonthInputValue();
+    setMonthlyTestingTrainerId(trainerId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        monthStart: string;
+        sent: number;
+        skipped: number;
+      }>(`/api/admin/trainers/${trainerId}/telegram/monthly-test`, {
+        method: "POST",
+        body: JSON.stringify({ monthDate })
+      });
+      alert(
+        `Monthly report отправлен.\nМесяц: ${result.monthStart}\nОтправлено: ${result.sent}\nПропущено без тренировок: ${result.skipped}`
+      );
+      eventsApi.refresh();
+      telegramApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка monthly report: ${err.message}`);
+    } finally {
+      setMonthlyTestingTrainerId(null);
+    }
+  }
+
   async function sendAthleteWeeklyReport(athleteId: number) {
     const period = athleteWeeklyPeriods[athleteId] ?? "current";
     setSendingAthleteWeeklyId(athleteId);
@@ -334,6 +431,30 @@ export function AdminPage() {
       alert(`Ошибка отправки weekly report: ${err.message}`);
     } finally {
       setSendingAthleteWeeklyId(null);
+    }
+  }
+
+  async function sendAthleteMonthlyReport(athleteId: number) {
+    const period = athleteMonthlyPeriods[athleteId] ?? "current";
+    setSendingAthleteMonthlyId(athleteId);
+    try {
+      const result = await api<{
+        ok: boolean;
+        athleteName: string;
+        coachName: string;
+        monthStart: string;
+      }>(`/api/admin/athletes/${athleteId}/telegram/monthly-send`, {
+        method: "POST",
+        body: JSON.stringify({ period })
+      });
+      alert(
+        `Месячный отчет отправлен.\nСпортсмен: ${result.athleteName}\nТренер: ${result.coachName}\nМесяц: ${result.monthStart}`
+      );
+      eventsApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка отправки monthly report: ${err.message}`);
+    } finally {
+      setSendingAthleteMonthlyId(null);
     }
   }
 
@@ -401,6 +522,7 @@ export function AdminPage() {
               notificationsEnabled: trainer.telegram_notifications_enabled
             };
             const weeklyPreview = weeklyPreviews[trainer.id];
+            const monthlyPreview = monthlyPreviews[trainer.id];
 
             return (
               <div key={trainer.id} className="admin-telegram-row inset-card">
@@ -511,6 +633,77 @@ export function AdminPage() {
                     ) : (
                       <div className="list">
                         {weeklyPreview.reports.map((report) => (
+                          <div key={report.athleteUserId} className="list-row">
+                            <div>
+                              <strong>{report.athleteName}</strong>
+                              <div className="muted">
+                                Тренировок: {report.workoutCount} · Объем:{" "}
+                                {formatDistanceKm(report.totalDistanceMeters)} · Время:{" "}
+                                {formatDuration(report.totalMovingTimeSeconds)} · Набор:{" "}
+                                {Math.round(report.totalElevationGain)} м
+                              </div>
+                              <div className="muted">
+                                Темп: {formatPace(report.averageSpeed)} · Пульс:{" "}
+                                {formatHeartRate(report.averageHeartrate)}
+                              </div>
+                              <div className="muted">
+                                Зоны: до 130 {report.zonePercentages.under130}% · 130-150{" "}
+                                {report.zonePercentages.from130To150}% · 150-162{" "}
+                                {report.zonePercentages.from150To162}% · 162+{" "}
+                                {report.zonePercentages.from162Plus}%
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="admin-telegram-actions">
+                  <label className="admin-telegram-field" style={{ marginBottom: 0 }}>
+                    Месяц отчета
+                    <input
+                      type="month"
+                      value={monthlyMonthDates[trainer.id] ?? getCurrentMonthInputValue()}
+                      onChange={(event) =>
+                        setMonthlyMonthDates((current) => ({
+                          ...current,
+                          [trainer.id]: event.target.value
+                        }))
+                      }
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => previewMonthlyTelegramTest(trainer.id)}
+                    disabled={previewingTrainerId === trainer.id}
+                  >
+                    {previewingTrainerId === trainer.id ? "Готовлю monthly preview..." : "Monthly preview"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => sendMonthlyTelegramTest(trainer.id)}
+                    disabled={monthlyTestingTrainerId === trainer.id || !draft.chatId.trim()}
+                  >
+                    {monthlyTestingTrainerId === trainer.id ? "Отправляю monthly..." : "Monthly test"}
+                  </button>
+                </div>
+
+                {monthlyPreview ? (
+                  <div className="admin-log-card">
+                    <div className="muted" style={{ marginBottom: 12 }}>
+                      Месяц: {monthlyPreview.monthStart} · отчетов: {monthlyPreview.reports.length} ·
+                      пропущено без тренировок: {monthlyPreview.skipped}
+                      {!monthlyPreview.trainerHasChatId ? " · chat id не задан" : ""}
+                    </div>
+                    {monthlyPreview.reports.length === 0 ? (
+                      <div className="muted">Для выбранного месяца нет спортсменов с тренировками.</div>
+                    ) : (
+                      <div className="list">
+                        {monthlyPreview.reports.map((report) => (
                           <div key={report.athleteUserId} className="list-row">
                             <div>
                               <strong>{report.athleteName}</strong>
@@ -652,6 +845,32 @@ export function AdminPage() {
                           disabled={sendingAthleteWeeklyId === user.id}
                         >
                           {sendingAthleteWeeklyId === user.id ? "Отправляю..." : "Weekly"}
+                        </button>
+                        <select
+                          value={athleteMonthlyPeriods[user.id] ?? "current"}
+                          onChange={(event) =>
+                            setAthleteMonthlyPeriods((current) => ({
+                              ...current,
+                              [user.id]: event.target.value as "current" | "previous"
+                            }))
+                          }
+                          style={{ minHeight: "32px" }}
+                        >
+                          <option value="current">Этот месяц</option>
+                          <option value="previous">Прошлый месяц</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            minHeight: "auto"
+                          }}
+                          onClick={() => sendAthleteMonthlyReport(user.id)}
+                          disabled={sendingAthleteMonthlyId === user.id}
+                        >
+                          {sendingAthleteMonthlyId === user.id ? "Отправляю..." : "Monthly"}
                         </button>
                       </>
                     ) : null}

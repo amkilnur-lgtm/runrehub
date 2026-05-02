@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
 import {
+  formatTelegramMonthlyReportMessage,
   formatTelegramWeeklyReportMessage,
   formatTelegramWorkoutMessage,
   isTelegramConfigured,
@@ -12,11 +13,12 @@ import {
 
 type PendingTelegramJob = {
   id: number;
-  kind: "new_workout" | "weekly_report";
+  kind: "new_workout" | "weekly_report" | "monthly_report";
   workout_id: number | null;
   coach_user_id: number;
   athlete_user_id: number | null;
   report_week_start: string | Date | null;
+  report_month_start: string | Date | null;
   chat_id: string;
   athlete_name: string;
   distance_meters: number | null;
@@ -24,7 +26,7 @@ type PendingTelegramJob = {
   average_heartrate: number | null;
 };
 
-type WeeklyReportData = {
+type PeriodReportData = {
   athleteName: string;
   workoutCount: number;
   totalDistanceMeters: number;
@@ -40,7 +42,11 @@ type WeeklyReportData = {
   };
 };
 
-export type WeeklyReportPreviewItem = WeeklyReportData & {
+export type WeeklyReportPreviewItem = PeriodReportData & {
+  athleteUserId: number;
+};
+
+export type MonthlyReportPreviewItem = PeriodReportData & {
   athleteUserId: number;
 };
 
@@ -48,6 +54,7 @@ const MAX_TELEGRAM_ATTEMPTS = 5;
 const WEEKLY_REPORT_UTC_OFFSET_MINUTES = 5 * 60;
 const WEEKLY_REPORT_SEND_HOUR = 20;
 const WEEKLY_REPORT_SEND_DAY = 0;
+const MONTHLY_REPORT_SEND_HOUR = 20;
 
 function logTelegramEvent(
   level: "info" | "warn" | "error",
@@ -96,6 +103,19 @@ function toUtcPlus5ShiftedDate(date: Date) {
   return new Date(date.getTime() + WEEKLY_REPORT_UTC_OFFSET_MINUTES * 60 * 1000);
 }
 
+function fromUtcPlus5ShiftedMs(shiftedMs: number) {
+  return new Date(shiftedMs - WEEKLY_REPORT_UTC_OFFSET_MINUTES * 60 * 1000);
+}
+
+function getUtcPlus5DateStart(dateString: string) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  if (!year || !month || !day) {
+    throw new Error("INVALID_REPORT_DATE_START");
+  }
+
+  return fromUtcPlus5ShiftedMs(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+}
+
 function getUtcPlus5WeekStart(date: Date) {
   const shifted = toUtcPlus5ShiftedDate(date);
   const shiftedMidnightMs = Date.UTC(
@@ -111,7 +131,29 @@ function getUtcPlus5WeekStart(date: Date) {
   const daysFromMonday = day === 0 ? 6 : day - 1;
   const shiftedWeekStart = new Date(shiftedMidnightMs - daysFromMonday * DAY_MS);
 
-  return new Date(shiftedWeekStart.getTime() - WEEKLY_REPORT_UTC_OFFSET_MINUTES * 60 * 1000);
+  return fromUtcPlus5ShiftedMs(shiftedWeekStart.getTime());
+}
+
+function getUtcPlus5MonthStart(date: Date) {
+  const shifted = toUtcPlus5ShiftedDate(date);
+  const shiftedMonthStartMs = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    1,
+    0,
+    0,
+    0,
+    0
+  );
+
+  return fromUtcPlus5ShiftedMs(shiftedMonthStartMs);
+}
+
+function addUtcPlus5Months(monthStart: Date, months: number) {
+  const shifted = toUtcPlus5ShiftedDate(monthStart);
+  return fromUtcPlus5ShiftedMs(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + months, 1, 0, 0, 0, 0)
+  );
 }
 
 export function getLatestEligibleWeeklyReportWeekStart(date = new Date()) {
@@ -130,14 +172,44 @@ function getWeekStartDateString(date: Date) {
   return shifted.toISOString().slice(0, 10);
 }
 
+function getMonthStartDateString(date: Date) {
+  const shifted = toUtcPlus5ShiftedDate(date);
+  return shifted.toISOString().slice(0, 7) + "-01";
+}
+
 export function getWeeklyReportWeekStartForDate(value: string | Date) {
-  return getWeekStartDateString(getUtcPlus5WeekStart(parseDateInput(value)));
+  const date = value instanceof Date ? value : parseDateInput(value);
+  return getWeekStartDateString(getUtcPlus5WeekStart(date));
+}
+
+export function getLatestEligibleMonthlyReportMonthStart(date = new Date()) {
+  const currentMonthStart = getUtcPlus5MonthStart(date);
+  const scheduledSendAt = new Date(currentMonthStart.getTime() + MONTHLY_REPORT_SEND_HOUR * HOUR_MS);
+  const previousMonthStart = addUtcPlus5Months(currentMonthStart, -1);
+
+  return date.getTime() >= scheduledSendAt.getTime()
+    ? previousMonthStart
+    : addUtcPlus5Months(previousMonthStart, -1);
+}
+
+export function getMonthlyReportMonthStartForDate(value: string | Date) {
+  const date = value instanceof Date ? value : parseDateInput(value);
+  return getMonthStartDateString(getUtcPlus5MonthStart(date));
 }
 
 function addDays(dateString: string, days: number) {
   const date = new Date(`${dateString}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function addMonths(dateString: string, months: number) {
+  const [year, month] = dateString.split("-").map(Number);
+  if (!year || !month) {
+    throw new Error("INVALID_REPORT_MONTH_START");
+  }
+
+  return getMonthStartDateString(fromUtcPlus5ShiftedMs(Date.UTC(year, month - 1 + months, 1, 0, 0, 0, 0)));
 }
 
 export async function getWeeklyTelegramPreview(trainerId: number, weekDate: string | Date) {
@@ -191,6 +263,62 @@ export async function getWeeklyTelegramPreview(trainerId: number, weekDate: stri
     trainerName: trainer.full_name,
     trainerHasChatId: Boolean(trainer.telegram_chat_id?.trim()),
     reportWeekStart,
+    reports,
+    skipped
+  };
+}
+
+export async function getMonthlyTelegramPreview(trainerId: number, monthDate: string | Date) {
+  const { rows } = await pool.query<{
+    full_name: string;
+    telegram_chat_id: string | null;
+  }>(
+    `
+      select full_name, telegram_chat_id
+      from users
+      where id = $1
+        and role = 'trainer'
+    `,
+    [trainerId]
+  );
+
+  const trainer = rows[0];
+  if (!trainer) {
+    throw new Error("TRAINER_NOT_FOUND");
+  }
+
+  const reportMonthStart = getMonthlyReportMonthStartForDate(monthDate);
+  const athleteResult = await pool.query<{ id: number }>(
+    `
+      select id
+      from users
+      where role = 'athlete'
+        and coach_id = $1
+      order by full_name asc
+    `,
+    [trainerId]
+  );
+
+  const reports: MonthlyReportPreviewItem[] = [];
+  let skipped = 0;
+
+  for (const athlete of athleteResult.rows) {
+    const report = await buildMonthlyReportData(trainerId, athlete.id, reportMonthStart);
+    if (!report) {
+      skipped += 1;
+      continue;
+    }
+
+    reports.push({
+      athleteUserId: athlete.id,
+      ...report
+    });
+  }
+
+  return {
+    trainerName: trainer.full_name,
+    trainerHasChatId: Boolean(trainer.telegram_chat_id?.trim()),
+    reportMonthStart,
     reports,
     skipped
   };
@@ -320,6 +448,57 @@ export async function enqueueWeeklyTelegramReports(now = new Date(), logger?: Fa
   return { queued: rows.length, reportWeekStart };
 }
 
+export async function enqueueMonthlyTelegramReports(now = new Date(), logger?: FastifyBaseLogger) {
+  const monthStart = getLatestEligibleMonthlyReportMonthStart(now);
+  const monthEnd = addUtcPlus5Months(monthStart, 1);
+  const reportMonthStart = getMonthStartDateString(monthStart);
+
+  const { rows } = await pool.query(
+    `
+      insert into telegram_notification_jobs (
+        workout_id,
+        coach_user_id,
+        athlete_user_id,
+        report_month_start,
+        kind
+      )
+      select
+        null,
+        athlete.coach_id,
+        athlete.id,
+        $3::date,
+        'monthly_report'
+      from users athlete
+      join users coach on coach.id = athlete.coach_id
+      where athlete.role = 'athlete'
+        and athlete.coach_id is not null
+        and coach.role = 'trainer'
+        and coach.telegram_notifications_enabled = true
+        and nullif(trim(coach.telegram_chat_id), '') is not null
+        and exists (
+          select 1
+          from workouts w
+          where w.user_id = athlete.id
+            and w.start_date >= $1
+            and w.start_date < $2
+        )
+      on conflict do nothing
+      returning id
+    `,
+    [monthStart.toISOString(), monthEnd.toISOString(), reportMonthStart]
+  );
+
+  if (rows.length > 0) {
+    logger?.info({ queued: rows.length, reportMonthStart }, "telegram monthly reports queued");
+    logTelegramEvent("info", "telegram monthly reports queued", {
+      queued: rows.length,
+      reportMonthStart
+    });
+  }
+
+  return { queued: rows.length, reportMonthStart };
+}
+
 async function claimPendingJob() {
   const client = await pool.connect();
 
@@ -335,7 +514,8 @@ async function claimPendingJob() {
             job.workout_id,
             job.coach_user_id,
             job.athlete_user_id,
-            job.report_week_start
+            job.report_week_start,
+            job.report_month_start
           from telegram_notification_jobs job
           where (
             job.status = 'pending'
@@ -357,6 +537,7 @@ async function claimPendingJob() {
           job.coach_user_id,
           job.athlete_user_id,
           job.report_week_start,
+          job.report_month_start,
           coach.telegram_chat_id as chat_id,
           coalesce(report_athlete.full_name, workout_athlete.full_name) as athlete_name,
           workout.distance_meters,
@@ -372,6 +553,7 @@ async function claimPendingJob() {
           and (
             (job.kind = 'new_workout' and workout.id is not null)
             or (job.kind = 'weekly_report' and report_athlete.id is not null and job.report_week_start is not null)
+            or (job.kind = 'monthly_report' and report_athlete.id is not null and job.report_month_start is not null)
           )
       `,
       [MAX_TELEGRAM_ATTEMPTS]
@@ -409,11 +591,32 @@ async function buildWeeklyReportData(
   coachUserId: number,
   athleteUserId: number,
   reportWeekStart: string | Date
-): Promise<WeeklyReportData | null> {
+): Promise<PeriodReportData | null> {
   const normalizedWeekStart = normalizeDateOnly(reportWeekStart);
-  const weekStart = new Date(`${normalizedWeekStart}T00:00:00Z`);
+  const weekStart = getUtcPlus5DateStart(normalizedWeekStart);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
 
+  return buildPeriodReportData(coachUserId, athleteUserId, weekStart, weekEnd);
+}
+
+async function buildMonthlyReportData(
+  coachUserId: number,
+  athleteUserId: number,
+  reportMonthStart: string | Date
+): Promise<PeriodReportData | null> {
+  const normalizedMonthStart = getMonthlyReportMonthStartForDate(reportMonthStart);
+  const monthStart = getUtcPlus5DateStart(normalizedMonthStart);
+  const monthEnd = getUtcPlus5DateStart(addMonths(normalizedMonthStart, 1));
+
+  return buildPeriodReportData(coachUserId, athleteUserId, monthStart, monthEnd);
+}
+
+async function buildPeriodReportData(
+  coachUserId: number,
+  athleteUserId: number,
+  periodStart: Date,
+  periodEnd: Date
+): Promise<PeriodReportData | null> {
   const summaryResult = await pool.query<{
     athlete_name: string;
     workout_count: number | string;
@@ -446,7 +649,7 @@ async function buildWeeklyReportData(
         and w.start_date < $4
       group by athlete.full_name
     `,
-    [athleteUserId, coachUserId, weekStart.toISOString(), weekEnd.toISOString()]
+    [athleteUserId, coachUserId, periodStart.toISOString(), periodEnd.toISOString()]
   );
 
   const summary = summaryResult.rows[0];
@@ -479,7 +682,7 @@ async function buildWeeklyReportData(
         and w.start_date < $3
       order by w.start_date asc
     `,
-    [athleteUserId, weekStart.toISOString(), weekEnd.toISOString()]
+    [athleteUserId, periodStart.toISOString(), periodEnd.toISOString()]
   );
 
   const zoneSeconds = [0, 0, 0, 0];
@@ -583,6 +786,42 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
         message = formatTelegramWeeklyReportMessage({
           athleteName: report.athleteName,
           weekStart: job.report_week_start,
+          totalDistanceMeters: report.totalDistanceMeters,
+          totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+          totalElevationGain: report.totalElevationGain,
+          averageSpeed: report.averageSpeed,
+          averageHeartrate: report.averageHeartrate,
+          workoutCount: report.workoutCount,
+          zonePercentages: report.zonePercentages
+        });
+      } else if (job.kind === "monthly_report") {
+        if (!job.athlete_user_id || !job.report_month_start) {
+          throw new Error("TELEGRAM_MONTHLY_REPORT_CONTEXT_MISSING");
+        }
+
+        const report = await buildMonthlyReportData(
+          job.coach_user_id,
+          job.athlete_user_id,
+          job.report_month_start
+        );
+        if (!report) {
+          await pool.query(
+            `
+              update telegram_notification_jobs
+              set status = 'sent',
+                  sent_at = now(),
+                  updated_at = now(),
+                  last_error = null
+              where id = $1
+            `,
+            [job.id]
+          );
+          continue;
+        }
+
+        message = formatTelegramMonthlyReportMessage({
+          athleteName: report.athleteName,
+          monthStart: job.report_month_start,
           totalDistanceMeters: report.totalDistanceMeters,
           totalMovingTimeSeconds: report.totalMovingTimeSeconds,
           totalElevationGain: report.totalElevationGain,
@@ -725,6 +964,51 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
   };
 }
 
+export async function sendMonthlyTelegramTestMessages(trainerId: number, monthDate: string | Date) {
+  if (!isTelegramConfigured()) {
+    throw new Error("TELEGRAM_NOT_CONFIGURED");
+  }
+
+  const preview = await getMonthlyTelegramPreview(trainerId, monthDate);
+
+  const { rows } = await pool.query<{ telegram_chat_id: string | null }>(
+    `select telegram_chat_id from users where id = $1 and role = 'trainer'`,
+    [trainerId]
+  );
+  const chatId = rows[0]?.telegram_chat_id?.trim() ?? "";
+
+  if (!chatId) {
+    throw new Error("TELEGRAM_CHAT_ID_EMPTY");
+  }
+
+  let sent = 0;
+
+  for (const report of preview.reports) {
+    await sendTelegramMessage(
+      chatId,
+      formatTelegramMonthlyReportMessage({
+        athleteName: report.athleteName,
+        monthStart: preview.reportMonthStart,
+        totalDistanceMeters: report.totalDistanceMeters,
+        totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+        totalElevationGain: report.totalElevationGain,
+        averageSpeed: report.averageSpeed,
+        averageHeartrate: report.averageHeartrate,
+        workoutCount: report.workoutCount,
+        zonePercentages: report.zonePercentages
+      })
+    );
+    sent += 1;
+  }
+
+  return {
+    trainerName: preview.trainerName,
+    reportMonthStart: preview.reportMonthStart,
+    sent,
+    skipped: preview.skipped
+  };
+}
+
 export async function sendAthleteWeeklyTelegramReport(
   athleteId: number,
   period: "current" | "previous",
@@ -796,5 +1080,80 @@ export async function sendAthleteWeeklyTelegramReport(
     athleteName: athlete.athlete_name,
     coachName: athlete.coach_name,
     weekStart: preview.reportWeekStart
+  };
+}
+
+export async function sendAthleteMonthlyTelegramReport(
+  athleteId: number,
+  period: "current" | "previous",
+  now = new Date()
+) {
+  if (!isTelegramConfigured()) {
+    throw new Error("TELEGRAM_NOT_CONFIGURED");
+  }
+
+  const { rows } = await pool.query<{
+    athlete_name: string;
+    coach_id: number | null;
+    coach_name: string | null;
+    telegram_chat_id: string | null;
+  }>(
+    `
+      select
+        athlete.full_name as athlete_name,
+        athlete.coach_id,
+        coach.full_name as coach_name,
+        coach.telegram_chat_id
+      from users athlete
+      left join users coach on coach.id = athlete.coach_id
+      where athlete.id = $1
+        and athlete.role = 'athlete'
+    `,
+    [athleteId]
+  );
+
+  const athlete = rows[0];
+  if (!athlete) {
+    throw new Error("ATHLETE_NOT_FOUND");
+  }
+
+  if (!athlete.coach_id) {
+    throw new Error("ATHLETE_COACH_NOT_FOUND");
+  }
+
+  const chatId = athlete.telegram_chat_id?.trim() ?? "";
+  if (!chatId) {
+    throw new Error("TELEGRAM_CHAT_ID_EMPTY");
+  }
+
+  const currentMonthStart = getMonthlyReportMonthStartForDate(now);
+  const targetMonthStart =
+    period === "current" ? currentMonthStart : addMonths(currentMonthStart, -1);
+  const preview = await getMonthlyTelegramPreview(athlete.coach_id, targetMonthStart);
+  const report = preview.reports.find((item) => item.athleteUserId === athleteId);
+
+  if (!report) {
+    throw new Error("MONTHLY_REPORT_NOT_FOUND");
+  }
+
+  await sendTelegramMessage(
+    chatId,
+    formatTelegramMonthlyReportMessage({
+      athleteName: report.athleteName,
+      monthStart: preview.reportMonthStart,
+      totalDistanceMeters: report.totalDistanceMeters,
+      totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+      totalElevationGain: report.totalElevationGain,
+      averageSpeed: report.averageSpeed,
+      averageHeartrate: report.averageHeartrate,
+      workoutCount: report.workoutCount,
+      zonePercentages: report.zonePercentages
+    })
+  );
+
+  return {
+    athleteName: athlete.athlete_name,
+    coachName: athlete.coach_name,
+    monthStart: preview.reportMonthStart
   };
 }
