@@ -34,6 +34,17 @@ function formatLapDistanceKilometers(distanceMeters: number) {
   return (distanceMeters / 1000).toFixed(2);
 }
 
+function formatLapTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "—";
+  }
+
+  const totalSeconds = Math.round(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const params = useParams();
   const navigate = useNavigate();
@@ -657,6 +668,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 <colgroup>
                   <col className="lap-col-lap" />
                   <col className="lap-col-distance" />
+                  <col className="lap-col-time" />
                   <col className="lap-col-pace" />
                   <col className="lap-col-heart" />
                   <col className="lap-col-elevation" />
@@ -665,6 +677,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   <tr className="lap-report-head muted">
                     <th scope="col">КРУГ</th>
                     <th scope="col">КМ</th>
+                    <th scope="col">ВР</th>
                     <th scope="col">ТЕМП</th>
                     <th scope="col">ЧСС</th>
                     <th scope="col">М</th>
@@ -675,6 +688,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <tr key={lap.id} className="lap-report-row">
                       <td className="lap-report-index">{index + 1}</td>
                       <td className="lap-report-distance">{formatLapDistanceKilometers(lap.distance_meters)}</td>
+                      <td className="lap-report-time">{formatLapTime(lap.elapsed_time_seconds)}</td>
                       <td className="lap-report-pace-cell">
                         <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
                       </td>
