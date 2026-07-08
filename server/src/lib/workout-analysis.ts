@@ -281,7 +281,11 @@ export async function analyzeWorkout(workoutId: number) {
         ws.distance_stream,
         ws.time_stream
       from workouts w
-      left join workout_corrections wc on wc.workout_id = w.id
+      left join lateral (
+        select max(updated_at) as updated_at, min(kind) as kind
+        from workout_corrections
+        where workout_id = w.id
+      ) wc on true
       left join workout_streams ws on ws.workout_id = w.id
       where w.id = $1
     `,
@@ -307,18 +311,24 @@ export async function analyzeStaleWorkouts(limit = 50) {
     `
       select w.id
       from workouts w
-      left join workout_corrections wc on wc.workout_id = w.id
+      left join lateral (
+        select max(updated_at) as updated_at
+        from workout_corrections
+        where workout_id = w.id
+      ) wc on true
       left join workout_streams ws on ws.workout_id = w.id
       left join workout_analysis wa on wa.workout_id = w.id
       where w.sport_type = 'Run'
         and (
           wa.workout_id is null
           or wa.analysis_version < $2
-          or wa.source_updated_at < greatest(
+          -- date_trunc: JS Date хранит миллисекунды, поэтому записанный
+          -- source_updated_at всегда «старее» микросекундного оригинала
+          or wa.source_updated_at < date_trunc('milliseconds', greatest(
             w.created_at,
             coalesce(wc.updated_at, w.created_at),
             coalesce(ws.fetched_at, w.created_at)
-          )
+          ))
         )
       order by w.start_date desc
       limit $1

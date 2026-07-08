@@ -692,6 +692,46 @@ select:focus-visible {
   width: auto;
 }
 
+.compact-button {
+  padding: 5px 10px;
+  font-size: 13px;
+  min-height: auto;
+}
+
+.report-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.report-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  padding: 6px;
+  display: grid;
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  z-index: 30;
+}
+
+.report-menu-item {
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-menu-item:hover {
+  background: var(--surface-2);
+}
+
 .stat-card {
   padding: 18px;
   border-radius: 18px;
