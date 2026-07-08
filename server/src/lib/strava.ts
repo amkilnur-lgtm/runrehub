@@ -5,6 +5,7 @@ import { FastifyBaseLogger } from "fastify";
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
 import { enqueueNewWorkoutTelegramNotification } from "./telegram-notifications.js";
+import { analyzeWorkout } from "./workout-analysis.js";
 import { config } from "../config.js";
 
 type TokenResponse = {
@@ -620,6 +621,17 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
       await saveActivityStreams(workoutId, streamsData);
       await applyLapElevationChanges(workoutId, streamsData.altitude);
     }
+    void analyzeWorkout(workoutId).catch((error) => {
+      addStravaEvent({
+        source: "system",
+        level: "warn",
+        message: "workout analysis failed",
+        details: {
+          workoutId,
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      });
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

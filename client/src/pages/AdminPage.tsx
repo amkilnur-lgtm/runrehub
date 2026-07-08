@@ -35,6 +35,18 @@ type StravaEvent = {
   details?: Record<string, unknown>;
 };
 
+type FitnessSummaryRow = {
+  athlete_id: number;
+  athlete_name: string;
+  week_start: string;
+  runs: number;
+  score_runs: number;
+  estimated_hrmax: number | null;
+  week_best_score: number | null;
+  aerobic_avg_score: number | null;
+  fitness_index: number | null;
+};
+
 type WeeklyPreviewItem = {
   athleteUserId: number;
   athleteName: string;
@@ -134,10 +146,19 @@ function formatHeartRate(averageHeartrate: number | null) {
   return `${Math.round(averageHeartrate)} уд/мин`;
 }
 
+function formatFitnessScore(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return value.toFixed(2);
+}
+
 export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
   const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/strava/events?limit=80");
+  const fitnessApi = useApi<{ weeks: number; rows: FitnessSummaryRow[] }>("/api/admin/fitness/summary?weeks=8");
   const telegramApi = useApi<{
     configured: boolean;
     trainers: TrainerTelegramSettings[];
@@ -461,15 +482,178 @@ export function AdminPage() {
   const users = usersApi.data?.users ?? [];
   const trainers = trainersApi.data?.trainers ?? [];
   const events = eventsApi.data?.events ?? [];
+  const fitnessRows = fitnessApi.data?.rows ?? [];
   const telegramTrainers = telegramApi.data?.trainers ?? [];
   const logText = events.map(formatLogLine).join("\n");
 
   return (
     <div className="stack">
+      <div className="grid two-columns">
+        <section className="card">
+          <h2>Создать учетку</h2>
+          <form className="form" onSubmit={onSubmit}>
+            <label>
+              Имя
+              <input
+                required
+                value={form.fullName}
+                onChange={(event) => setForm({ ...form, fullName: event.target.value })}
+              />
+            </label>
+            <label>
+              Логин
+              <input
+                required
+                value={form.username}
+                onChange={(event) => setForm({ ...form, username: event.target.value })}
+              />
+            </label>
+            <label>
+              Пароль
+              <input
+                required
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+              />
+            </label>
+            <label>
+              Роль
+              <select
+                value={form.role}
+                onChange={(event) => setForm({ ...form, role: event.target.value, coachId: "" })}
+              >
+                <option value="trainer">Тренер</option>
+                <option value="athlete">Спортсмен</option>
+              </select>
+            </label>
+            {form.role === "athlete" ? (
+              <label>
+                Тренер
+                <select
+                  value={form.coachId}
+                  onChange={(event) => setForm({ ...form, coachId: event.target.value })}
+                >
+                  <option value="">Выбери тренера</option>
+                  {trainers.map((trainer) => (
+                    <option key={trainer.id} value={trainer.id}>
+                      {trainer.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <button className="primary-button">Создать</button>
+          </form>
+        </section>
+
+        <section className={usersApi.loading ? "card skeleton-card" : "card"}>
+          <h2>Пользователи {usersApi.loading ? "(Загрузка...)" : ""}</h2>
+          {usersApi.error ? (
+            <p className="muted" style={{ color: "var(--danger)" }}>
+              {usersApi.error}
+            </p>
+          ) : null}
+          <div className="list">
+            {users.map((user) => (
+              <div key={user.id} className="list-row">
+                <div>
+                  <strong>{user.full_name}</strong>
+                  <div className="muted">@{user.username}</div>
+                </div>
+                <div className="align-right">
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      marginBottom: "4px"
+                    }}
+                  >
+                    {user.role === "athlete" ? (
+                      <>
+                        <select
+                          value={athleteWeeklyPeriods[user.id] ?? "current"}
+                          onChange={(event) =>
+                            setAthleteWeeklyPeriods((current) => ({
+                              ...current,
+                              [user.id]: event.target.value as "current" | "previous"
+                            }))
+                          }
+                          style={{ minHeight: "32px" }}
+                        >
+                          <option value="current">Текущая</option>
+                          <option value="previous">Прошлая</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            minHeight: "auto"
+                          }}
+                          onClick={() => sendAthleteWeeklyReport(user.id)}
+                          disabled={sendingAthleteWeeklyId === user.id}
+                        >
+                          {sendingAthleteWeeklyId === user.id ? "Отправляю..." : "Недельный"}
+                        </button>
+                        <select
+                          value={athleteMonthlyPeriods[user.id] ?? "current"}
+                          onChange={(event) =>
+                            setAthleteMonthlyPeriods((current) => ({
+                              ...current,
+                              [user.id]: event.target.value as "current" | "previous"
+                            }))
+                          }
+                          style={{ minHeight: "32px" }}
+                        >
+                          <option value="current">Этот месяц</option>
+                          <option value="previous">Прошлый месяц</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            minHeight: "auto"
+                          }}
+                          onClick={() => sendAthleteMonthlyReport(user.id)}
+                          disabled={sendingAthleteMonthlyId === user.id}
+                        >
+                          {sendingAthleteMonthlyId === user.id ? "Отправляю..." : "Месячный"}
+                        </button>
+                      </>
+                    ) : null}
+                    {user.role !== "admin" ? (
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        style={{
+                          padding: "4px 8px",
+                          fontSize: "12px",
+                          minHeight: "auto",
+                          color: "var(--danger)"
+                        }}
+                        onClick={() => deleteUser(user.id, user.username)}
+                      >
+                        Удалить
+                      </button>
+                    ) : null}
+                  </div>
+                  {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
       <section className="card">
         <div className="section-header">
           <div>
-            <h2>Strava Логи</h2>
+            <h2>События Strava</h2>
             <p className="muted">
               Последние серверные события webhook и cron. Обновляй список, чтобы видеть новые
               срабатывания.
@@ -495,10 +679,52 @@ export function AdminPage() {
       <section className="card">
         <div className="section-header">
           <div>
+            <h2>Индекс формы</h2>
+            <p className="muted">
+              Черновой расчет формы по надежным GPS + пульсу. Это не VO2max Garmin, а внутренняя метрика для проверки.
+            </p>
+          </div>
+          <button type="button" className="ghost-button" onClick={fitnessApi.refresh}>
+            Обновить
+          </button>
+        </div>
+
+        {fitnessApi.loading ? <div className="muted">Загрузка сводки...</div> : null}
+        {fitnessApi.error ? <div className="error-box">{fitnessApi.error}</div> : null}
+        {!fitnessApi.loading && !fitnessApi.error ? (
+          <div className="list">
+            {fitnessRows.map((row) => (
+              <div key={`${row.athlete_id}-${row.week_start}`} className="list-row">
+                <div>
+                  <strong>{row.athlete_name}</strong>
+                  <div className="muted">
+                    Неделя с {new Date(row.week_start).toLocaleDateString("ru-RU")} · тренировок: {row.runs} · расчетных: {row.score_runs}
+                    {row.estimated_hrmax ? ` · HRmax est.: ${Math.round(row.estimated_hrmax)}` : ""}
+                  </div>
+                </div>
+                <div className="align-right">
+                  <div>
+                    Форма: <strong>{formatFitnessScore(row.fitness_index)}</strong>
+                  </div>
+                  <div className="muted">
+                    неделя {formatFitnessScore(row.week_best_score)} · аэробика{" "}
+                    {formatFitnessScore(row.aerobic_avg_score)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {fitnessRows.length === 0 ? <div className="muted">Пока нет рассчитанных тренировок.</div> : null}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="card">
+        <div className="section-header">
+          <div>
             <h2>Telegram тренеров</h2>
             <p className="muted">
               Здесь можно задать chat id, включить уведомления, проверить обычный тест и посмотреть
-              preview недельного отчета перед отправкой.
+              превью недельного отчета перед отправкой.
             </p>
           </div>
           <button type="button" className="ghost-button" onClick={telegramApi.refresh}>
@@ -530,8 +756,8 @@ export function AdminPage() {
                   <div>
                     <strong>{trainer.full_name}</strong>
                     <div className="muted">
-                      {trainer.telegram_chat_id ? "Chat id задан" : "Chat id не задан"} · pending:{" "}
-                      {trainer.pending_jobs} · sent: {trainer.sent_jobs}
+                      {trainer.telegram_chat_id ? "Chat ID задан" : "Chat ID не задан"} · в очереди:{" "}
+                      {trainer.pending_jobs} · отправлено: {trainer.sent_jobs}
                     </div>
                   </div>
 
@@ -554,7 +780,7 @@ export function AdminPage() {
                 </div>
 
                 <label className="admin-telegram-field">
-                  Telegram chat id
+                  Telegram chat ID
                   <input
                     value={draft.chatId}
                     placeholder="Например: 123456789"
@@ -609,7 +835,7 @@ export function AdminPage() {
                     onClick={() => previewWeeklyTelegramTest(trainer.id)}
                     disabled={previewingTrainerId === trainer.id}
                   >
-                    {previewingTrainerId === trainer.id ? "Готовлю preview..." : "Preview"}
+                    {previewingTrainerId === trainer.id ? "Готовлю превью..." : "Превью недели"}
                   </button>
                   <button
                     type="button"
@@ -617,7 +843,7 @@ export function AdminPage() {
                     onClick={() => sendWeeklyTelegramTest(trainer.id)}
                     disabled={weeklyTestingTrainerId === trainer.id || !draft.chatId.trim()}
                   >
-                    {weeklyTestingTrainerId === trainer.id ? "Отправляю weekly..." : "Weekly test"}
+                    {weeklyTestingTrainerId === trainer.id ? "Отправляю..." : "Тест недели"}
                   </button>
                 </div>
 
@@ -680,7 +906,7 @@ export function AdminPage() {
                     onClick={() => previewMonthlyTelegramTest(trainer.id)}
                     disabled={previewingTrainerId === trainer.id}
                   >
-                    {previewingTrainerId === trainer.id ? "Готовлю monthly preview..." : "Monthly preview"}
+                    {previewingTrainerId === trainer.id ? "Готовлю превью..." : "Превью месяца"}
                   </button>
                   <button
                     type="button"
@@ -688,7 +914,7 @@ export function AdminPage() {
                     onClick={() => sendMonthlyTelegramTest(trainer.id)}
                     disabled={monthlyTestingTrainerId === trainer.id || !draft.chatId.trim()}
                   >
-                    {monthlyTestingTrainerId === trainer.id ? "Отправляю monthly..." : "Monthly test"}
+                    {monthlyTestingTrainerId === trainer.id ? "Отправляю..." : "Тест месяца"}
                   </button>
                 </div>
 
@@ -736,167 +962,6 @@ export function AdminPage() {
         </div>
       </section>
 
-      <div className="grid two-columns">
-        <section className="card">
-          <h2>Создать учетку</h2>
-          <form className="form" onSubmit={onSubmit}>
-            <label>
-              Имя
-              <input
-                required
-                value={form.fullName}
-                onChange={(event) => setForm({ ...form, fullName: event.target.value })}
-              />
-            </label>
-            <label>
-              Логин
-              <input
-                required
-                value={form.username}
-                onChange={(event) => setForm({ ...form, username: event.target.value })}
-              />
-            </label>
-            <label>
-              Пароль
-              <input
-                required
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-              />
-            </label>
-            <label>
-              Роль
-              <select
-                value={form.role}
-                onChange={(event) => setForm({ ...form, role: event.target.value, coachId: "" })}
-              >
-                <option value="trainer">Тренер</option>
-                <option value="athlete">Спортсмен</option>
-              </select>
-            </label>
-            {form.role === "athlete" ? (
-              <label>
-                Тренер
-                <select
-                  value={form.coachId}
-                  onChange={(event) => setForm({ ...form, coachId: event.target.value })}
-                >
-                  <option value="">Выбери тренера</option>
-                  {trainers.map((trainer) => (
-                    <option key={trainer.id} value={trainer.id}>
-                      {trainer.full_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <button className="primary-button">Создать</button>
-          </form>
-        </section>
-
-        <section className={usersApi.loading ? "card skeleton-card" : "card"}>
-          <h2>Пользователи {usersApi.loading ? "(Загрузка...)" : ""}</h2>
-          {usersApi.error ? (
-            <p className="muted" style={{ color: "red" }}>
-              {usersApi.error}
-            </p>
-          ) : null}
-          <div className="list">
-            {users.map((user) => (
-              <div key={user.id} className="list-row">
-                <div>
-                  <strong>{user.full_name}</strong>
-                  <div className="muted">@{user.username}</div>
-                </div>
-                <div className="align-right">
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      marginBottom: "4px"
-                    }}
-                  >
-                    {user.role === "athlete" ? (
-                      <>
-                        <select
-                          value={athleteWeeklyPeriods[user.id] ?? "current"}
-                          onChange={(event) =>
-                            setAthleteWeeklyPeriods((current) => ({
-                              ...current,
-                              [user.id]: event.target.value as "current" | "previous"
-                            }))
-                          }
-                          style={{ minHeight: "32px" }}
-                        >
-                          <option value="current">Текущая</option>
-                          <option value="previous">Прошлая</option>
-                        </select>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "12px",
-                            minHeight: "auto"
-                          }}
-                          onClick={() => sendAthleteWeeklyReport(user.id)}
-                          disabled={sendingAthleteWeeklyId === user.id}
-                        >
-                          {sendingAthleteWeeklyId === user.id ? "Отправляю..." : "Weekly"}
-                        </button>
-                        <select
-                          value={athleteMonthlyPeriods[user.id] ?? "current"}
-                          onChange={(event) =>
-                            setAthleteMonthlyPeriods((current) => ({
-                              ...current,
-                              [user.id]: event.target.value as "current" | "previous"
-                            }))
-                          }
-                          style={{ minHeight: "32px" }}
-                        >
-                          <option value="current">Этот месяц</option>
-                          <option value="previous">Прошлый месяц</option>
-                        </select>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "12px",
-                            minHeight: "auto"
-                          }}
-                          onClick={() => sendAthleteMonthlyReport(user.id)}
-                          disabled={sendingAthleteMonthlyId === user.id}
-                        >
-                          {sendingAthleteMonthlyId === user.id ? "Отправляю..." : "Monthly"}
-                        </button>
-                      </>
-                    ) : null}
-                    {user.role !== "admin" ? (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        style={{
-                          padding: "4px 8px",
-                          fontSize: "12px",
-                          minHeight: "auto",
-                          color: "red"
-                        }}
-                        onClick={() => deleteUser(user.id, user.username)}
-                      >
-                        Удалить
-                      </button>
-                    ) : null}
-                  </div>
-                  {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }

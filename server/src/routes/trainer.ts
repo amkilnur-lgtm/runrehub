@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import { ensureActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
+import { analyzeWorkout } from "../lib/workout-analysis.js";
 import {
   applyWorkoutCorrectionToView,
   buildAthleteCadenceProfile,
@@ -34,6 +35,10 @@ const workoutTimeFixSchema = z.object({
 });
 
 const ATHLETE_WORKOUTS_PAGE_SIZE = 20;
+
+function scheduleWorkoutAnalysis(workoutId: number) {
+  void analyzeWorkout(workoutId).catch(() => undefined);
+}
 
 type AthleteStatsRow = {
   week_distance_meters: number | string | null;
@@ -588,6 +593,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "gps_autofix", preview);
+    scheduleWorkoutAnalysis(workoutId);
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
 
@@ -619,6 +625,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await deleteWorkoutCorrection(workoutId);
+    scheduleWorkoutAnalysis(workoutId);
     return { ok: true };
   });
 
@@ -740,6 +747,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_distance", preview);
+    scheduleWorkoutAnalysis(workoutId);
     const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
     const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
 
@@ -869,6 +877,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_time", preview);
+    scheduleWorkoutAnalysis(workoutId);
     const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
     const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
 

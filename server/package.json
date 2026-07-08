@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node dist/test.js"
+    "test": "npm run build && node dist/test.js",
+    "analyze:workouts": "tsx src/scripts/analyze-workouts.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
