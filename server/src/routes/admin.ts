@@ -46,6 +46,10 @@ const athleteWeeklyReportSchema = z.object({
   period: z.enum(["current", "previous"])
 });
 
+const fitnessSummaryQuerySchema = z.object({
+  weeks: z.coerce.number().int().positive().max(12).default(8)
+});
+
 export async function adminRoutes(app: FastifyInstance) {
   app.get("/api/admin/users", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["admin"]);
@@ -97,6 +101,97 @@ export async function adminRoutes(app: FastifyInstance) {
     requireRole(request, ["admin"]);
     const query = stravaEventsQuerySchema.parse(request.query);
     return { events: getStravaEvents(query.limit) };
+  });
+
+  app.get("/api/admin/fitness/summary", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    const query = fitnessSummaryQuerySchema.parse(request.query);
+
+    const { rows } = await pool.query(
+      `
+        with week_bounds as (
+          select (date_trunc('week', now())::date - (($1::int - 1) * 7))::date as first_week,
+                 date_trunc('week', now())::date as current_week
+        ),
+        athletes as (
+          select id, full_name
+          from users
+          where role = 'athlete'
+          order by full_name asc
+        ),
+        weeks as (
+          select
+            athlete.id as athlete_id,
+            athlete.full_name as athlete_name,
+            (bounds.first_week + (series.value * 7))::date as week_start
+          from athletes athlete
+          cross join week_bounds bounds
+          cross join generate_series(0, $1::int - 1) as series(value)
+        ),
+        base_runs as (
+          select
+            w.user_id,
+            w.id,
+            (w.start_date::date - (extract(isodow from w.start_date)::int - 1))::date as week_start
+          from workouts w
+          join week_bounds bounds on w.start_date::date >= bounds.first_week
+          where w.sport_type = 'Run'
+        ),
+        reliable_scores as (
+          select
+            w.user_id,
+            w.id,
+            w.start_date::date as run_date,
+            (w.start_date::date - (extract(isodow from w.start_date)::int - 1))::date as week_start,
+            wa.fitness_score,
+            wa.aerobic_score,
+            wa.estimated_hrmax
+          from workouts w
+          join workout_analysis wa on wa.workout_id = w.id
+          join week_bounds bounds on w.start_date::date >= bounds.first_week - 49
+          where wa.gps_quality_status = 'reliable'
+            and wa.fitness_score is not null
+        ),
+        weekly as (
+          select
+            weeks.athlete_id,
+            weeks.athlete_name,
+            weeks.week_start,
+            count(distinct base_runs.id)::int as runs,
+            count(distinct reliable_scores.id) filter (where reliable_scores.week_start = weeks.week_start)::int as score_runs,
+            round(max(reliable_scores.estimated_hrmax)::numeric, 0) as estimated_hrmax,
+            round(max(reliable_scores.fitness_score) filter (where reliable_scores.week_start = weeks.week_start)::numeric, 2) as week_best_score,
+            round(avg(reliable_scores.aerobic_score) filter (
+              where reliable_scores.week_start = weeks.week_start
+                and reliable_scores.aerobic_score is not null
+            )::numeric, 2) as aerobic_avg_score,
+            round(max(
+              reliable_scores.fitness_score *
+              case
+                when (weeks.week_start - reliable_scores.run_date) <= 7 then 1.00
+                when (weeks.week_start - reliable_scores.run_date) <= 14 then 0.97
+                when (weeks.week_start - reliable_scores.run_date) <= 28 then 0.92
+                when (weeks.week_start - reliable_scores.run_date) <= 42 then 0.85
+                else 0.75
+              end
+            ) filter (
+              where reliable_scores.run_date <= weeks.week_start + 6
+                and reliable_scores.run_date >= weeks.week_start - 49
+            )::numeric, 2) as fitness_index
+          from weeks
+          left join base_runs on base_runs.user_id = weeks.athlete_id
+            and base_runs.week_start = weeks.week_start
+          left join reliable_scores on reliable_scores.user_id = weeks.athlete_id
+          group by weeks.athlete_id, weeks.athlete_name, weeks.week_start
+        )
+        select *
+        from weekly
+        order by athlete_name asc, week_start desc
+      `,
+      [query.weeks]
+    );
+
+    return { weeks: query.weeks, rows };
   });
 
   app.post("/api/admin/users", { preHandler: requireAuth }, async (request, reply) => {
