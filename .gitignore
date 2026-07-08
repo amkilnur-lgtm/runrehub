@@ -12,3 +12,8 @@ data
 .ssh_temp_key
 repomix-output.xml
 runrehab-repomix.xml
+
+# local tooling
+.claude/
+.impeccable/
+.screenshots/

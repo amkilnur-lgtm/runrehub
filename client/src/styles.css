@@ -1,12 +1,52 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", "Arial", sans-serif;
+  font-family: "Manrope Variable", "Manrope", "Segoe UI", "Arial", sans-serif;
   --chart-axis-gutter: 29px;
   --chart-side-gutter: 7px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 120, 80, 0.16), transparent 30%),
-    linear-gradient(180deg, #fbfaf7 0%, #f3efe8 100%);
-  color: #181510;
+
+  /* Brand palette (from logo: deep navy + running red) */
+  --brand-navy: oklch(0.32 0.085 272);
+  --brand-navy-deep: oklch(0.25 0.07 272);
+  --brand-red: oklch(0.58 0.2 28);
+
+  /* Semantic tokens */
+  --bg: oklch(0.98 0.003 272);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.96 0.006 272);
+  --ink: oklch(0.28 0.055 272);
+  --ink-muted: oklch(0.5 0.03 272);
+  --border: oklch(0.9 0.012 272);
+  --border-strong: oklch(0.82 0.018 272);
+
+  --accent: var(--brand-red);
+  --accent-hover: oklch(0.52 0.2 28);
+  --accent-active: oklch(0.47 0.19 28);
+  --accent-ink: oklch(1 0 0);
+  --accent-soft: oklch(0.96 0.018 28);
+
+  --danger: oklch(0.55 0.19 25);
+  --danger-soft: oklch(0.95 0.025 25);
+  --success: oklch(0.55 0.14 150);
+
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+
+  --shadow-1: 0 1px 2px oklch(0.28 0.055 272 / 0.06), 0 2px 8px oklch(0.28 0.055 272 / 0.05);
+  --shadow-2: 0 4px 12px oklch(0.28 0.055 272 / 0.08), 0 12px 32px oklch(0.28 0.055 272 / 0.08);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Blue-accent variant (comparison) */
+:root[data-accent="blue"] {
+  --accent: oklch(0.48 0.17 266);
+  --accent-hover: oklch(0.42 0.17 266);
+  --accent-active: oklch(0.38 0.16 266);
+  --accent-soft: oklch(0.955 0.02 266);
 }
 
 * {
@@ -30,7 +70,6 @@ select {
   font: inherit;
 }
 
-.login-screen,
 .center-screen {
   min-height: 100vh;
   display: grid;
@@ -38,37 +77,136 @@ select {
   padding: 24px;
 }
 
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+.login-brand {
+  background: var(--brand-navy-deep);
+  color: oklch(0.97 0.005 272);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: clamp(28px, 5vw, 64px);
+}
+
+.login-brand-mark {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(0.97 0.005 272 / 0.72);
+}
+
+.login-tagline {
+  font-size: clamp(2rem, 3.6vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.login-tagline::before {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 4px;
+  border-radius: 2px;
+  margin-bottom: 24px;
+  background: var(--accent);
+}
+
+.login-tagline em {
+  font-style: normal;
+  color: oklch(0.72 0.17 28);
+}
+
+:root[data-accent="blue"] .login-tagline em {
+  color: oklch(0.78 0.09 266);
+}
+
+.login-brand-note {
+  max-width: 44ch;
+  line-height: 1.5;
+  color: oklch(0.97 0.005 272 / 0.66);
+}
+
+.login-side {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+@media (max-width: 860px) {
+  .login-screen {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-brand {
+    gap: 16px;
+    padding: 24px 20px;
+  }
+
+  .login-tagline {
+    font-size: 1.45rem;
+  }
+
+  .login-tagline::before {
+    width: 40px;
+    height: 3px;
+    margin-bottom: 12px;
+  }
+
+  .login-brand-note {
+    display: none;
+  }
+
+  .login-side {
+    align-items: start;
+    padding-top: 8px;
+  }
+}
+
 .login-card,
 .card {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-1);
 }
 
 .login-card {
   width: min(100%, 420px);
   padding: 32px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .login-logo-wrap {
   display: flex;
   justify-content: center;
-  padding: 32px 0;
+  padding: 0 0 28px;
 }
 
 .login-logo {
   display: block;
-  width: min(100%, 238px);
+  width: min(100%, 200px);
   height: auto;
   margin: 0;
 }
 
 .login-card h1 {
-  margin: 0 0 18px;
-  font-size: clamp(1.95rem, 4.8vw, 2.4rem);
-  font-weight: 700;
-  line-height: 1.05;
+  margin: 0 0 10px;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
 .login-card > .muted {
@@ -115,7 +253,8 @@ select {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-weight: 700;
+  font-weight: 800;
+  color: var(--brand-navy);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -163,12 +302,9 @@ select {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background:
-    linear-gradient(180deg, #fff8ee 0%, #f3e7d4 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(24, 21, 16, 0.07),
-    0 10px 24px rgba(56, 42, 16, 0.08);
-  color: #6e5844;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--brand-navy);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -183,7 +319,7 @@ select {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.07);
+  box-shadow: inset 0 0 0 1px var(--border);
   pointer-events: none;
 }
 
@@ -214,7 +350,7 @@ select {
 }
 
 .avatar-menu-trigger:focus-visible {
-  outline: 2px solid rgba(0, 102, 255, 0.35);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 
@@ -229,9 +365,9 @@ select {
   min-width: 180px;
   padding: 8px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px oklch(0.28 0.055 272 / 0.12);
   z-index: 20;
 }
 
@@ -241,13 +377,13 @@ select {
   border-radius: 12px;
   padding: 12px 14px;
   background: transparent;
-  color: #181510;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 
 .avatar-menu-item:hover:enabled {
-  background: #fff4e7;
+  background: var(--surface-2);
 }
 
 .avatar-menu-item:disabled {
@@ -256,11 +392,11 @@ select {
 }
 
 .avatar-menu-item-danger {
-  color: #9a2f13;
+  color: var(--danger);
 }
 
 .avatar-menu-item-danger:hover:enabled {
-  background: #fff1ec;
+  background: var(--danger-soft);
 }
 
 .topbar-actions {
@@ -312,7 +448,7 @@ select {
 .inset-card {
   padding: 18px;
   border-radius: 18px;
-  background: #fff9f2;
+  background: var(--surface-2);
   box-shadow: none;
 }
 
@@ -326,32 +462,78 @@ input,
 select {
   width: 100%;
   padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(24, 21, 16, 0.12);
-  background: white;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+}
+
+input::placeholder {
+  color: var(--ink-muted);
+}
+
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .primary-button,
 .ghost-button {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-m);
   padding: 12px 18px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+
+.primary-button:focus-visible,
+.ghost-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .primary-button {
-  background: #111111;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.primary-button:hover {
+  background: var(--accent-hover);
+}
+
+.primary-button:active {
+  background: var(--accent-active);
+  transform: translateY(1px);
+}
+
+.primary-button:disabled {
+  background: var(--border-strong);
+  color: var(--ink-muted);
+  cursor: default;
+  transform: none;
 }
 
 .ghost-button {
-  background: #f0ece4;
-  color: #181510;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.ghost-button:hover {
+  background: var(--surface-2);
+}
+
+.ghost-button:active {
+  background: var(--border);
 }
 
 .eyebrow,
 .muted {
-  color: #72685a;
+  color: var(--ink-muted);
 }
 
 .eyebrow {
@@ -367,18 +549,18 @@ select {
   min-height: 44px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: #fff2de;
-  color: #8c4a17;
+  background: var(--surface-2);
+  color: var(--accent-hover);
   text-transform: uppercase;
   font-size: 12px;
-  box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  box-shadow: inset 0 0 0 1px var(--border);
   transform: translateY(3px);
 }
 
 .topbar-logout {
   min-height: 44px;
-  background: #f6f0e7;
-  box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
   transform: translateY(3px);
   display: inline-flex;
   align-items: center;
@@ -397,7 +579,7 @@ select {
 
 .list-row {
   padding: 16px 0;
-  border-bottom: 1px solid rgba(24, 21, 16, 0.08);
+  border-bottom: 1px solid var(--border);
 }
 
 .list-row:last-child {
@@ -417,15 +599,15 @@ select {
   gap: 12px;
   padding: 16px 18px;
   border-radius: 18px;
-  background: #fff9f2;
+  background: var(--surface-2);
 }
 
 .admin-event-details {
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #181510;
-  color: #f7f2eb;
+  background: var(--ink);
+  color: oklch(0.96 0.006 272);
   font-family: "Consolas", "Courier New", monospace;
   font-size: 12px;
   white-space: pre-wrap;
@@ -439,8 +621,8 @@ select {
   padding: 14px;
   border: 0;
   border-radius: 14px;
-  background: #181510;
-  color: #f7f2eb;
+  background: var(--ink);
+  color: oklch(0.96 0.006 272);
   font-family: "Consolas", "Courier New", monospace;
   font-size: 12px;
   line-height: 1.5;
@@ -452,8 +634,8 @@ select {
   margin-top: 12px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #fff9f2;
-  color: #72685a;
+  background: var(--surface-2);
+  color: var(--ink-muted);
 }
 
 .admin-telegram-list {
@@ -484,7 +666,7 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #72685a;
+  color: var(--ink-muted);
   font-size: 14px;
   white-space: nowrap;
 }
@@ -504,10 +686,14 @@ select {
   text-align: right;
 }
 
+.align-right select {
+  width: auto;
+}
+
 .stat-card {
   padding: 18px;
   border-radius: 18px;
-  background: #fff9f2;
+  background: var(--surface-2);
 }
 
 .stat-value {
@@ -528,14 +714,14 @@ select {
 }
 
 .error-box {
-  background: #ffe3de;
-  color: #9a2f13;
+  background: var(--danger-soft);
+  color: var(--danger);
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-m);
 }
 
 .inline-link {
-  color: #8c4a17;
+  color: var(--accent-hover);
 }
 
 .workout-layout {
@@ -556,7 +742,7 @@ select {
 .lap-report-table {
   width: 100%;
   margin-top: 10px;
-  border-top: 1px solid rgba(24, 21, 16, 0.06);
+  border-top: 1px solid var(--border);
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -597,7 +783,7 @@ select {
 .lap-report-row td {
   height: 56px;
   padding: 10px 8px;
-  border-top: 1px solid rgba(24, 21, 16, 0.06);
+  border-top: 1px solid var(--border);
   vertical-align: middle;
   text-align: left;
 }
@@ -628,7 +814,7 @@ select {
 }
 
 .lap-report-elevation {
-  color: #5f5a67;
+  color: var(--ink-muted);
   font-weight: 400;
   text-align: left;
 }
@@ -702,11 +888,11 @@ select {
 }
 
 .compact-lap-row:nth-child(even) {
-  background: rgba(255, 249, 242, 0.88);
+  background: var(--surface-2);
 }
 
 .compact-lap-row:nth-child(odd) {
-  background: rgba(243, 239, 232, 0.42);
+  background: oklch(0.98 0.003 272);
 }
 
 .lap-name {
@@ -769,10 +955,10 @@ select {
 }
 
 .trainer-dashboard-header {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-1);
   padding: 24px;
 }
 
@@ -787,8 +973,8 @@ select {
   display: grid;
   gap: 16px;
   padding: 20px;
-  border-radius: 24px;
-  background: #fff9f2;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
 }
 
 .trainer-dashboard-identity {
@@ -822,10 +1008,13 @@ select {
 
 .trainer-dashboard-title h2 {
   margin: 0;
-  font-size: 34px;
-  line-height: 1.05;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .trainer-dashboard-title p {
@@ -845,7 +1034,8 @@ select {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px 16px;
+  flex-wrap: wrap;
 }
 
 .trainer-dashboard-heading {
@@ -861,9 +1051,10 @@ select {
 
 .trainer-dashboard-eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   font-size: 12px;
-  color: #8e816f;
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
 .trainer-dashboard-stats {
@@ -876,19 +1067,21 @@ select {
   display: grid;
   gap: 6px;
   padding-top: 14px;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .trainer-dashboard-stat strong {
   font-size: 28px;
   line-height: 1.05;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .trainer-dashboard-caption {
   margin: 0;
   font-size: 13px;
-  color: #8e816f;
+  color: var(--ink-muted);
 }
 
 .trainer-dashboard-leader-list {
@@ -911,7 +1104,7 @@ select {
   padding: 10px 0;
   color: inherit;
   text-decoration: none;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .trainer-dashboard-leader-row:first-child {
@@ -925,8 +1118,17 @@ select {
 
 .trainer-dashboard-leader-rank {
   width: 24px;
-  color: #8e816f;
-  font-weight: 600;
+  color: var(--ink-muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trainer-dashboard-leader-row:first-child .trainer-dashboard-leader-rank {
+  color: var(--accent);
+}
+
+.trainer-dashboard-leader-distance {
+  font-weight: 700;
 }
 
 .trainer-dashboard-leader-avatar {
@@ -962,11 +1164,11 @@ select {
   padding: 16px 0;
   color: inherit;
   text-decoration: none;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .trainer-dashboard-athlete-meta {
-  color: #72685a;
+  color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -977,10 +1179,26 @@ select {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
-  padding: 16px 0 16px 2px;
+  padding: 16px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-s);
   color: inherit;
   text-decoration: none;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
+  transition: background-color 150ms var(--ease-out);
+}
+
+.trainer-dashboard-workout-row:hover {
+  background: var(--surface-2);
+}
+
+.trainer-dashboard-workout-row strong {
+  font-weight: 700;
+}
+
+.trainer-dashboard-workout-meta > div:first-child {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .trainer-dashboard-athlete-row:first-child,
@@ -1030,10 +1248,10 @@ select {
 }
 
 .athlete-account-header {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-1);
   padding: 24px;
 }
 
@@ -1087,10 +1305,10 @@ select {
 
 .athlete-account-main {
   display: grid;
-  gap: 18px;
-  padding: 18px 20px;
-  border-radius: 24px;
-  background: #fff9f2;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
 }
 
 .athlete-account-topbar {
@@ -1120,14 +1338,14 @@ select {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #181510;
+  color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .athlete-account-status-trigger:hover {
-  color: #8a4b16;
+  color: var(--accent-hover);
 }
 
 .athlete-account-heading {
@@ -1143,9 +1361,10 @@ select {
 
 .athlete-account-eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   font-size: 12px;
-  color: #8e816f;
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
 .athlete-account-stats {
@@ -1158,19 +1377,21 @@ select {
   display: grid;
   gap: 6px;
   padding-top: 14px;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .athlete-account-stat strong {
   font-size: 28px;
   line-height: 1.05;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .athlete-account-caption {
   margin: 0;
   font-size: 13px;
-  color: #8e816f;
+  color: var(--ink-muted);
 }
 
 .athlete-strava-control {
@@ -1190,9 +1411,9 @@ select {
   min-width: 180px;
   padding: 8px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px oklch(0.28 0.055 272 / 0.12);
   z-index: 20;
 }
 
@@ -1207,37 +1428,44 @@ select {
 }
 
 .athlete-strava-item-danger {
-  color: #9a2f13;
+  color: var(--danger);
 }
 
 .athlete-strava-item-danger:hover {
-  background: #fff1ec;
+  background: var(--danger-soft);
 }
 
 .athlete-stats-periods {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   padding: 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.06);
+  border-radius: var(--radius-m);
+  background: oklch(0.28 0.055 272 / 0.06);
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .athlete-stats-period {
   border: 0;
-  border-radius: 999px;
-  padding: 8px 12px;
+  border-radius: var(--radius-s);
+  padding: 7px 12px;
   background: transparent;
-  color: #72685a;
+  color: var(--ink-muted);
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+
+.athlete-stats-period:hover {
+  color: var(--ink);
 }
 
 .athlete-stats-period.is-active {
-  background: #fff;
-  color: #181510;
-  box-shadow: 0 8px 18px rgba(56, 42, 16, 0.08);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px oklch(0.28 0.055 272 / 0.1);
 }
 
 .chart-column {
@@ -1246,11 +1474,11 @@ select {
 }
 
 .chart-card {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(24, 21, 16, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 24px;
   padding: 19px 21px 16px 15px;
-  box-shadow: 0 20px 50px rgba(56, 42, 16, 0.08);
+  box-shadow: 0 20px 50px oklch(0.28 0.055 272 / 0.07);
 }
 
 .chart-header,
@@ -1274,7 +1502,7 @@ select {
   line-height: 1.2;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8e816f;
+  color: var(--ink-muted);
 }
 
 .chart-title {
@@ -1284,7 +1512,7 @@ select {
 }
 
 .chart-axis-caption {
-  color: #8a7660;
+  color: var(--ink-muted);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1296,7 +1524,7 @@ select {
   gap: 14px;
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(24, 21, 16, 0.08);
+  border-bottom: 1px solid var(--border);
 }
 
 .chart-metric {
@@ -1313,7 +1541,7 @@ select {
 }
 
 .chart-metric-label {
-  color: #7b6f61;
+  color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -1333,7 +1561,7 @@ select {
 .chart-y-axis {
   min-height: 220px;
   position: relative;
-  color: #83796b;
+  color: var(--ink-muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   padding-right: 0;
@@ -1352,9 +1580,9 @@ select {
   overflow: hidden;
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98) 0%, rgba(248, 242, 234, 0.74) 100%);
+    var(--surface);
   box-shadow:
-    inset 0 0 0 1px rgba(24, 21, 16, 0.036),
+    inset 0 0 0 1px var(--border),
     inset 0 16px 24px rgba(255, 255, 255, 0.2);
 }
 
@@ -1363,7 +1591,7 @@ select {
   left: 0;
   right: 0;
   height: 1px;
-  background: rgba(24, 21, 16, 0.034);
+  background: var(--border);
   transform: translateY(-50%);
 }
 
@@ -1387,7 +1615,7 @@ select {
 .chart-x-axis {
   position: relative;
   height: 18px;
-  color: #83796b;
+  color: var(--ink-muted);
   font-size: 11px;
   margin-bottom: 3px;
   font-variant-numeric: tabular-nums;
@@ -1413,7 +1641,7 @@ select {
 .chart-x-label {
   text-align: center;
   font-size: 11px;
-  color: #83796b;
+  color: var(--ink-muted);
 }
 
 .chart-empty {
@@ -1421,7 +1649,7 @@ select {
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: #fff9f2;
+  background: var(--surface-2);
 }
 
 .workout-menu {
@@ -1456,9 +1684,9 @@ select {
   min-width: 220px;
   padding: 8px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(24, 21, 16, 0.08);
-  box-shadow: 0 16px 40px rgba(56, 42, 16, 0.14);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px oklch(0.28 0.055 272 / 0.12);
   z-index: 20;
 }
 
@@ -1468,21 +1696,21 @@ select {
   border-radius: 12px;
   padding: 12px 14px;
   background: transparent;
-  color: #181510;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 
 .workout-menu-item:hover:enabled {
-  background: #f6f0e7;
+  background: var(--surface-2);
 }
 
 .workout-menu-item-danger {
-  color: #9a2f13;
+  color: var(--danger);
 }
 
 .workout-menu-item-danger:hover:enabled {
-  background: #fff1ec;
+  background: var(--danger-soft);
 }
 
 .workout-menu-item:disabled {
@@ -1559,7 +1787,7 @@ select {
   gap: 18px;
   padding: 20px;
   border-radius: 24px;
-  background: #fff9f2;
+  background: var(--surface-2);
 }
 
 .workout-summary-stats {
@@ -1573,7 +1801,7 @@ select {
   gap: 6px;
   min-width: 0;
   padding-top: 14px;
-  border-top: 1px solid rgba(24, 21, 16, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .workout-summary-stat strong {
@@ -1591,7 +1819,7 @@ select {
   border-radius: 24px;
   overflow: hidden;
   background: #dfe7ee;
-  box-shadow: inset 0 0 0 1px rgba(24, 21, 16, 0.05);
+  box-shadow: inset 0 0 0 1px var(--border);
   align-self: stretch;
 }
 
@@ -1644,7 +1872,7 @@ select {
 
 .workout-route-maplibre .maplibregl-ctrl-attrib {
   background: rgba(255, 255, 255, 0.72);
-  color: #8e816f;
+  color: var(--ink-muted);
   font-size: 9px;
   backdrop-filter: blur(6px);
   padding: 1px 4px;
@@ -1701,7 +1929,7 @@ select {
 }
 
 .workout-route-error {
-  color: #8e816f;
+  color: var(--ink-muted);
   font-size: 14px;
 }
 
@@ -1714,10 +1942,10 @@ select {
   min-height: 132px;
   resize: vertical;
   padding: 14px;
-  border: 1px solid rgba(24, 21, 16, 0.12);
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  background: #fff9f2;
-  color: #181510;
+  background: var(--surface-2);
+  color: var(--ink);
   font: inherit;
   line-height: 1.5;
 }
@@ -1731,7 +1959,7 @@ select {
 .workout-comment-text {
   padding: 16px 18px;
   border-radius: 16px;
-  background: #fff9f2;
+  background: var(--surface-2);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -1904,13 +2132,13 @@ select {
 
   .list-row {
     padding: 14px;
-    border: 1px solid rgba(24, 21, 16, 0.07);
+    border: 1px solid var(--border);
     border-radius: 16px;
-    background: rgba(255, 249, 242, 0.68);
+    background: var(--surface-2);
   }
 
   .list-row:last-child {
-    border-bottom: 1px solid rgba(24, 21, 16, 0.07);
+    border-bottom: 1px solid var(--border);
   }
 
   .workout-layout {
@@ -2231,16 +2459,16 @@ select {
   }
 
   .athlete-stats-periods {
-    width: fit-content;
-    max-width: 100%;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 2px;
+    display: flex;
+    width: 100%;
+    padding: 3px;
   }
 
   .athlete-stats-period {
-    padding: 6px 10px;
-    font-size: 15px;
+    flex: 1 1 auto;
+    text-align: center;
+    padding: 7px 6px;
+    font-size: 14px;
   }
 
   .athlete-account-stats {

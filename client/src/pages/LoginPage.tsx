@@ -37,7 +37,22 @@ export function LoginPage() {
 
   return (
     <div className="login-screen">
-      <div className="login-card">
+      <aside className="login-brand">
+        <div className="login-brand-mark">Running Rehab · беговой клуб</div>
+        <div className="login-tagline">
+          Тренируйся.
+          <br />
+          Восстанавливайся.
+          <br />
+          <em>Беги дальше.</em>
+        </div>
+        <div className="login-brand-note">
+          Кабинет тренера и спортсменов: тренировки подтягиваются из Strava, тренер видит данные и
+          даёт обратную связь.
+        </div>
+      </aside>
+      <div className="login-side">
+        <div className="login-card">
         <div className="login-logo-wrap">
           <img className="login-logo" src={logoImage} alt="Running Rehab" />
         </div>
@@ -63,6 +78,7 @@ export function LoginPage() {
             {pending ? "Входим..." : "Войти"}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
