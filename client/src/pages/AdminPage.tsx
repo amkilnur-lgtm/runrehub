@@ -183,8 +183,33 @@ export function AdminPage() {
   const [monthlyMonthDates, setMonthlyMonthDates] = useState<Record<number, string>>({});
   const [weeklyPreviews, setWeeklyPreviews] = useState<Record<number, WeeklyPreviewState>>({});
   const [monthlyPreviews, setMonthlyPreviews] = useState<Record<number, MonthlyPreviewState>>({});
-  const [athleteWeeklyPeriods, setAthleteWeeklyPeriods] = useState<Record<number, "current" | "previous">>({});
-  const [athleteMonthlyPeriods, setAthleteMonthlyPeriods] = useState<Record<number, "current" | "previous">>({});
+  const [reportMenuUserId, setReportMenuUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (reportMenuUserId === null) {
+      return undefined;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!(event.target as HTMLElement).closest(".report-menu")) {
+        setReportMenuUserId(null);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setReportMenuUserId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [reportMenuUserId]);
   const [sendingAthleteWeeklyId, setSendingAthleteWeeklyId] = useState<number | null>(null);
   const [sendingAthleteMonthlyId, setSendingAthleteMonthlyId] = useState<number | null>(null);
 
@@ -220,30 +245,6 @@ export function AdminPage() {
       return next;
     });
   }, [telegramApi.data]);
-
-  useEffect(() => {
-    setAthleteWeeklyPeriods((current) => {
-      const next = { ...current };
-      for (const user of usersApi.data?.users ?? []) {
-        if (user.role === "athlete") {
-          next[user.id] ||= "current";
-        }
-      }
-      return next;
-    });
-  }, [usersApi.data]);
-
-  useEffect(() => {
-    setAthleteMonthlyPeriods((current) => {
-      const next = { ...current };
-      for (const user of usersApi.data?.users ?? []) {
-        if (user.role === "athlete") {
-          next[user.id] ||= "current";
-        }
-      }
-      return next;
-    });
-  }, [usersApi.data]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -431,8 +432,7 @@ export function AdminPage() {
     }
   }
 
-  async function sendAthleteWeeklyReport(athleteId: number) {
-    const period = athleteWeeklyPeriods[athleteId] ?? "current";
+  async function sendAthleteWeeklyReport(athleteId: number, period: "current" | "previous") {
     setSendingAthleteWeeklyId(athleteId);
     try {
       const result = await api<{
@@ -455,8 +455,7 @@ export function AdminPage() {
     }
   }
 
-  async function sendAthleteMonthlyReport(athleteId: number) {
-    const period = athleteMonthlyPeriods[athleteId] ?? "current";
+  async function sendAthleteMonthlyReport(athleteId: number, period: "current" | "previous") {
     setSendingAthleteMonthlyId(athleteId);
     try {
       const result = await api<{
@@ -482,7 +481,9 @@ export function AdminPage() {
   const users = usersApi.data?.users ?? [];
   const trainers = trainersApi.data?.trainers ?? [];
   const events = eventsApi.data?.events ?? [];
-  const fitnessRows = fitnessApi.data?.rows ?? [];
+  const fitnessRows = (fitnessApi.data?.rows ?? []).filter(
+    (row) => row.runs > 0 || row.fitness_index != null
+  );
   const telegramTrainers = telegramApi.data?.trainers ?? [];
   const logText = events.map(formatLogLine).join("\n");
 
@@ -571,71 +572,74 @@ export function AdminPage() {
                     }}
                   >
                     {user.role === "athlete" ? (
-                      <>
-                        <select
-                          value={athleteWeeklyPeriods[user.id] ?? "current"}
-                          onChange={(event) =>
-                            setAthleteWeeklyPeriods((current) => ({
-                              ...current,
-                              [user.id]: event.target.value as "current" | "previous"
-                            }))
-                          }
-                          style={{ minHeight: "32px" }}
-                        >
-                          <option value="current">Текущая</option>
-                          <option value="previous">Прошлая</option>
-                        </select>
+                      <div className="report-menu">
                         <button
                           type="button"
-                          className="ghost-button"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "12px",
-                            minHeight: "auto"
-                          }}
-                          onClick={() => sendAthleteWeeklyReport(user.id)}
-                          disabled={sendingAthleteWeeklyId === user.id}
-                        >
-                          {sendingAthleteWeeklyId === user.id ? "Отправляю..." : "Недельный"}
-                        </button>
-                        <select
-                          value={athleteMonthlyPeriods[user.id] ?? "current"}
-                          onChange={(event) =>
-                            setAthleteMonthlyPeriods((current) => ({
-                              ...current,
-                              [user.id]: event.target.value as "current" | "previous"
-                            }))
+                          className="ghost-button compact-button"
+                          aria-haspopup="menu"
+                          aria-expanded={reportMenuUserId === user.id}
+                          disabled={
+                            sendingAthleteWeeklyId === user.id || sendingAthleteMonthlyId === user.id
                           }
-                          style={{ minHeight: "32px" }}
+                          onClick={() =>
+                            setReportMenuUserId(reportMenuUserId === user.id ? null : user.id)
+                          }
                         >
-                          <option value="current">Этот месяц</option>
-                          <option value="previous">Прошлый месяц</option>
-                        </select>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "12px",
-                            minHeight: "auto"
-                          }}
-                          onClick={() => sendAthleteMonthlyReport(user.id)}
-                          disabled={sendingAthleteMonthlyId === user.id}
-                        >
-                          {sendingAthleteMonthlyId === user.id ? "Отправляю..." : "Месячный"}
+                          {sendingAthleteWeeklyId === user.id || sendingAthleteMonthlyId === user.id
+                            ? "Отправляю..."
+                            : "Отчёт в Telegram ▾"}
                         </button>
-                      </>
+                        {reportMenuUserId === user.id ? (
+                          <div className="report-menu-popover" role="menu">
+                            <button
+                              type="button"
+                              className="report-menu-item"
+                              onClick={() => {
+                                setReportMenuUserId(null);
+                                sendAthleteWeeklyReport(user.id, "current");
+                              }}
+                            >
+                              Недельный · текущая неделя
+                            </button>
+                            <button
+                              type="button"
+                              className="report-menu-item"
+                              onClick={() => {
+                                setReportMenuUserId(null);
+                                sendAthleteWeeklyReport(user.id, "previous");
+                              }}
+                            >
+                              Недельный · прошлая неделя
+                            </button>
+                            <button
+                              type="button"
+                              className="report-menu-item"
+                              onClick={() => {
+                                setReportMenuUserId(null);
+                                sendAthleteMonthlyReport(user.id, "current");
+                              }}
+                            >
+                              Месячный · этот месяц
+                            </button>
+                            <button
+                              type="button"
+                              className="report-menu-item"
+                              onClick={() => {
+                                setReportMenuUserId(null);
+                                sendAthleteMonthlyReport(user.id, "previous");
+                              }}
+                            >
+                              Месячный · прошлый месяц
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
                     {user.role !== "admin" ? (
                       <button
                         type="button"
-                        className="ghost-button"
-                        style={{
-                          padding: "4px 8px",
-                          fontSize: "12px",
-                          minHeight: "auto",
-                          color: "var(--danger)"
-                        }}
+                        className="ghost-button compact-button"
+                        style={{ color: "var(--danger)" }}
                         onClick={() => deleteUser(user.id, user.username)}
                       >
                         Удалить
@@ -681,7 +685,8 @@ export function AdminPage() {
           <div>
             <h2>Индекс формы</h2>
             <p className="muted">
-              Черновой расчет формы по надежным GPS + пульсу. Это не VO2max Garmin, а внутренняя метрика для проверки.
+              Оценка беговой формы по неделям. В расчёт попадают только пробежки с надёжным GPS и
+              пульсом — если таких нет, у недели не будет оценки. Это внутренняя метрика, не VO2max.
             </p>
           </div>
           <button type="button" className="ghost-button" onClick={fitnessApi.refresh}>
@@ -698,22 +703,33 @@ export function AdminPage() {
                 <div>
                   <strong>{row.athlete_name}</strong>
                   <div className="muted">
-                    Неделя с {new Date(row.week_start).toLocaleDateString("ru-RU")} · тренировок: {row.runs} · расчетных: {row.score_runs}
-                    {row.estimated_hrmax ? ` · HRmax est.: ${Math.round(row.estimated_hrmax)}` : ""}
+                    Неделя с {new Date(row.week_start).toLocaleDateString("ru-RU")} · пробежек: {row.runs} · в расчёте: {row.score_runs}
+                    {row.estimated_hrmax ? ` · оценка макс. пульса: ${Math.round(row.estimated_hrmax)}` : ""}
                   </div>
                 </div>
                 <div className="align-right">
-                  <div>
-                    Форма: <strong>{formatFitnessScore(row.fitness_index)}</strong>
-                  </div>
-                  <div className="muted">
-                    неделя {formatFitnessScore(row.week_best_score)} · аэробика{" "}
-                    {formatFitnessScore(row.aerobic_avg_score)}
-                  </div>
+                  {row.fitness_index != null ? (
+                    <>
+                      <div>
+                        Форма: <strong>{formatFitnessScore(row.fitness_index)}</strong>
+                      </div>
+                      <div className="muted">
+                        лучшая за неделю {formatFitnessScore(row.week_best_score)} · аэробная{" "}
+                        {formatFitnessScore(row.aerobic_avg_score)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="muted">нет данных для расчёта</div>
+                  )}
                 </div>
               </div>
             ))}
-            {fitnessRows.length === 0 ? <div className="muted">Пока нет рассчитанных тренировок.</div> : null}
+            {fitnessRows.length === 0 ? (
+              <div className="muted">
+                Пока нет недель с пробежками — оценки появятся после синхронизации тренировок из
+                Strava.
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>
