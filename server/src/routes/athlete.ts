@@ -51,9 +51,17 @@ export async function athleteRoutes(app: FastifyInstance) {
     const [profileResult, workoutsResult, statsResult] = await Promise.all([
       pool.query(
         `
-          select u.id, u.full_name, u.username, u.avatar_url, sc.connected_at, sc.last_synced_at
+          select
+            u.id, u.full_name, u.username, u.avatar_url,
+            coalesce(ic.connected_at, sc.connected_at) as connected_at,
+            greatest(sc.last_synced_at, ic.last_synced_at) as last_synced_at,
+            case
+              when ic.user_id is not null then 'intervals'
+              when sc.user_id is not null then 'strava'
+            end as provider
           from users u
           left join strava_connections sc on sc.user_id = u.id
+          left join intervals_connections ic on ic.user_id = u.id
           where u.id = $1
         `,
         [request.user.id]

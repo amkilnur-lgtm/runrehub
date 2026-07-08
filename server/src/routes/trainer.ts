@@ -145,8 +145,11 @@ export async function trainerRoutes(app: FastifyInstance) {
         `
           select count(*) as connected_count
           from users u
-          join strava_connections sc on sc.user_id = u.id
           where u.role = 'athlete' and u.coach_id = $1
+            and (
+              exists (select 1 from strava_connections sc where sc.user_id = u.id)
+              or exists (select 1 from intervals_connections ic where ic.user_id = u.id)
+            )
         `,
         [request.user.id]
       ),
@@ -239,10 +242,15 @@ export async function trainerRoutes(app: FastifyInstance) {
           u.full_name,
           u.username,
           u.avatar_url,
-          sc.connected_at,
-          sc.last_synced_at
+          coalesce(ic.connected_at, sc.connected_at) as connected_at,
+          greatest(sc.last_synced_at, ic.last_synced_at) as last_synced_at,
+          case
+            when ic.user_id is not null then 'intervals'
+            when sc.user_id is not null then 'strava'
+          end as provider
         from users u
         left join strava_connections sc on sc.user_id = u.id
+        left join intervals_connections ic on ic.user_id = u.id
         where u.id = $1 and u.coach_id = $2 and u.role = 'athlete'
       `,
       [athleteId, request.user.id]

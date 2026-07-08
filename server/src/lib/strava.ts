@@ -262,7 +262,7 @@ function isNumberArray(values: unknown[]): values is number[] {
   return values.every((value) => typeof value === "number" && Number.isFinite(value));
 }
 
-function parseNumberStream(values: unknown[] | undefined) {
+export function parseNumberStream(values: unknown[] | undefined) {
   if (!Array.isArray(values) || !isNumberArray(values)) {
     return [];
   }
@@ -270,7 +270,7 @@ function parseNumberStream(values: unknown[] | undefined) {
   return values;
 }
 
-function parseLatLngStream(values: unknown[] | undefined) {
+export function parseLatLngStream(values: unknown[] | undefined) {
   if (!Array.isArray(values)) {
     return [];
   }
@@ -316,7 +316,7 @@ async function fetchActivityStreamsFromStrava(userId: number, activityId: number
   } satisfies ActivityStreams;
 }
 
-async function saveActivityStreams(workoutId: number, streams: ActivityStreams) {
+export async function saveActivityStreams(workoutId: number, streams: ActivityStreams) {
   await pool.query(
     `
       insert into workout_streams (
@@ -439,7 +439,7 @@ export async function registerStravaWebhookEvent(payload: StravaWebhookPayload) 
 }
 
 // Обновляем net elevation для всех лапов одним запросом вместо цикла UPDATE
-async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
+export async function applyLapElevationChanges(workoutId: number, altitude: number[]) {
   const lapsResult = await pool.query(
     `
       select id, start_index, end_index
@@ -518,6 +518,8 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
         insert into workouts (
           user_id,
           strava_activity_id,
+          source,
+          source_activity_id,
           name,
           strava_name,
           sport_type,
@@ -530,7 +532,7 @@ async function syncSingleActivity(userId: number, token: string, activity: Strav
           average_heartrate,
           max_heartrate
         )
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        values ($1,$2,'strava',$2::text,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
         on conflict (strava_activity_id) do update
         set name = coalesce(workouts.custom_name, excluded.strava_name),
             strava_name = excluded.strava_name,

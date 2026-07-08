@@ -18,6 +18,7 @@ type AthleteIdentity = {
   avatar_url: string | null;
   connected_at: string | null;
   last_synced_at: string | null;
+  provider?: "strava" | "intervals" | null;
 };
 
 type AthleteAccountHeaderProps = {
@@ -56,16 +57,20 @@ function formatStatsElevation(value: number) {
   return `${Math.round(value)} м`;
 }
 
-function formatSyncStatus(connectedAt: string | null, lastSyncedAt: string | null) {
+function formatSyncStatus(
+  connectedAt: string | null,
+  lastSyncedAt: string | null,
+  provider: "strava" | "intervals" | null | undefined
+) {
   if (!connectedAt) {
     return {
-      title: "Strava не подключена",
-      subtitle: "Подключите Strava для автоматической синхронизации"
+      title: "Синхронизация не подключена",
+      subtitle: "Подключите Strava или попросите администратора подключить intervals.icu"
     };
   }
 
   return {
-    title: "Strava подключена",
+    title: provider === "intervals" ? "intervals.icu подключён" : "Strava подключена",
     subtitle: lastSyncedAt
       ? `Последняя синхронизация: ${formatDate(lastSyncedAt)}`
       : "Последняя синхронизация: еще не выполнялась"
@@ -104,8 +109,11 @@ export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
   }, [isStravaMenuOpen]);
 
   const selectedStats = stats[selectedPeriod];
-  const syncStatus = formatSyncStatus(athlete.connected_at, athlete.last_synced_at);
-  const canManageStrava = typeof onDisconnectStrava === "function" || typeof onConnectStrava === "function";
+  const syncStatus = formatSyncStatus(athlete.connected_at, athlete.last_synced_at, athlete.provider);
+  const isIntervalsManaged = athlete.provider === "intervals";
+  const canManageStrava =
+    !isIntervalsManaged &&
+    (typeof onDisconnectStrava === "function" || typeof onConnectStrava === "function");
 
   return (
     <section className="athlete-account-header">
@@ -126,7 +134,12 @@ export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
             </div>
           </div>
           <div className="athlete-account-status athlete-account-status-inline">
-            {athlete.connected_at ? (
+            {athlete.connected_at && isIntervalsManaged ? (
+              <>
+                <div>{syncStatus.title}</div>
+                {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
+              </>
+            ) : athlete.connected_at ? (
               <div className="athlete-strava-control" ref={stravaMenuRef}>
                 {typeof onDisconnectStrava === "function" ? (
                   <button

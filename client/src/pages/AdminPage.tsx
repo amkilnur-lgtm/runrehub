@@ -1,7 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Fragment, useEffect, useState } from "react";
 
 import { api } from "../api";
 import { useApi } from "../hooks/useApi";
+import { formatDate } from "../lib";
 
 type AdminUser = {
   id: number;
@@ -10,6 +11,10 @@ type AdminUser = {
   role: string;
   coach_id: number | null;
   coach_name: string | null;
+  icu_athlete_id: string | null;
+  intervals_last_synced_at: string | null;
+  intervals_last_sync_error: string | null;
+  strava_connected: boolean;
 };
 
 type Trainer = {
@@ -184,6 +189,12 @@ export function AdminPage() {
   const [weeklyPreviews, setWeeklyPreviews] = useState<Record<number, WeeklyPreviewState>>({});
   const [monthlyPreviews, setMonthlyPreviews] = useState<Record<number, MonthlyPreviewState>>({});
   const [reportMenuUserId, setReportMenuUserId] = useState<number | null>(null);
+  const [intervalsFormUserId, setIntervalsFormUserId] = useState<number | null>(null);
+  const [intervalsDrafts, setIntervalsDrafts] = useState<
+    Record<number, { icuAthleteId: string; apiKey: string }>
+  >({});
+  const [savingIntervalsId, setSavingIntervalsId] = useState<number | null>(null);
+  const [syncingIntervalsId, setSyncingIntervalsId] = useState<number | null>(null);
 
   useEffect(() => {
     if (reportMenuUserId === null) {
@@ -432,6 +443,69 @@ export function AdminPage() {
     }
   }
 
+  async function saveIntervalsConnection(userId: number) {
+    const draft = intervalsDrafts[userId];
+    if (!draft?.icuAthleteId.trim() || !draft?.apiKey.trim()) {
+      alert("Заполните Athlete ID и API key из intervals.icu");
+      return;
+    }
+
+    setSavingIntervalsId(userId);
+    try {
+      const result = await api<{ ok: boolean; icuAthleteId: string; athleteName: string | null }>(
+        `/api/admin/athletes/${userId}/intervals`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            icuAthleteId: draft.icuAthleteId.trim(),
+            apiKey: draft.apiKey.trim()
+          })
+        }
+      );
+      alert(
+        `intervals.icu подключён (${result.icuAthleteId}${
+          result.athleteName ? ` · ${result.athleteName}` : ""
+        }). Первая синхронизация подтянет тренировки за 90 дней.`
+      );
+      setIntervalsFormUserId(null);
+      setIntervalsDrafts((current) => ({ ...current, [userId]: { icuAthleteId: "", apiKey: "" } }));
+      usersApi.refresh();
+    } catch (err: any) {
+      alert(`Не удалось подключить intervals.icu: ${err.message}`);
+    } finally {
+      setSavingIntervalsId(null);
+    }
+  }
+
+  async function disconnectIntervals(userId: number, username: string) {
+    if (!window.confirm(`Отключить intervals.icu у @${username}? Тренировки останутся в базе.`)) {
+      return;
+    }
+    await api(`/api/admin/athletes/${userId}/intervals`, { method: "DELETE" });
+    usersApi.refresh();
+  }
+
+  async function syncIntervalsNow(userId: number) {
+    setSyncingIntervalsId(userId);
+    try {
+      const result = await api<{ synced: boolean; imported?: number }>(
+        `/api/admin/athletes/${userId}/intervals/sync`,
+        { method: "POST" }
+      );
+      alert(
+        result.synced
+          ? `Синхронизация завершена: импортировано тренировок — ${result.imported}.`
+          : "Синхронизация уже выполняется."
+      );
+      usersApi.refresh();
+      eventsApi.refresh();
+    } catch (err: any) {
+      alert(`Ошибка синхронизации: ${err.message}`);
+    } finally {
+      setSyncingIntervalsId(null);
+    }
+  }
+
   async function sendAthleteWeeklyReport(athleteId: number, period: "current" | "previous") {
     setSendingAthleteWeeklyId(athleteId);
     try {
@@ -555,11 +629,38 @@ export function AdminPage() {
             </p>
           ) : null}
           <div className="list">
-            {users.map((user) => (
-              <div key={user.id} className="list-row">
+            {users.map((user) => {
+              const intervalsDraft = intervalsDrafts[user.id] ?? { icuAthleteId: "", apiKey: "" };
+              const isIntervalsFormOpen = intervalsFormUserId === user.id;
+              const intervalsStatus =
+                user.role !== "athlete"
+                  ? null
+                  : user.icu_athlete_id
+                    ? user.intervals_last_sync_error
+                      ? `intervals.icu: ${user.icu_athlete_id} · ошибка синхронизации`
+                      : user.intervals_last_synced_at
+                        ? `intervals.icu: ${user.icu_athlete_id} · синхр. ${formatDate(user.intervals_last_synced_at)}`
+                        : `intervals.icu: ${user.icu_athlete_id} · ждёт первой синхронизации`
+                    : user.strava_connected
+                      ? "Strava подключена"
+                      : "синхронизация не подключена";
+
+              return (
+              <Fragment key={user.id}>
+              <div className="list-row">
                 <div>
                   <strong>{user.full_name}</strong>
                   <div className="muted">@{user.username}</div>
+                  {intervalsStatus ? (
+                    <div
+                      className="muted"
+                      style={
+                        user.intervals_last_sync_error ? { color: "var(--danger)" } : undefined
+                      }
+                    >
+                      {intervalsStatus}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="align-right">
                   <div
@@ -635,6 +736,18 @@ export function AdminPage() {
                         ) : null}
                       </div>
                     ) : null}
+                    {user.role === "athlete" ? (
+                      <button
+                        type="button"
+                        className="ghost-button compact-button"
+                        aria-expanded={isIntervalsFormOpen}
+                        onClick={() =>
+                          setIntervalsFormUserId(isIntervalsFormOpen ? null : user.id)
+                        }
+                      >
+                        intervals.icu
+                      </button>
+                    ) : null}
                     {user.role !== "admin" ? (
                       <button
                         type="button"
@@ -649,7 +762,78 @@ export function AdminPage() {
                   {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
                 </div>
               </div>
-            ))}
+              {isIntervalsFormOpen ? (
+                <div className="intervals-panel">
+                  {user.intervals_last_sync_error ? (
+                    <div className="error-box">{user.intervals_last_sync_error}</div>
+                  ) : null}
+                  <div className="intervals-panel-fields">
+                    <label className="admin-telegram-field">
+                      Athlete ID
+                      <input
+                        placeholder="i123456"
+                        value={intervalsDraft.icuAthleteId}
+                        onChange={(event) =>
+                          setIntervalsDrafts((current) => ({
+                            ...current,
+                            [user.id]: { ...intervalsDraft, icuAthleteId: event.target.value }
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin-telegram-field">
+                      API key
+                      <input
+                        placeholder="ключ из Settings → Developer"
+                        value={intervalsDraft.apiKey}
+                        onChange={(event) =>
+                          setIntervalsDrafts((current) => ({
+                            ...current,
+                            [user.id]: { ...intervalsDraft, apiKey: event.target.value }
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="admin-telegram-actions">
+                    <button
+                      type="button"
+                      className="primary-button compact-button"
+                      onClick={() => saveIntervalsConnection(user.id)}
+                      disabled={savingIntervalsId === user.id}
+                    >
+                      {savingIntervalsId === user.id ? "Проверяю ключ..." : "Сохранить и проверить"}
+                    </button>
+                    {user.icu_athlete_id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ghost-button compact-button"
+                          onClick={() => syncIntervalsNow(user.id)}
+                          disabled={syncingIntervalsId === user.id}
+                        >
+                          {syncingIntervalsId === user.id ? "Синхронизирую..." : "Синхронизировать"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button compact-button"
+                          style={{ color: "var(--danger)" }}
+                          onClick={() => disconnectIntervals(user.id, user.username)}
+                        >
+                          Отключить
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="muted">
+                    Спортсмен берёт ключ в intervals.icu: Settings → Developer → API key. Athlete ID
+                    виден в адресе профиля (например, i123456).
+                  </div>
+                </div>
+              ) : null}
+              </Fragment>
+              );
+            })}
           </div>
         </section>
       </div>
