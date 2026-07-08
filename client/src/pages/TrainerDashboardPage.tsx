@@ -293,7 +293,8 @@ export function TrainerDashboardPage() {
                     <div className="muted">@{athlete.username}</div>
                   </div>
                   <div className="trainer-dashboard-athlete-meta">
-                    {athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "Без пробежек"}
+                    <div>{athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "—"}</div>
+                    <div className="muted">последняя пробежка</div>
                   </div>
                 </Link>
               ))}
