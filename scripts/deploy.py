@@ -33,7 +33,20 @@ def load_config() -> dict[str, str]:
     return {}
 
 
+IS_WINDOWS = os.name == "nt"
+
+
 def build_plink_command(password: str, host: str, user: str, hostkey: str, remote_command: str) -> list[str]:
+    if not IS_WINDOWS:
+        # Linux/WSL/macOS: system OpenSSH with key-based auth
+        return [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            f"{user}@{host}",
+            remote_command,
+        ]
+
     return [
         r"C:\Program Files\PuTTY\plink.exe",
         "-batch",
@@ -113,6 +126,10 @@ def require_password(cli_password: str | None) -> str:
     password = cli_password or os.environ.get("RUNREHAB_SSH_PASSWORD")
     if password:
         return password
+
+    if not IS_WINDOWS:
+        # ssh uses key-based auth; password is only needed for plink on Windows
+        return ""
 
     print("Set RUNREHAB_SSH_PASSWORD or pass --password.", file=sys.stderr)
     sys.exit(2)
