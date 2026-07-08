@@ -34,7 +34,8 @@ declare module "fastify" {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = Fastify({ logger: true });
+// trustProxy: приложение стоит за Caddy, реальный IP клиента приходит в X-Forwarded-For
+const app = Fastify({ logger: true, trustProxy: true });
 app.decorate("pg", pool);
 
 // --- CORS: в production разрешаем только свои домены ---
@@ -79,6 +80,10 @@ app.setErrorHandler((error: any, request, reply) => {
   // Ошибки доступа (requireRole)
   if (error.message === "FORBIDDEN") {
     return reply.code(403).send({ message: "Нет доступа" });
+  }
+  // Ошибки с клиентским кодом (например 429 от rate-limit) отдаем как есть
+  if (typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500) {
+    return reply.code(error.statusCode).send({ message: error.message });
   }
   // Всё остальное
   request.log.error({ err: error, url: request.url }, "unhandled error");
