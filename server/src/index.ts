@@ -19,6 +19,7 @@ import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
 import { syncDueAthletes } from "./lib/strava.js";
+import { syncDueIntervalsAthletes } from "./lib/intervals.js";
 import {
   enqueueMonthlyTelegramReports,
   enqueueWeeklyTelegramReports,
@@ -171,6 +172,9 @@ addStravaEvent({
 });
 setInterval(() => {
   void syncDueAthletes(app.log);
+  void syncDueIntervalsAthletes(app.log).catch((error) => {
+    app.log.error({ err: error }, "intervals cron tick failed");
+  });
 }, syncIntervalMs);
 
 const telegramIntervalMs = 30 * 1000;

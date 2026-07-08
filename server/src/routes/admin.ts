@@ -4,6 +4,13 @@ import { z } from "zod";
 import { hashPassword, requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
+import {
+  connectIntervalsAccount,
+  disconnectIntervalsAccount,
+  normalizeIcuAthleteId,
+  syncIntervalsLatestActivities,
+  verifyIntervalsCredentials
+} from "../lib/intervals.js";
 import { isTelegramConfigured } from "../lib/telegram.js";
 import {
   getMonthlyTelegramPreview,
@@ -27,6 +34,11 @@ const createUserSchema = z.object({
 
 const stravaEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(100)
+});
+
+const connectIntervalsSchema = z.object({
+  icuAthleteId: z.string().min(1).max(40),
+  apiKey: z.string().min(8).max(200)
 });
 
 const updateTrainerTelegramSchema = z.object({
@@ -55,13 +67,68 @@ export async function adminRoutes(app: FastifyInstance) {
     requireRole(request, ["admin"]);
     const { rows } = await pool.query(
       `
-        select u.id, u.username, u.full_name, u.role, u.coach_id, coach.full_name as coach_name
+        select
+          u.id, u.username, u.full_name, u.role, u.coach_id, coach.full_name as coach_name,
+          ic.icu_athlete_id,
+          ic.last_synced_at as intervals_last_synced_at,
+          ic.last_sync_error as intervals_last_sync_error,
+          (sc.user_id is not null) as strava_connected
         from users u
         left join users coach on coach.id = u.coach_id
+        left join intervals_connections ic on ic.user_id = u.id
+        left join strava_connections sc on sc.user_id = u.id
         order by u.created_at desc
       `
     );
     return { users: rows };
+  });
+
+  app.put("/api/admin/athletes/:id/intervals", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    const athleteUserId = parseInt(params.id, 10);
+    const body = connectIntervalsSchema.parse(request.body);
+
+    const { rows } = await pool.query(`select id from users where id = $1 and role = 'athlete'`, [
+      athleteUserId
+    ]);
+    if (!rows[0]) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+
+    const icuAthleteId = normalizeIcuAthleteId(body.icuAthleteId);
+    const verification = await verifyIntervalsCredentials(icuAthleteId, body.apiKey);
+    if (!verification.ok) {
+      return reply.code(400).send({
+        message:
+          verification.status === 401 || verification.status === 403
+            ? "intervals.icu не принял ключ: проверьте Athlete ID и API key"
+            : `intervals.icu недоступен (${verification.status})`
+      });
+    }
+
+    await connectIntervalsAccount(athleteUserId, icuAthleteId, body.apiKey);
+    return { ok: true, icuAthleteId, athleteName: verification.athleteName };
+  });
+
+  app.delete("/api/admin/athletes/:id/intervals", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    await disconnectIntervalsAccount(parseInt(params.id, 10));
+    return { ok: true };
+  });
+
+  app.post("/api/admin/athletes/:id/intervals/sync", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    try {
+      const result = await syncIntervalsLatestActivities(parseInt(params.id, 10));
+      return result;
+    } catch (error) {
+      return reply.code(502).send({
+        message: error instanceof Error ? error.message.slice(0, 300) : "Ошибка синхронизации"
+      });
+    }
   });
 
   app.get("/api/admin/trainers", { preHandler: requireAuth }, async (request) => {

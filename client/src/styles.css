@@ -732,6 +732,20 @@ select:focus-visible {
   background: var(--surface-2);
 }
 
+.intervals-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+}
+
+.intervals-panel-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
 .stat-card {
   padding: 18px;
   border-radius: 18px;

@@ -16,6 +16,7 @@ type AthleteDashboardData = {
     avatar_url: string | null;
     connected_at: string | null;
     last_synced_at: string | null;
+    provider?: "strava" | "intervals" | null;
   };
   stats: {
     week: PeriodStats;
