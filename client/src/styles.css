@@ -81,9 +81,12 @@ select {
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
 }
 
 .login-brand {
+  border-radius: var(--radius-l);
   background: var(--brand-navy-deep);
   color: oklch(0.97 0.005 272);
   display: flex;
@@ -144,11 +147,13 @@ select {
   .login-screen {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    padding: 12px;
+    gap: 12px;
   }
 
   .login-brand {
     gap: 16px;
-    padding: 24px 20px;
+    padding: 20px;
   }
 
   .login-tagline {
@@ -167,7 +172,7 @@ select {
 
   .login-side {
     align-items: start;
-    padding-top: 8px;
+    padding: 0;
   }
 }
 
@@ -182,9 +187,6 @@ select {
 .login-card {
   width: min(100%, 420px);
   padding: 32px;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
 }
 
 .login-logo-wrap {
