@@ -34,6 +34,12 @@ export type IntervalsActivity = {
   average_speed: number | null;
   average_heartrate: number | null;
   max_heartrate: number | null;
+  // считаются intervals.icu из данных часов, профиль атлета не нужен
+  gap: number | null;
+  average_cadence: number | null;
+  average_stride: number | null;
+  icu_training_load: number | null;
+  device_name: string | null;
 };
 
 type IntervalsLap = {
@@ -145,7 +151,7 @@ function isRunningActivity(activity: IntervalsActivity) {
 }
 
 async function fetchActivityStreams(apiKey: string, activityId: string) {
-  const types = "time,distance,heartrate,cadence,velocity_smooth,altitude,fixed_altitude,latlng";
+  const types = "time,distance,heartrate,cadence,velocity_smooth,altitude,fixed_altitude,latlng,watts";
   const response = await intervalsFetch(
     apiKey,
     `/activity/${encodeURIComponent(activityId)}/streams?types=${types}`
@@ -167,7 +173,8 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
     altitude: parseNumberStream(numberData("fixed_altitude") ?? numberData("altitude")),
     velocity_smooth: parseNumberStream(numberData("velocity_smooth")),
     latlng:
-      latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined)
+      latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined),
+    watts: parseNumberStream(numberData("watts"))
   } satisfies ActivityStreams;
 }
 
@@ -218,9 +225,14 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
           elevation_gain,
           average_speed,
           average_heartrate,
-          max_heartrate
+          max_heartrate,
+          grade_adjusted_speed,
+          average_cadence,
+          average_stride,
+          training_load,
+          device_name
         )
-        values ($1,'intervals',$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        values ($1,'intervals',$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         on conflict (source, source_activity_id) do update
         set name = coalesce(workouts.custom_name, excluded.strava_name),
             strava_name = excluded.strava_name,
@@ -232,7 +244,12 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
             elevation_gain = excluded.elevation_gain,
             average_speed = excluded.average_speed,
             average_heartrate = excluded.average_heartrate,
-            max_heartrate = excluded.max_heartrate
+            max_heartrate = excluded.max_heartrate,
+            grade_adjusted_speed = excluded.grade_adjusted_speed,
+            average_cadence = excluded.average_cadence,
+            average_stride = excluded.average_stride,
+            training_load = excluded.training_load,
+            device_name = excluded.device_name
         returning id, (xmax = 0) as inserted
       `,
       [
@@ -247,7 +264,12 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
         activity.total_elevation_gain ?? 0,
         activity.average_speed,
         activity.average_heartrate ?? null,
-        activity.max_heartrate ?? null
+        activity.max_heartrate ?? null,
+        activity.gap ?? null,
+        activity.average_cadence ?? null,
+        activity.average_stride ?? null,
+        activity.icu_training_load ?? null,
+        activity.device_name ?? null
       ]
     );
 
