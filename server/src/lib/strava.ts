@@ -80,6 +80,8 @@ export type ActivityStreams = {
   altitude: number[];
   velocity_smooth: number[];
   latlng: [number, number][];
+  // беговая мощность: intervals.icu отдает, Strava для бега — нет
+  watts?: number[];
 };
 
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
@@ -328,9 +330,10 @@ export async function saveActivityStreams(workoutId: number, streams: ActivitySt
         altitude_stream,
         velocity_stream,
         latlng_stream,
+        watts_stream,
         fetched_at
       )
-      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, now())
+      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, now())
       on conflict (workout_id) do update
       set distance_stream = excluded.distance_stream,
           time_stream = excluded.time_stream,
@@ -339,6 +342,7 @@ export async function saveActivityStreams(workoutId: number, streams: ActivitySt
           altitude_stream = excluded.altitude_stream,
           velocity_stream = excluded.velocity_stream,
           latlng_stream = excluded.latlng_stream,
+          watts_stream = excluded.watts_stream,
           fetched_at = now()
     `,
     [
@@ -349,7 +353,8 @@ export async function saveActivityStreams(workoutId: number, streams: ActivitySt
       JSON.stringify(streams.cadence),
       JSON.stringify(streams.altitude),
       JSON.stringify(streams.velocity_smooth),
-      JSON.stringify(streams.latlng)
+      JSON.stringify(streams.latlng),
+      JSON.stringify(streams.watts ?? [])
     ]
   );
 }
