@@ -226,12 +226,12 @@ export async function adminRoutes(app: FastifyInstance) {
             weeks.week_start,
             count(distinct base_runs.id)::int as runs,
             count(distinct reliable_scores.id) filter (where reliable_scores.week_start = weeks.week_start)::int as score_runs,
-            round(max(reliable_scores.estimated_hrmax)::numeric, 0) as estimated_hrmax,
-            round(max(reliable_scores.fitness_score) filter (where reliable_scores.week_start = weeks.week_start)::numeric, 2) as week_best_score,
+            round(max(reliable_scores.estimated_hrmax)::numeric, 0)::float8 as estimated_hrmax,
+            round(max(reliable_scores.fitness_score) filter (where reliable_scores.week_start = weeks.week_start)::numeric, 2)::float8 as week_best_score,
             round(avg(reliable_scores.aerobic_score) filter (
               where reliable_scores.week_start = weeks.week_start
                 and reliable_scores.aerobic_score is not null
-            )::numeric, 2) as aerobic_avg_score,
+            )::numeric, 2)::float8 as aerobic_avg_score,
             round(max(
               reliable_scores.fitness_score *
               case
@@ -244,7 +244,7 @@ export async function adminRoutes(app: FastifyInstance) {
             ) filter (
               where reliable_scores.run_date <= weeks.week_start + 6
                 and reliable_scores.run_date >= weeks.week_start - 49
-            )::numeric, 2) as fitness_index
+            )::numeric, 2)::float8 as fitness_index
           from weeks
           left join base_runs on base_runs.user_id = weeks.athlete_id
             and base_runs.week_start = weeks.week_start
