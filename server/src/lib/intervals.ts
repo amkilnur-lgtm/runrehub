@@ -61,6 +61,15 @@ type StreamEntry = {
   data2?: unknown[] | null;
 };
 
+// В паузах записи intervals.icu кладет в watts null — заменяем на 0,
+// чтобы не терять весь стрим и сохранить выравнивание по индексам
+function parseWattsStream(values: unknown[] | undefined) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : 0));
+}
+
 function zipLatLng(entry: StreamEntry | undefined) {
   const lats = entry?.data;
   const lngs = entry?.data2;
@@ -174,7 +183,7 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
     velocity_smooth: parseNumberStream(numberData("velocity_smooth")),
     latlng:
       latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined),
-    watts: parseNumberStream(numberData("watts"))
+    watts: parseWattsStream(numberData("watts"))
   } satisfies ActivityStreams;
 }
 
