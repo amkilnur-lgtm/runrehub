@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
-import { ensureActivityStreams, getStravaAuthUrl, markStravaActivityDeleted, syncLatestActivities } from "../lib/strava.js";
+import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
@@ -53,14 +53,10 @@ export async function athleteRoutes(app: FastifyInstance) {
         `
           select
             u.id, u.full_name, u.username, u.avatar_url,
-            coalesce(ic.connected_at, sc.connected_at) as connected_at,
-            greatest(sc.last_synced_at, ic.last_synced_at) as last_synced_at,
-            case
-              when ic.user_id is not null then 'intervals'
-              when sc.user_id is not null then 'strava'
-            end as provider
+            ic.connected_at as connected_at,
+            ic.last_synced_at as last_synced_at,
+            case when ic.user_id is not null then 'intervals' end as provider
           from users u
-          left join strava_connections sc on sc.user_id = u.id
           left join intervals_connections ic on ic.user_id = u.id
           where u.id = $1
         `,
@@ -173,34 +169,6 @@ export async function athleteRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/api/athlete/strava/connect", { preHandler: requireAuth }, async (request) => {
-    requireRole(request, ["athlete"]);
-    return { url: getStravaAuthUrl() };
-  });
-
-  app.post(
-    "/api/athlete/strava/sync",
-    {
-      preHandler: requireAuth,
-      config: {
-        rateLimit: {
-          max: 3,
-          timeWindow: "1 minute"
-        }
-      }
-    },
-    async (request) => {
-      requireRole(request, ["athlete"]);
-      return syncLatestActivities(request.user.id);
-    }
-  );
-
-  app.delete("/api/athlete/strava/disconnect", { preHandler: requireAuth }, async (request) => {
-    requireRole(request, ["athlete"]);
-    await pool.query(`delete from strava_connections where user_id = $1`, [request.user.id]);
-    return { ok: true };
-  });
-
   app.get("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["athlete"]);
     const params = request.params as { id: string };
@@ -219,11 +187,7 @@ export async function athleteRoutes(app: FastifyInstance) {
       [workoutId]
     );
 
-    const streams = await ensureActivityStreams(
-      request.user.id,
-      workoutId,
-      workoutResult.rows[0].strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
 
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(

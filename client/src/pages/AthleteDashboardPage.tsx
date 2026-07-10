@@ -16,7 +16,7 @@ type AthleteDashboardData = {
     avatar_url: string | null;
     connected_at: string | null;
     last_synced_at: string | null;
-    provider?: "strava" | "intervals" | null;
+    provider?: "intervals" | null;
   };
   stats: {
     week: PeriodStats;
@@ -41,7 +41,7 @@ type AthleteDashboardData = {
 
 export function AthleteDashboardPage() {
   const { user } = useAuth();
-  const { data, loading, error, refresh } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
+  const { data, loading, error } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
   const [extraWorkouts, setExtraWorkouts] = useState<AthleteDashboardData["workouts"]>([]);
   const [nextCursor, setNextCursor] = useState<AthleteDashboardData["nextCursor"]>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -78,23 +78,6 @@ export function AthleteDashboardPage() {
     }
   }
 
-  async function connectStrava() {
-    const response = await api<{ url: string }>("/api/athlete/strava/connect");
-    window.location.href = response.url;
-  }
-
-  async function disconnectStrava() {
-    const confirmed = window.confirm(
-      "Вы уверены, что хотите отключить Strava? История тренировок останется, но новые данные больше не будут подтягиваться автоматически."
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    await api("/api/athlete/strava/disconnect", { method: "DELETE" });
-    refresh();
-  }
-
   if (loading) {
     return (
       <div className="stack">
@@ -123,8 +106,6 @@ export function AthleteDashboardPage() {
         stats={data.stats}
         selectedPeriod={selectedPeriod}
         onPeriodChange={setSelectedPeriod}
-        onConnectStrava={connectStrava}
-        onDisconnectStrava={disconnectStrava}
         avatarControl={
           <EditableAvatarMenu
             fullName={user?.fullName ?? data.athlete.full_name}

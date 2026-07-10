@@ -10,6 +10,7 @@ process.env.STRAVA_TOKEN_ENCRYPTION_KEY ??= "test-encryption-key-1234567890";
 
 const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
+const intervalsModule = await import("./lib/intervals.js");
 const dbModule = await import("./lib/db.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
@@ -66,23 +67,7 @@ await runTest("decryptToken keeps legacy plaintext tokens readable", () => {
   assert.equal(stravaModule.decryptToken("legacy-plain-token"), "legacy-plain-token");
 });
 
-await runTest("createWebhookFingerprint is deterministic for identical payloads", () => {
-  const payload = {
-    owner_id: 101,
-    object_id: 202,
-    aspect_type: "create",
-    object_type: "activity",
-    event_time: 1711111111,
-    subscription_id: 303
-  };
-
-  assert.equal(
-    stravaModule.createWebhookFingerprint(payload),
-    stravaModule.createWebhookFingerprint(payload)
-  );
-});
-
-await runTest("syncLatestActivities returns already_running when advisory lock is busy", async () => {
+await runTest("syncIntervalsLatestActivities returns already_running when advisory lock is busy", async () => {
   const queryMock = mock.method(dbModule.pool, "query", async (sql: string) => {
     if (sql.includes("pg_try_advisory_lock")) {
       return { rows: [{ locked: false }] };
@@ -92,7 +77,7 @@ await runTest("syncLatestActivities returns already_running when advisory lock i
   });
 
   try {
-    const result = await stravaModule.syncLatestActivities(77);
+    const result = await intervalsModule.syncIntervalsLatestActivities(77);
     assert.deepEqual(result, { synced: false, reason: "already_running" });
   } finally {
     queryMock.mock.restore();

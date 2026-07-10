@@ -18,7 +18,7 @@ export function StreamChart({
         <div className="chart-title-row">
           <span className="muted trainer-dashboard-eyebrow">{title}</span>
         </div>
-        <div className="chart-empty muted">Нет данных Strava для этого графика.</div>
+        <div className="chart-empty muted">Нет данных для этого графика.</div>
       </div>
     );
   }
