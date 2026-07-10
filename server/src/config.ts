@@ -15,9 +15,7 @@ const configSchema = z
     ADMIN_PASSWORD: z.string().min(6),
     ADMIN_FULL_NAME: z.string().default("RunningRehab Admin"),
     DATABASE_URL: z.string().min(1),
-    STRAVA_CLIENT_ID: z.string().optional(),
-    STRAVA_CLIENT_SECRET: z.string().optional(),
-    STRAVA_WEBHOOK_VERIFY_TOKEN: z.string().default("change-me"),
+    // Ключом зашифрованы api-ключи intervals.icu (имя осталось со времен Strava)
     STRAVA_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional(),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_BOT_USERNAME: z.string().optional()

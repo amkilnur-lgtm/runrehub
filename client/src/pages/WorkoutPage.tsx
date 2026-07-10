@@ -452,7 +452,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
 
     const confirmed = window.confirm(
-      "Отменить исправление и вернуть исходные данные Strava?"
+      "Отменить исправление и вернуть исходные данные тренировки?"
     );
     if (!confirmed) {
       return;
@@ -707,7 +707,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </table>
             </div>
           ) : (
-            <div className="muted">Strava не вернула отдельные отрезки для этой тренировки.</div>
+            <div className="muted">У этой тренировки нет отдельных отрезков.</div>
           )}
         </div>
 

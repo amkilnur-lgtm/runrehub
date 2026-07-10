@@ -13,12 +13,10 @@ import { authRoutes } from "./routes/auth.js";
 import { adminRoutes } from "./routes/admin.js";
 import { athleteRoutes } from "./routes/athlete.js";
 import { trainerRoutes } from "./routes/trainer.js";
-import { stravaRoutes } from "./routes/strava.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
-import { syncDueAthletes } from "./lib/strava.js";
 import { syncDueIntervalsAthletes } from "./lib/intervals.js";
 import {
   enqueueMonthlyTelegramReports,
@@ -97,7 +95,6 @@ await app.register(authRoutes);
 await app.register(adminRoutes);
 await app.register(athleteRoutes);
 await app.register(trainerRoutes);
-await app.register(stravaRoutes);
 
 const publicDir = path.join(__dirname, "public");
 const avatarUploadsRoot = getAvatarUploadsRoot();
@@ -158,20 +155,19 @@ const shutdown = async () => {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-// --- Фоновая синхронизация Strava ---
+// --- Фоновая синхронизация intervals.icu ---
 const syncIntervalMs = config.STRAVA_SYNC_INTERVAL_MINUTES * 60 * 1000;
 app.log.info(
   { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES },
-  "strava cron scheduler started"
+  "sync cron scheduler started"
 );
 addStravaEvent({
   source: "system",
   level: "info",
-  message: "strava cron scheduler started",
+  message: "sync cron scheduler started",
   details: { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES }
 });
 setInterval(() => {
-  void syncDueAthletes(app.log);
   void syncDueIntervalsAthletes(app.log).catch((error) => {
     app.log.error({ err: error }, "intervals cron tick failed");
   });

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
-import { ensureActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
+import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
 import { analyzeWorkout } from "../lib/workout-analysis.js";
 import {
   applyWorkoutCorrectionToView,
@@ -146,10 +146,7 @@ export async function trainerRoutes(app: FastifyInstance) {
           select count(*) as connected_count
           from users u
           where u.role = 'athlete' and u.coach_id = $1
-            and (
-              exists (select 1 from strava_connections sc where sc.user_id = u.id)
-              or exists (select 1 from intervals_connections ic where ic.user_id = u.id)
-            )
+            and exists (select 1 from intervals_connections ic where ic.user_id = u.id)
         `,
         [request.user.id]
       ),
@@ -242,14 +239,10 @@ export async function trainerRoutes(app: FastifyInstance) {
           u.full_name,
           u.username,
           u.avatar_url,
-          coalesce(ic.connected_at, sc.connected_at) as connected_at,
-          greatest(sc.last_synced_at, ic.last_synced_at) as last_synced_at,
-          case
-            when ic.user_id is not null then 'intervals'
-            when sc.user_id is not null then 'strava'
-          end as provider
+          ic.connected_at as connected_at,
+          ic.last_synced_at as last_synced_at,
+          case when ic.user_id is not null then 'intervals' end as provider
         from users u
-        left join strava_connections sc on sc.user_id = u.id
         left join intervals_connections ic on ic.user_id = u.id
         where u.id = $1 and u.coach_id = $2 and u.role = 'athlete'
       `,
@@ -392,11 +385,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       [workoutId]
     );
 
-    const streams = await ensureActivityStreams(
-      workoutResult.rows[0].user_id as number,
-      workoutId,
-      workoutResult.rows[0].strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
 
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(
@@ -536,11 +525,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const athleteProfile = await buildAthleteCadenceProfile(workout.user_id as number, workoutId);
 
     const preview = buildGpsFixPreview(workout, lapsResult.rows, streams, athleteProfile);
@@ -588,11 +573,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const athleteProfile = await buildAthleteCadenceProfile(workout.user_id as number, workoutId);
 
     const preview = buildGpsFixPreview(workout, lapsResult.rows, streams, athleteProfile);
@@ -662,11 +643,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
     const currentWorkout = correctedView.workout as typeof workout & {
@@ -728,11 +705,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
     const currentWorkout = correctedView.workout as typeof workout & {
@@ -792,11 +765,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
     const currentWorkout = correctedView.workout as typeof workout & {
@@ -858,11 +827,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       `select * from workout_laps where workout_id = $1 order by id asc`,
       [workoutId]
     );
-    const streams = await ensureActivityStreams(
-      workout.user_id as number,
-      workoutId,
-      workout.strava_activity_id as number
-    );
+    const streams = await getStoredActivityStreams(workoutId);
     const correction = await getActiveWorkoutCorrection(workoutId);
     const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
     const currentWorkout = correctedView.workout as typeof workout & {

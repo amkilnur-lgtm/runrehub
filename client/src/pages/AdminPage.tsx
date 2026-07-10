@@ -14,7 +14,6 @@ type AdminUser = {
   icu_athlete_id: string | null;
   intervals_last_synced_at: string | null;
   intervals_last_sync_error: string | null;
-  strava_connected: boolean;
 };
 
 type Trainer = {
@@ -162,7 +161,7 @@ function formatFitnessScore(value: number | null) {
 export function AdminPage() {
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
-  const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/strava/events?limit=80");
+  const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/events?limit=80");
   const fitnessApi = useApi<{ weeks: number; rows: FitnessSummaryRow[] }>("/api/admin/fitness/summary?weeks=8");
   const telegramApi = useApi<{
     configured: boolean;
@@ -641,9 +640,7 @@ export function AdminPage() {
                       : user.intervals_last_synced_at
                         ? `intervals.icu: ${user.icu_athlete_id} · синхр. ${formatDate(user.intervals_last_synced_at)}`
                         : `intervals.icu: ${user.icu_athlete_id} · ждёт первой синхронизации`
-                    : user.strava_connected
-                      ? "Strava подключена"
-                      : "синхронизация не подключена";
+                    : "синхронизация не подключена";
 
               return (
               <Fragment key={user.id}>
@@ -841,9 +838,9 @@ export function AdminPage() {
       <section className="card">
         <div className="section-header">
           <div>
-            <h2>События Strava</h2>
+            <h2>Журнал событий</h2>
             <p className="muted">
-              Последние серверные события webhook и cron. Обновляй список, чтобы видеть новые
+              Последние серверные события синхронизации и cron. Обновляй список, чтобы видеть новые
               срабатывания.
             </p>
           </div>
@@ -911,7 +908,7 @@ export function AdminPage() {
             {fitnessRows.length === 0 ? (
               <div className="muted">
                 Пока нет недель с пробежками — оценки появятся после синхронизации тренировок из
-                Strava.
+                intervals.icu.
               </div>
             ) : null}
           </div>

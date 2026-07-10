@@ -93,7 +93,7 @@ function formatAthleteCount(count: number) {
 }
 
 function formatConnectedCount(count: number) {
-  return `${count} ${pluralize(count, "спортсмен подключил", "спортсмена подключили", "спортсменов подключили")} Strava`;
+  return `${count} ${pluralize(count, "спортсмен подключил", "спортсмена подключили", "спортсменов подключили")} синхронизацию`;
 }
 
 function formatWorkoutCount(count: number) {

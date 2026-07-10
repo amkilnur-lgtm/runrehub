@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode } from "react";
 
 import { UserAvatar } from "./UserAvatar";
 import { formatDate, formatDistance } from "../lib";
@@ -18,7 +18,7 @@ type AthleteIdentity = {
   avatar_url: string | null;
   connected_at: string | null;
   last_synced_at: string | null;
-  provider?: "strava" | "intervals" | null;
+  provider?: "intervals" | null;
 };
 
 type AthleteAccountHeaderProps = {
@@ -31,8 +31,6 @@ type AthleteAccountHeaderProps = {
   };
   selectedPeriod: StatsPeriodKey;
   onPeriodChange: (period: StatsPeriodKey) => void;
-  onConnectStrava?: () => void;
-  onDisconnectStrava?: () => Promise<void> | void;
   avatarControl?: ReactNode;
 };
 
@@ -57,20 +55,16 @@ function formatStatsElevation(value: number) {
   return `${Math.round(value)} м`;
 }
 
-function formatSyncStatus(
-  connectedAt: string | null,
-  lastSyncedAt: string | null,
-  provider: "strava" | "intervals" | null | undefined
-) {
+function formatSyncStatus(connectedAt: string | null, lastSyncedAt: string | null) {
   if (!connectedAt) {
     return {
       title: "Синхронизация не подключена",
-      subtitle: "Подключите Strava или попросите администратора подключить intervals.icu"
+      subtitle: "Попросите администратора подключить intervals.icu"
     };
   }
 
   return {
-    title: provider === "intervals" ? "intervals.icu подключён" : "Strava подключена",
+    title: "intervals.icu подключён",
     subtitle: lastSyncedAt
       ? `Последняя синхронизация: ${formatDate(lastSyncedAt)}`
       : "Последняя синхронизация: еще не выполнялась"
@@ -78,42 +72,10 @@ function formatSyncStatus(
 }
 
 export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
-  const { athlete, stats, selectedPeriod, onPeriodChange, onConnectStrava, onDisconnectStrava, avatarControl } = props;
-  const [isStravaMenuOpen, setIsStravaMenuOpen] = useState(false);
-  const stravaMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isStravaMenuOpen) {
-      return undefined;
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      if (stravaMenuRef.current && !stravaMenuRef.current.contains(event.target as Node)) {
-        setIsStravaMenuOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsStravaMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isStravaMenuOpen]);
+  const { athlete, stats, selectedPeriod, onPeriodChange, avatarControl } = props;
 
   const selectedStats = stats[selectedPeriod];
-  const syncStatus = formatSyncStatus(athlete.connected_at, athlete.last_synced_at, athlete.provider);
-  const isIntervalsManaged = athlete.provider === "intervals";
-  const canManageStrava =
-    !isIntervalsManaged &&
-    (typeof onDisconnectStrava === "function" || typeof onConnectStrava === "function");
+  const syncStatus = formatSyncStatus(athlete.connected_at, athlete.last_synced_at);
 
   return (
     <section className="athlete-account-header">
@@ -134,54 +96,8 @@ export function AthleteAccountHeader(props: AthleteAccountHeaderProps) {
             </div>
           </div>
           <div className="athlete-account-status athlete-account-status-inline">
-            {athlete.connected_at && isIntervalsManaged ? (
-              <>
-                <div>{syncStatus.title}</div>
-                {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
-              </>
-            ) : athlete.connected_at ? (
-              <div className="athlete-strava-control" ref={stravaMenuRef}>
-                {typeof onDisconnectStrava === "function" ? (
-                  <button
-                    type="button"
-                    className="athlete-account-status-trigger"
-                    aria-expanded={isStravaMenuOpen}
-                    onClick={() => setIsStravaMenuOpen((open) => !open)}
-                  >
-                    {syncStatus.title}
-                  </button>
-                ) : (
-                  <div>{syncStatus.title}</div>
-                )}
-                {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
-                {isStravaMenuOpen && typeof onDisconnectStrava === "function" ? (
-                  <div className="athlete-strava-popover">
-                    <button
-                      type="button"
-                      className="athlete-strava-item athlete-strava-item-danger"
-                      onClick={async () => {
-                        await onDisconnectStrava();
-                        setIsStravaMenuOpen(false);
-                      }}
-                    >
-                      Отключить
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : canManageStrava && typeof onConnectStrava === "function" ? (
-              <>
-                <button type="button" className="primary-button athlete-strava-button" onClick={onConnectStrava}>
-                  Подключить Strava
-                </button>
-                <div className="muted">{syncStatus.subtitle}</div>
-              </>
-            ) : (
-              <>
-                <div>{syncStatus.title}</div>
-                {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
-              </>
-            )}
+            <div>{syncStatus.title}</div>
+            {syncStatus.subtitle ? <div className="muted">{syncStatus.subtitle}</div> : null}
           </div>
         </div>
         <div className="athlete-account-main">

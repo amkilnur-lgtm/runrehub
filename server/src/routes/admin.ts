@@ -71,12 +71,10 @@ export async function adminRoutes(app: FastifyInstance) {
           u.id, u.username, u.full_name, u.role, u.coach_id, coach.full_name as coach_name,
           ic.icu_athlete_id,
           ic.last_synced_at as intervals_last_synced_at,
-          ic.last_sync_error as intervals_last_sync_error,
-          (sc.user_id is not null) as strava_connected
+          ic.last_sync_error as intervals_last_sync_error
         from users u
         left join users coach on coach.id = u.coach_id
         left join intervals_connections ic on ic.user_id = u.id
-        left join strava_connections sc on sc.user_id = u.id
         order by u.created_at desc
       `
     );
@@ -164,7 +162,7 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/api/admin/strava/events", { preHandler: requireAuth }, async (request) => {
+  app.get("/api/admin/events", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["admin"]);
     const query = stravaEventsQuerySchema.parse(request.query);
     return { events: getStravaEvents(query.limit) };
