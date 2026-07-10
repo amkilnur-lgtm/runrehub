@@ -187,6 +187,12 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
   } satisfies ActivityStreams;
 }
 
+// Хвост автокруга (последние метры после целых километров: 3 м / 1 с) — не круг.
+// Порог не трогает осознанно короткие круги: ускорения (~100 м) и стоячие паузы отдыха (60+ с)
+function isRemainderLap(lap: IntervalsLap) {
+  return (lap.distance ?? 0) < 30 && (lap.elapsed_time ?? 0) < 15;
+}
+
 async function fetchActivityLaps(apiKey: string, activityId: string) {
   const response = await intervalsFetch(
     apiKey,
@@ -196,7 +202,7 @@ async function fetchActivityLaps(apiKey: string, activityId: string) {
     return [];
   }
   const payload = (await response.json()) as { icu_intervals?: IntervalsLap[] };
-  return payload.icu_intervals ?? [];
+  return (payload.icu_intervals ?? []).filter((lap) => !isRemainderLap(lap));
 }
 
 async function syncSingleIntervalsActivity(userId: number, apiKey: string, activity: IntervalsActivity) {
