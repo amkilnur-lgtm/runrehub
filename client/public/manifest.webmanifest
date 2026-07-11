@@ -1,0 +1,29 @@
+{
+  "name": "RunningRehab",
+  "short_name": "RunRehab",
+  "description": "Кабинет тренера и спортсменов: тренировки, анализ, обратная связь",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f8fa",
+  "theme_color": "#1c2245",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

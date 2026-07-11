@@ -115,6 +115,11 @@ export function TrainerAthletePage() {
         {allWorkouts.length === 0 ? (
           <div className="trainer-dashboard-leader-empty">
             <strong>Пока нет тренировок.</strong>
+            <div className="muted">
+              {data.athlete.connected_at
+                ? "Пробежки появятся после следующей синхронизации с часами спортсмена."
+                : "У спортсмена не подключена синхронизация — попросите администратора настроить intervals.icu."}
+            </div>
           </div>
         ) : (
           <div className="trainer-dashboard-workout-list">

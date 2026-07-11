@@ -2,8 +2,25 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>RunningRehab</title>
+    <meta name="description" content="Кабинет тренера и спортсменов: тренировки, анализ, обратная связь" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#1c2245" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171a2e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // применяем сохранённую тему до первой отрисовки, чтобы не мигало
+      try {
+        var rrTheme = localStorage.getItem("rr-theme");
+        if (rrTheme === "light" || rrTheme === "dark") {
+          document.documentElement.dataset.theme = rrTheme;
+        }
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>

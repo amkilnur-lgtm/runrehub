@@ -49,6 +49,51 @@
   --accent-soft: oklch(0.955 0.02 266);
 }
 
+/* --- Тёмная тема ---
+   Токены продублированы: media-запрос покрывает "авто" (нет ручного выбора),
+   data-theme="dark" — ручной выбор. Менять оба блока синхронно. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: oklch(0.19 0.028 272);
+  --surface: oklch(0.235 0.032 272);
+  --surface-2: oklch(0.28 0.034 272);
+  --ink: oklch(0.93 0.012 272);
+  --ink-muted: oklch(0.71 0.022 272);
+  --border: oklch(0.33 0.03 272);
+  --border-strong: oklch(0.41 0.03 272);
+  --accent: oklch(0.64 0.2 28);
+  --accent-hover: oklch(0.68 0.2 28);
+  --accent-active: oklch(0.6 0.19 28);
+  --accent-soft: oklch(0.29 0.055 28);
+  --danger: oklch(0.68 0.18 25);
+  --danger-soft: oklch(0.29 0.055 25);
+  --success: oklch(0.7 0.13 150);
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
+  --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: oklch(0.19 0.028 272);
+    --surface: oklch(0.235 0.032 272);
+    --surface-2: oklch(0.28 0.034 272);
+    --ink: oklch(0.93 0.012 272);
+    --ink-muted: oklch(0.71 0.022 272);
+    --border: oklch(0.33 0.03 272);
+    --border-strong: oklch(0.41 0.03 272);
+    --accent: oklch(0.64 0.2 28);
+    --accent-hover: oklch(0.68 0.2 28);
+    --accent-active: oklch(0.6 0.19 28);
+    --accent-soft: oklch(0.29 0.055 28);
+    --danger: oklch(0.68 0.18 25);
+    --danger-soft: oklch(0.29 0.055 25);
+    --success: oklch(0.7 0.13 150);
+    --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
+    --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -260,7 +305,7 @@ select {
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-  max-width: calc(100% - 180px);
+  max-width: calc(100% - 250px);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -608,7 +653,7 @@ select:focus-visible {
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--ink);
+  background: var(--brand-navy-deep);
   color: oklch(0.96 0.006 272);
   font-family: "Consolas", "Courier New", monospace;
   font-size: 12px;
@@ -623,7 +668,8 @@ select:focus-visible {
   padding: 14px;
   border: 0;
   border-radius: 14px;
-  background: var(--ink);
+  /* терминал всегда тёмный, вне зависимости от темы */
+  background: var(--brand-navy-deep);
   color: oklch(0.96 0.006 272);
   font-family: "Consolas", "Courier New", monospace;
   font-size: 12px;
@@ -948,7 +994,7 @@ select:focus-visible {
 }
 
 .compact-lap-row:nth-child(odd) {
-  background: oklch(0.98 0.003 272);
+  background: var(--bg);
 }
 
 .lap-name {
@@ -2021,6 +2067,15 @@ select:focus-visible {
 }
 
 @media (max-width: 640px) {
+  /* на узких экранах бренд уходит влево, кнопки справа — центр не помещается */
+  .topbar-brand {
+    position: static;
+    transform: none;
+    text-align: left;
+    margin-right: auto;
+    max-width: none;
+  }
+
   .login-screen,
   .center-screen {
     padding: 14px;
@@ -2608,4 +2663,289 @@ select:focus-visible {
   .align-right {
     text-align: left;
   }
+}
+
+/* --- Тосты --- */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 60;
+  pointer-events: none;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  font-size: 14px;
+  animation: toast-in 0.22s var(--ease-out);
+}
+
+.toast-leaving {
+  opacity: 0;
+  translate: 0 6px;
+  transition: opacity 0.2s var(--ease-out), translate 0.2s var(--ease-out);
+}
+
+.toast-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.toast-success .toast-dot { background: var(--success); }
+.toast-error .toast-dot { background: var(--danger); }
+.toast-info .toast-dot { background: var(--accent); }
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-close {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  margin: -4px -6px -4px 0;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+  .toast-leaving {
+    transition: opacity 0.15s linear;
+    translate: 0 0;
+  }
+}
+
+/* --- Переключатель темы --- */
+.theme-toggle {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transform: translateY(3px);
+}
+
+.theme-toggle-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Тренды атлета --- */
+.trend-records {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.trend-record {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: border-color 150ms var(--ease-out);
+}
+
+.trend-record:hover {
+  border-color: var(--border-strong);
+}
+
+.trend-record strong {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.trend-record-date {
+  font-size: 12px;
+}
+
+.trends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.trend-bars-plot {
+  position: relative;
+  height: 200px;
+  margin-top: 10px;
+}
+
+.trend-bars-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.trend-grid-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-grid-label {
+  flex: none;
+  width: 26px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-align: right;
+  transform: translateY(-1px);
+}
+
+.trend-grid-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.trend-bars {
+  position: absolute;
+  inset: 6px 0 0 34px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.trend-bar-slot {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.trend-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  opacity: 0.55;
+  transition: opacity 150ms var(--ease-out);
+}
+
+.trend-bar:hover {
+  opacity: 0.85;
+}
+
+.trend-bar-current {
+  opacity: 1;
+}
+
+.trend-bar-value {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.trend-bars-labels {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 2px 34px;
+}
+
+.trend-bar-label {
+  flex: 1;
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.trend-line-plot {
+  margin-top: 10px;
+}
+
+.trend-line-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.trend-line-plot {
+  position: relative;
+}
+
+.trend-point-label {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 10px));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.trend-months {
+  position: relative;
+  height: 18px;
+  margin-top: 2px;
+}
+
+.trend-month-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.trend-footnote {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 62ch;
 }

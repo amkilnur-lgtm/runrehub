@@ -1,6 +1,7 @@
 import { FormEvent, Fragment, useEffect, useState } from "react";
 
 import { api } from "../api";
+import { useToast } from "../components/ToastProvider";
 import { useApi } from "../hooks/useApi";
 import { formatDate } from "../lib";
 
@@ -159,6 +160,7 @@ function formatFitnessScore(value: number | null) {
 }
 
 export function AdminPage() {
+  const showToast = useToast();
   const usersApi = useApi<{ users: AdminUser[] }>("/api/admin/users");
   const trainersApi = useApi<{ trainers: Trainer[] }>("/api/admin/trainers");
   const eventsApi = useApi<{ events: StravaEvent[] }>("/api/admin/events?limit=80");
@@ -258,6 +260,7 @@ export function AdminPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    const created = form.username;
     try {
       await api("/api/admin/users", {
         method: "POST",
@@ -274,8 +277,9 @@ export function AdminPage() {
       if (form.role === "trainer") {
         trainersApi.refresh();
       }
+      showToast("success", `Пользователь @${created} создан`);
     } catch (err: any) {
-      alert(`Ошибка: ${err.message}`);
+      showToast("error", `Не удалось создать пользователя: ${err.message}`);
     }
   }
 
@@ -288,8 +292,9 @@ export function AdminPage() {
       await api(`/api/admin/users/${id}`, { method: "DELETE" });
       usersApi.refresh();
       trainersApi.refresh();
+      showToast("success", `Пользователь @${username} удалён`);
     } catch (err: any) {
-      alert(`Ошибка удаления: ${err.message}`);
+      showToast("error", `Не удалось удалить пользователя: ${err.message}`);
     }
   }
 
@@ -309,8 +314,9 @@ export function AdminPage() {
         })
       });
       telegramApi.refresh();
+      showToast("success", "Настройки Telegram сохранены");
     } catch (err: any) {
-      alert(`Ошибка сохранения Telegram: ${err.message}`);
+      showToast("error", `Не удалось сохранить Telegram: ${err.message}`);
     } finally {
       setSavingTrainerId(null);
     }
@@ -322,9 +328,9 @@ export function AdminPage() {
       await api(`/api/admin/trainers/${trainerId}/telegram/test`, {
         method: "POST"
       });
-      alert("Тестовое сообщение отправлено");
+      showToast("success", "Тестовое сообщение отправлено");
     } catch (err: any) {
-      alert(`Ошибка тестового сообщения: ${err.message}`);
+      showToast("error", `Ошибка тестового сообщения: ${err.message}`);
     } finally {
       setTestingTrainerId(null);
     }
@@ -355,7 +361,7 @@ export function AdminPage() {
         }
       }));
     } catch (err: any) {
-      alert(`Ошибка preview weekly report: ${err.message}`);
+      showToast("error", `Не удалось построить недельный отчёт: ${err.message}`);
     } finally {
       setPreviewingTrainerId(null);
     }
@@ -374,13 +380,14 @@ export function AdminPage() {
         method: "POST",
         body: JSON.stringify({ weekDate })
       });
-      alert(
-        `Weekly report отправлен.\nНеделя: ${result.weekStart}\nОтправлено: ${result.sent}\nПропущено без тренировок: ${result.skipped}`
+      showToast(
+        "success",
+        `Недельный отчёт отправлен: ${result.sent}, пропущено без тренировок: ${result.skipped}`
       );
       eventsApi.refresh();
       telegramApi.refresh();
     } catch (err: any) {
-      alert(`Ошибка weekly report: ${err.message}`);
+      showToast("error", `Не удалось отправить недельный отчёт: ${err.message}`);
     } finally {
       setWeeklyTestingTrainerId(null);
     }
@@ -411,7 +418,7 @@ export function AdminPage() {
         }
       }));
     } catch (err: any) {
-      alert(`Ошибка preview monthly report: ${err.message}`);
+      showToast("error", `Не удалось построить месячный отчёт: ${err.message}`);
     } finally {
       setPreviewingTrainerId(null);
     }
@@ -430,13 +437,14 @@ export function AdminPage() {
         method: "POST",
         body: JSON.stringify({ monthDate })
       });
-      alert(
-        `Monthly report отправлен.\nМесяц: ${result.monthStart}\nОтправлено: ${result.sent}\nПропущено без тренировок: ${result.skipped}`
+      showToast(
+        "success",
+        `Месячный отчёт отправлен: ${result.sent}, пропущено без тренировок: ${result.skipped}`
       );
       eventsApi.refresh();
       telegramApi.refresh();
     } catch (err: any) {
-      alert(`Ошибка monthly report: ${err.message}`);
+      showToast("error", `Не удалось отправить месячный отчёт: ${err.message}`);
     } finally {
       setMonthlyTestingTrainerId(null);
     }
@@ -445,7 +453,7 @@ export function AdminPage() {
   async function saveIntervalsConnection(userId: number) {
     const draft = intervalsDrafts[userId];
     if (!draft?.icuAthleteId.trim() || !draft?.apiKey.trim()) {
-      alert("Заполните Athlete ID и API key из intervals.icu");
+      showToast("error", "Заполните Athlete ID и API key из intervals.icu");
       return;
     }
 
@@ -461,16 +469,17 @@ export function AdminPage() {
           })
         }
       );
-      alert(
+      showToast(
+        "success",
         `intervals.icu подключён (${result.icuAthleteId}${
           result.athleteName ? ` · ${result.athleteName}` : ""
-        }). Первая синхронизация подтянет тренировки за 90 дней.`
+        }). Первая синхронизация подтянет 90 дней.`
       );
       setIntervalsFormUserId(null);
       setIntervalsDrafts((current) => ({ ...current, [userId]: { icuAthleteId: "", apiKey: "" } }));
       usersApi.refresh();
     } catch (err: any) {
-      alert(`Не удалось подключить intervals.icu: ${err.message}`);
+      showToast("error", `Не удалось подключить intervals.icu: ${err.message}`);
     } finally {
       setSavingIntervalsId(null);
     }
@@ -480,8 +489,13 @@ export function AdminPage() {
     if (!window.confirm(`Отключить intervals.icu у @${username}? Тренировки останутся в базе.`)) {
       return;
     }
-    await api(`/api/admin/athletes/${userId}/intervals`, { method: "DELETE" });
-    usersApi.refresh();
+    try {
+      await api(`/api/admin/athletes/${userId}/intervals`, { method: "DELETE" });
+      usersApi.refresh();
+      showToast("success", `intervals.icu отключён у @${username}`);
+    } catch (err: any) {
+      showToast("error", `Не удалось отключить intervals.icu: ${err.message}`);
+    }
   }
 
   async function syncIntervalsNow(userId: number) {
@@ -491,15 +505,15 @@ export function AdminPage() {
         `/api/admin/athletes/${userId}/intervals/sync`,
         { method: "POST" }
       );
-      alert(
-        result.synced
-          ? `Синхронизация завершена: импортировано тренировок — ${result.imported}.`
-          : "Синхронизация уже выполняется."
-      );
+      if (result.synced) {
+        showToast("success", `Синхронизация завершена: импортировано тренировок — ${result.imported}`);
+      } else {
+        showToast("info", "Синхронизация уже выполняется");
+      }
       usersApi.refresh();
       eventsApi.refresh();
     } catch (err: any) {
-      alert(`Ошибка синхронизации: ${err.message}`);
+      showToast("error", `Ошибка синхронизации: ${err.message}`);
     } finally {
       setSyncingIntervalsId(null);
     }
@@ -517,12 +531,10 @@ export function AdminPage() {
         method: "POST",
         body: JSON.stringify({ period })
       });
-      alert(
-        `Недельный отчет отправлен.\nСпортсмен: ${result.athleteName}\nТренер: ${result.coachName}\nНеделя: ${result.weekStart}`
-      );
+      showToast("success", `Недельный отчёт по ${result.athleteName} отправлен тренеру ${result.coachName}`);
       eventsApi.refresh();
     } catch (err: any) {
-      alert(`Ошибка отправки weekly report: ${err.message}`);
+      showToast("error", `Не удалось отправить недельный отчёт: ${err.message}`);
     } finally {
       setSendingAthleteWeeklyId(null);
     }
@@ -540,12 +552,10 @@ export function AdminPage() {
         method: "POST",
         body: JSON.stringify({ period })
       });
-      alert(
-        `Месячный отчет отправлен.\nСпортсмен: ${result.athleteName}\nТренер: ${result.coachName}\nМесяц: ${result.monthStart}`
-      );
+      showToast("success", `Месячный отчёт по ${result.athleteName} отправлен тренеру ${result.coachName}`);
       eventsApi.refresh();
     } catch (err: any) {
-      alert(`Ошибка отправки monthly report: ${err.message}`);
+      showToast("error", `Не удалось отправить месячный отчёт: ${err.message}`);
     } finally {
       setSendingAthleteMonthlyId(null);
     }
@@ -732,6 +742,16 @@ export function AdminPage() {
                           </div>
                         ) : null}
                       </div>
+                    ) : null}
+                    {user.role === "athlete" && user.icu_athlete_id ? (
+                      <button
+                        type="button"
+                        className="ghost-button compact-button"
+                        disabled={syncingIntervalsId === user.id}
+                        onClick={() => syncIntervalsNow(user.id)}
+                      >
+                        {syncingIntervalsId === user.id ? "Синхронизирую..." : "Синхронизировать"}
+                      </button>
                     ) : null}
                     {user.role === "athlete" ? (
                       <button
