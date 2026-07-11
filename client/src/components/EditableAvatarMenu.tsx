@@ -3,6 +3,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { User } from "../types";
 import { useAuth } from "./AuthProvider";
+import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
 
 type EditableAvatarMenuProps = {
@@ -14,6 +15,7 @@ type EditableAvatarMenuProps = {
 export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
   const { fullName, avatarUrl, className } = props;
   const { setUser } = useAuth();
+  const showToast = useToast();
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isAvatarBusy, setIsAvatarBusy] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(avatarUrl ?? null);
@@ -80,7 +82,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
     }
 
     if (!file.type.startsWith("image/")) {
-      window.alert("Можно загружать только изображения");
+      showToast("error", "Можно загружать только изображения");
       return;
     }
 
@@ -95,7 +97,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
       setCurrentAvatarUrl(result.user.avatarUrl);
       setIsAvatarMenuOpen(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Не удалось загрузить фото");
+      showToast("error", error instanceof Error ? error.message : "Не удалось загрузить фото");
     } finally {
       setIsAvatarBusy(false);
     }
@@ -120,7 +122,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
       setCurrentAvatarUrl(result.user.avatarUrl);
       setIsAvatarMenuOpen(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Не удалось удалить фото");
+      showToast("error", error instanceof Error ? error.message : "Не удалось удалить фото");
     } finally {
       setIsAvatarBusy(false);
     }

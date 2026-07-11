@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "./AuthProvider";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function AppLayout() {
   const { logout } = useAuth();
@@ -17,6 +18,7 @@ export function AppLayout() {
         <div className="topbar-identity">
           <div className="eyebrow topbar-brand">RunningRehab</div>
           <div className="topbar-actions">
+            <ThemeToggle />
             <button className="ghost-button topbar-logout" onClick={handleLogout}>
               <svg viewBox="0 0 24 24" className="topbar-logout-icon" aria-hidden="true">
                 <path

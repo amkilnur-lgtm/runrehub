@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { AthleteAccountHeader, type PeriodStats, type StatsPeriodKey } from "../components/AthleteAccountHeader";
+import { AthleteTrends } from "../components/AthleteTrends";
 import { useAuth } from "../components/AuthProvider";
 import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
 import { useApi } from "../hooks/useApi";
@@ -115,6 +116,8 @@ export function AthleteDashboardPage() {
         }
       />
 
+      <AthleteTrends />
+
       <section className="card trainer-dashboard-list-section">
         <div className="trainer-dashboard-heading">
           <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
@@ -122,6 +125,11 @@ export function AthleteDashboardPage() {
         {allWorkouts.length === 0 ? (
           <div className="trainer-dashboard-leader-empty">
             <strong>Пока нет тренировок.</strong>
+            <div className="muted">
+              {data.athlete.connected_at
+                ? "Пробежки появятся автоматически после следующей синхронизации с часами."
+                : "Попросите администратора подключить синхронизацию intervals.icu — тренировки будут подтягиваться с часов автоматически."}
+            </div>
           </div>
         ) : (
           <div className="trainer-dashboard-workout-list">

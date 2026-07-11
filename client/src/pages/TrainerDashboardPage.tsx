@@ -275,6 +275,12 @@ export function TrainerDashboardPage() {
             <div className="trainer-dashboard-heading">
               <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
             </div>
+            {data.athletes.length === 0 ? (
+              <div className="trainer-dashboard-leader-empty">
+                <strong>У вас пока нет спортсменов.</strong>
+                <div className="muted">Администратор назначает спортсменов тренеру в админке.</div>
+              </div>
+            ) : null}
             <div className="trainer-dashboard-athlete-list">
               {data.athletes.map((athlete) => (
                 <Link

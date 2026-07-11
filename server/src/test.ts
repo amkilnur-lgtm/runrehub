@@ -11,6 +11,7 @@ process.env.STRAVA_TOKEN_ENCRYPTION_KEY ??= "test-encryption-key-1234567890";
 const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
 const intervalsModule = await import("./lib/intervals.js");
+const trendsModule = await import("./lib/athlete-trends.js");
 const dbModule = await import("./lib/db.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
@@ -82,6 +83,19 @@ await runTest("syncIntervalsLatestActivities returns already_running when adviso
   } finally {
     queryMock.mock.restore();
   }
+});
+
+await runTest("bestRollingTime finds the fastest rolling kilometer", () => {
+  // 2 км: первый км по 30 c/100 м (300 с), второй км по 24 c/100 м (240 с)
+  const distance: number[] = [];
+  const time: number[] = [];
+  for (let i = 0; i <= 20; i += 1) {
+    distance.push(i * 100);
+    time.push(i <= 10 ? i * 30 : 300 + (i - 10) * 24);
+  }
+  assert.equal(trendsModule.bestRollingTime(distance, time, 1000), 240);
+  assert.equal(trendsModule.bestRollingTime(distance, time, 2000), 540);
+  assert.equal(trendsModule.bestRollingTime(distance, time, 3000), null);
 });
 
 await runTest("weekly telegram report week start switches after Sunday 20:00 UTC+5", () => {

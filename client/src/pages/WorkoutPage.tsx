@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import { StreamChart } from "../components/StreamChart";
+import { useToast } from "../components/ToastProvider";
 import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
 import { useApi } from "../hooks/useApi";
@@ -48,6 +49,7 @@ function formatLapTime(seconds: number) {
 export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const params = useParams();
   const navigate = useNavigate();
+  const showToast = useToast();
   const prefix = mode === "trainer" ? "/api/trainer/workouts/" : "/api/athlete/workouts/";
   const { data, loading, error, refresh } = useApi<WorkoutData>(`${prefix}${params.id}`);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -125,7 +127,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
       navigate(backHref);
     } catch (deleteError) {
-      window.alert(
+      showToast("error", 
         deleteError instanceof Error ? deleteError.message : "Не удалось удалить тренировку"
       );
       setIsDeleting(false);
@@ -145,7 +147,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
     const trimmedName = nextName.trim();
     if (!trimmedName) {
-      window.alert("Название не может быть пустым.");
+      showToast("error", "Название не может быть пустым.");
       return;
     }
 
@@ -162,7 +164,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       });
       refresh();
     } catch (renameError) {
-      window.alert(
+      showToast("error", 
         renameError instanceof Error ? renameError.message : "Не удалось переименовать тренировку"
       );
     } finally {
@@ -264,7 +266,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       });
       refresh();
     } catch (fixError) {
-      window.alert(
+      showToast("error", 
         fixError instanceof Error ? fixError.message : "Не удалось исправить GPS-пробежку"
       );
     } finally {
@@ -288,7 +290,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
     const parsedDistance = Number(nextDistance.replace(",", "."));
     if (!Number.isFinite(parsedDistance) || parsedDistance <= 0) {
-      window.alert("Введите корректную дистанцию в километрах.");
+      showToast("error", "Введите корректную дистанцию в километрах.");
       return;
     }
 
@@ -336,7 +338,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       });
       refresh();
     } catch (distanceError) {
-      window.alert(
+      showToast("error", 
         distanceError instanceof Error ? distanceError.message : "Не удалось изменить дистанцию тренировки"
       );
     } finally {
@@ -390,7 +392,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
     const parsedTimeSeconds = parseDurationInput(nextTime);
     if (!parsedTimeSeconds || parsedTimeSeconds <= 0) {
-      window.alert("Введите корректное время в формате мм:сс или чч:мм:сс.");
+      showToast("error", "Введите корректное время в формате мм:сс или чч:мм:сс.");
       return;
     }
 
@@ -438,7 +440,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       });
       refresh();
     } catch (timeError) {
-      window.alert(
+      showToast("error", 
         timeError instanceof Error ? timeError.message : "Не удалось изменить общее время тренировки"
       );
     } finally {
@@ -467,7 +469,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       });
       refresh();
     } catch (resetError) {
-      window.alert(
+      showToast("error", 
         resetError instanceof Error ? resetError.message : "Не удалось отменить исправление"
       );
     } finally {

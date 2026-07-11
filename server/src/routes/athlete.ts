@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
+import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
@@ -167,6 +168,11 @@ export async function athleteRoutes(app: FastifyInstance) {
       workouts,
       nextCursor: buildNextCursor(workouts as Array<{ id: number; start_date: string }>, WORKOUTS_PAGE_SIZE)
     };
+  });
+
+  app.get("/api/athlete/trends", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["athlete"]);
+    return getAthleteTrends(request.user.id);
   });
 
   app.get("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
