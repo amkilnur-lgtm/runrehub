@@ -230,8 +230,15 @@ function AerobicPaceChart({
   );
 }
 
-export function AthleteTrends() {
-  const { data, loading, error } = useApi<TrendsData>("/api/athlete/trends");
+type AthleteTrendsProps = {
+  // без athleteId — собственный кабинет атлета; с athleteId — взгляд тренера
+  athleteId?: number;
+};
+
+export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
+  const endpoint = athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends";
+  const workoutBase = athleteId != null ? "/trainer/workouts" : "/athlete/workouts";
+  const { data, loading, error } = useApi<TrendsData>(endpoint);
 
   if (loading || error || !data) {
     return null;
@@ -256,7 +263,7 @@ export function AthleteTrends() {
             <Link
               key={record.target_meters}
               className="trend-record"
-              to={`/athlete/workouts/${record.workout_id}`}
+              to={`${workoutBase}/${record.workout_id}`}
               title={`${record.workout_name} · ${new Date(record.start_date).toLocaleDateString("ru-RU")}`}
             >
               <span className="muted">Лучшие {formatRecordDistance(record.target_meters)}</span>

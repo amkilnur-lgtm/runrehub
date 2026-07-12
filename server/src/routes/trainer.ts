@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
+import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
@@ -218,6 +219,20 @@ export async function trainerRoutes(app: FastifyInstance) {
         week_workout_count: Number(row.week_workout_count ?? 0)
       }))
     };
+  });
+
+  app.get("/api/trainer/athletes/:id/trends", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const athleteId = Number(params.id);
+    const { rows } = await pool.query(
+      `select id from users where id = $1 and coach_id = $2 and role = 'athlete'`,
+      [athleteId, request.user.id]
+    );
+    if (!rows[0]) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    return getAthleteTrends(athleteId);
   });
 
   app.get("/api/trainer/athletes/:id", { preHandler: requireAuth }, async (request, reply) => {
