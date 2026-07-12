@@ -12,6 +12,7 @@ const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
 const intervalsModule = await import("./lib/intervals.js");
 const trendsModule = await import("./lib/athlete-trends.js");
+const analysisModule = await import("./lib/workout-analysis.js");
 const dbModule = await import("./lib/db.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
@@ -96,6 +97,31 @@ await runTest("bestRollingTime finds the fastest rolling kilometer", () => {
   assert.equal(trendsModule.bestRollingTime(distance, time, 1000), 240);
   assert.equal(trendsModule.bestRollingTime(distance, time, 2000), 540);
   assert.equal(trendsModule.bestRollingTime(distance, time, 3000), null);
+});
+
+await runTest("computeHrTrainingLoad weights minutes by Edwards zones", () => {
+  // 30 минут: 10 мин @120 (60% от 200 = зона 2), 20 мин @170 (85% = зона 4)
+  const time: number[] = [];
+  const hr: number[] = [];
+  for (let i = 0; i <= 1800; i += 10) {
+    time.push(i);
+    hr.push(i <= 600 ? 120 : 170);
+  }
+  const load = analysisModule.computeHrTrainingLoad(
+    { heartrate_stream: hr, time_stream: time, average_heartrate: null, moving_time_seconds: 1800 } as any,
+    200
+  );
+  // ~10*2 + ~20*4 = ~100
+  if (load === null || Math.abs(load - 100) > 3) {
+    throw new Error(`unexpected load: ${load}`);
+  }
+
+  // фолбэк по среднему пульсу: 60 минут @150 (75% = зона 3) = 180
+  const fallback = analysisModule.computeHrTrainingLoad(
+    { heartrate_stream: null, time_stream: null, average_heartrate: 150, moving_time_seconds: 3600 } as any,
+    200
+  );
+  assert.equal(fallback, 180);
 });
 
 await runTest("weekly telegram report week start switches after Sunday 20:00 UTC+5", () => {

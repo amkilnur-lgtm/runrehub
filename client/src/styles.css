@@ -2949,3 +2949,75 @@ select:focus-visible {
   line-height: 1.45;
   max-width: 62ch;
 }
+
+/* тап-состояния трендов */
+button.trend-bar-slot {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+button.trend-bar-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.trend-point-hit {
+  cursor: pointer;
+}
+
+.trend-point-runs {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+/* --- Нагрузка и ACWR --- */
+.trend-load-card {
+  margin-top: 12px;
+}
+
+.trend-acwr-status {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.trend-acwr-ok strong { color: var(--success); }
+.trend-acwr-info strong { color: var(--ink-muted); }
+.trend-acwr-warning strong { color: var(--accent); }
+.trend-acwr-danger strong { color: var(--danger); }
+
+.trend-load-bars-plot {
+  height: 130px;
+  margin-top: 12px;
+}
+
+.trend-load-bars {
+  inset: 0;
+}
+
+.trend-load-bar {
+  opacity: 0.4;
+}
+
+.trend-load-bar:hover {
+  opacity: 0.7;
+}
+
+.trend-acwr-plot {
+  position: relative;
+  margin-top: 4px;
+}
+
+.trend-acwr-corridor {
+  fill: var(--success);
+  opacity: 0.14;
+}
+
+.trend-load-card .trend-bars-labels {
+  margin-left: 0;
+}

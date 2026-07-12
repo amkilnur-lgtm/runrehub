@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useApi } from "../hooks/useApi";
@@ -23,12 +24,39 @@ type DistanceRecord = {
   start_date: string;
 };
 
+type WeeklyLoadRow = {
+  week_start: string;
+  load: number;
+  acwr: number | null;
+};
+
 type TrendsData = {
   weekly: WeeklyRow[];
   aerobicPace: AerobicPaceRow[];
   aerobicHrRange: { low: number; high: number };
   records: DistanceRecord[];
+  loadWeekly: WeeklyLoadRow[];
 };
+
+const ACWR_SAFE_LOW = 0.8;
+const ACWR_SAFE_HIGH = 1.3;
+const ACWR_DANGER = 1.5;
+
+function acwrStatus(acwr: number | null) {
+  if (acwr === null) {
+    return null;
+  }
+  if (acwr > ACWR_DANGER) {
+    return { label: "резкий скачок нагрузки — высокий риск", kind: "danger" as const };
+  }
+  if (acwr > ACWR_SAFE_HIGH) {
+    return { label: "нагрузка растёт быстровато", kind: "warning" as const };
+  }
+  if (acwr < ACWR_SAFE_LOW) {
+    return { label: "нагрузка ниже привычной", kind: "info" as const };
+  }
+  return { label: "нагрузка растёт безопасно", kind: "ok" as const };
+}
 
 const MONTH_LABELS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 
@@ -62,6 +90,7 @@ function formatKm(meters: number) {
 }
 
 function WeeklyDistanceChart({ weekly }: { weekly: WeeklyRow[] }) {
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const maxDistance = Math.max(...weekly.map((week) => week.distance_meters), 0);
   if (maxDistance <= 0) {
     return (
@@ -97,23 +126,32 @@ function WeeklyDistanceChart({ weekly }: { weekly: WeeklyRow[] }) {
             </div>
           ))}
         </div>
-        <div className="trend-bars" role="img" aria-label="Столбчатый график: километраж по неделям">
+        <div className="trend-bars">
           {weekly.map((week, index) => {
             const heightRatio = Math.max(week.distance_meters / ceiling, 0);
             const isCurrent = index === weekly.length - 1;
-            // подписи максимума и текущей недели; соседние сливаются — оставляем максимум
+            // по умолчанию подписаны максимум и текущая неделя (если не соседи);
+            // тап по столбику показывает его значение
             const showValue =
-              week.distance_meters > 0 &&
-              (index === maxIndex || (isCurrent && Math.abs(index - maxIndex) > 1));
+              selectedWeek !== null
+                ? index === selectedWeek
+                : week.distance_meters > 0 &&
+                  (index === maxIndex || (isCurrent && Math.abs(index - maxIndex) > 1));
             return (
-              <div key={week.week_start} className="trend-bar-slot">
+              <button
+                type="button"
+                key={week.week_start}
+                className="trend-bar-slot"
+                aria-label={`Неделя с ${formatWeekLabel(week.week_start)}: ${formatKm(week.distance_meters)} км, пробежек: ${week.runs}`}
+                aria-pressed={selectedWeek === index}
+                onClick={() => setSelectedWeek(selectedWeek === index ? null : index)}
+              >
                 {showValue ? <span className="trend-bar-value">{formatKm(week.distance_meters)}</span> : null}
-                <div
+                <span
                   className={isCurrent ? "trend-bar trend-bar-current" : "trend-bar"}
                   style={{ height: `${Math.max(heightRatio * 100, week.distance_meters > 0 ? 2 : 0)}%` }}
-                  title={`Неделя с ${formatWeekLabel(week.week_start)}: ${formatKm(week.distance_meters)} км · пробежек: ${week.runs}`}
                 />
-              </div>
+              </button>
             );
           })}
         </div>
@@ -136,6 +174,7 @@ function AerobicPaceChart({
   rows: AerobicPaceRow[];
   hrRange: { low: number; high: number };
 }) {
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const caption = `пульс ${hrRange.low}–${hrRange.high} · 6 месяцев`;
 
   if (rows.length < 2) {
@@ -189,15 +228,28 @@ function AerobicPaceChart({
           {points.map((point, index) => {
             const row = rows[index];
             return (
-              <circle key={row.month_start} cx={point.x} cy={point.y} r="5.5" fill="var(--accent)" stroke="var(--surface)" strokeWidth="2">
-                <title>{`${formatMonthLabel(row.month_start)}: ${formatPace(row.avg_speed)} · пробежек: ${row.runs}`}</title>
-              </circle>
+              <g
+                key={row.month_start}
+                className="trend-point-hit"
+                role="button"
+                aria-label={`${formatMonthLabel(row.month_start)}: ${formatPace(row.avg_speed)}, пробежек: ${row.runs}`}
+                onClick={() => setSelectedMonth(selectedMonth === index ? null : index)}
+              >
+                {/* невидимая зона нажатия побольше самой точки */}
+                <circle cx={point.x} cy={point.y} r="20" fill="transparent" />
+                <circle cx={point.x} cy={point.y} r="5.5" fill="var(--accent)" stroke="var(--surface)" strokeWidth="2" />
+              </g>
             );
           })}
         </svg>
         {points.map((point, index) => {
           const row = rows[index];
-          if (index !== bestIndex && index !== rows.length - 1) {
+          // по умолчанию подписаны лучший и последний месяц; тап по точке — её значение
+          const visible =
+            selectedMonth !== null
+              ? index === selectedMonth
+              : index === bestIndex || index === rows.length - 1;
+          if (!visible) {
             return null;
           }
           return (
@@ -207,6 +259,7 @@ function AerobicPaceChart({
               style={{ left: `${(point.x / WIDTH) * 100}%`, top: `${(point.y / HEIGHT) * 100}%` }}
             >
               {formatPace(row.avg_speed)}
+              {selectedMonth === index ? <em className="trend-point-runs"> · {row.runs} пробеж.</em> : null}
             </span>
           );
         })}
@@ -225,6 +278,134 @@ function AerobicPaceChart({
       <div className="muted trend-footnote">
         Средний темп спокойных пробежек (от 3 км, пульс в аэробной зоне). Рост линии — экономичность
         улучшается.
+      </div>
+    </div>
+  );
+}
+
+function TrainingLoadChart({ rows }: { rows: WeeklyLoadRow[] }) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const maxLoad = Math.max(...rows.map((row) => row.load), 0);
+  if (maxLoad <= 0) {
+    return null;
+  }
+
+  const currentAcwr = rows[rows.length - 1]?.acwr ?? null;
+  const status = acwrStatus(currentAcwr);
+
+  const WIDTH = 600;
+  const HEIGHT = 110;
+  const acwrCeiling = Math.max(2, ...rows.map((row) => row.acwr ?? 0)) * 1.1;
+  const yForAcwr = (value: number) => HEIGHT - (value / acwrCeiling) * (HEIGHT - 18);
+  const xFor = (index: number) =>
+    rows.length === 1 ? WIDTH / 2 : (index / (rows.length - 1)) * (WIDTH - 24) + 12;
+
+  const acwrPoints = rows
+    .map((row, index) => (row.acwr !== null ? { x: xFor(index), y: yForAcwr(row.acwr), index } : null))
+    .filter((point): point is { x: number; y: number; index: number } => point !== null);
+  const acwrPath = acwrPoints
+    .map((point, i) => `${i === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+    .join(" ");
+
+  const selected = selectedIndex !== null ? rows[selectedIndex] : null;
+
+  return (
+    <div className="chart-card trend-load-card">
+      <div className="chart-title-row">
+        <span className="muted trainer-dashboard-eyebrow">Нагрузка и ACWR</span>
+        <span className="muted chart-axis-caption">12 недель</span>
+      </div>
+      {status ? (
+        <div className={`trend-acwr-status trend-acwr-${status.kind}`}>
+          <strong>ACWR {currentAcwr?.toFixed(2)}</strong> · {status.label}
+        </div>
+      ) : (
+        <div className="muted trend-acwr-status">ACWR появится, когда накопится месяц истории</div>
+      )}
+      <div className="trend-bars-plot trend-load-bars-plot">
+        <div className="trend-bars trend-load-bars">
+          {rows.map((row, index) => {
+            const showValue =
+              selectedIndex !== null
+                ? index === selectedIndex
+                : index === rows.length - 1 && row.load > 0;
+            return (
+              <button
+                type="button"
+                key={row.week_start}
+                className="trend-bar-slot"
+                aria-label={`Неделя с ${formatWeekLabel(row.week_start)}: нагрузка ${row.load}${row.acwr !== null ? `, ACWR ${row.acwr.toFixed(2)}` : ""}`}
+                aria-pressed={selectedIndex === index}
+                onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
+              >
+                {showValue ? (
+                  <span className="trend-bar-value">
+                    {row.load}
+                    {selectedIndex === index && row.acwr !== null ? ` · ${row.acwr.toFixed(2)}` : ""}
+                  </span>
+                ) : null}
+                <span
+                  className="trend-bar trend-load-bar"
+                  style={{ height: `${Math.max((row.load / maxLoad) * 100, row.load > 0 ? 2 : 0)}%` }}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="trend-acwr-plot">
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="trend-line-svg" role="img" aria-label="Линия ACWR по неделям с безопасным коридором">
+          <rect
+            x="0"
+            y={yForAcwr(ACWR_SAFE_HIGH)}
+            width={WIDTH}
+            height={Math.max(yForAcwr(ACWR_SAFE_LOW) - yForAcwr(ACWR_SAFE_HIGH), 0)}
+            className="trend-acwr-corridor"
+          />
+          {acwrPath ? (
+            <>
+              <path d={acwrPath} fill="none" stroke="rgba(255,255,255,0.86)" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />
+              <path d={acwrPath} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            </>
+          ) : null}
+          {acwrPoints.map((point) => {
+            const row = rows[point.index];
+            const overLimit = (row.acwr ?? 0) > ACWR_DANGER;
+            return (
+              <circle
+                key={row.week_start}
+                cx={point.x}
+                cy={point.y}
+                r={overLimit ? 5 : 3.5}
+                fill={overLimit ? "var(--danger)" : "var(--accent)"}
+                stroke="var(--surface)"
+                strokeWidth="1.5"
+              />
+            );
+          })}
+        </svg>
+        {selected && selected.acwr !== null && selectedIndex !== null ? (
+          <span
+            className="trend-point-label"
+            style={{
+              left: `${(xFor(selectedIndex) / WIDTH) * 100}%`,
+              top: `${(yForAcwr(selected.acwr) / HEIGHT) * 100}%`
+            }}
+          >
+            {selected.acwr.toFixed(2)}
+          </span>
+        ) : null}
+      </div>
+      <div className="trend-bars-labels" aria-hidden="true">
+        {rows.map((row, index) => (
+          <span key={row.week_start} className="trend-bar-label">
+            {index % 2 === (rows.length - 1) % 2 ? formatWeekLabel(row.week_start) : ""}
+          </span>
+        ))}
+      </div>
+      <div className="muted trend-footnote">
+        Столбцы — недельная нагрузка (минуты в пульсовых зонах × вес зоны). Линия — отношение
+        нагрузки недели к средней за 4 недели: коридор 0.8–1.3 безопасен, выше 1.5 — риск травмы.
       </div>
     </div>
   );
@@ -279,6 +460,7 @@ export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
         <WeeklyDistanceChart weekly={data.weekly} />
         <AerobicPaceChart rows={data.aerobicPace} hrRange={data.aerobicHrRange} />
       </div>
+      <TrainingLoadChart rows={data.loadWeekly ?? []} />
     </section>
   );
 }

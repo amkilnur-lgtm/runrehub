@@ -1,6 +1,6 @@
 import { pool } from "./db.js";
 
-const ANALYSIS_VERSION = 1;
+const ANALYSIS_VERSION = 2;
 const MIN_DISTANCE_METERS = 3000;
 const MIN_MOVING_TIME_SECONDS = 12 * 60;
 const MIN_STREAM_POINTS = 60;
@@ -28,6 +28,7 @@ type WorkoutAnalysisInput = {
   streams_fetched_at: Date | null;
   distance_stream: unknown;
   time_stream: unknown;
+  heartrate_stream: unknown;
 };
 
 type EstimatedHrMaxRow = {
@@ -52,6 +53,53 @@ function getSourceUpdatedAt(row: WorkoutAnalysisInput) {
   return new Date(Math.max(...candidates.map((value) => value.getTime())));
 }
 
+// Внутренняя тренировочная нагрузка по зонам Эдвардса: минуты в зоне × номер зоны (1–5).
+// Единая метрика для всех источников — на ней строится ACWR.
+function hrZoneWeight(fraction: number) {
+  if (!Number.isFinite(fraction) || fraction < 0.5) return 0;
+  if (fraction < 0.6) return 1;
+  if (fraction < 0.7) return 2;
+  if (fraction < 0.8) return 3;
+  if (fraction < 0.9) return 4;
+  return 5;
+}
+
+export function computeHrTrainingLoad(row: WorkoutAnalysisInput, estimatedHrMax: number | null) {
+  if (!estimatedHrMax || estimatedHrMax < 120 || estimatedHrMax > 230) {
+    return null;
+  }
+
+  const hr = Array.isArray(row.heartrate_stream) ? row.heartrate_stream : [];
+  const time = Array.isArray(row.time_stream) ? row.time_stream : [];
+  const size = Math.min(hr.length, time.length);
+
+  if (size >= MIN_STREAM_POINTS) {
+    let weightedMinutes = 0;
+    let coveredSeconds = 0;
+    for (let index = 1; index < size; index += 1) {
+      const dt = Number(time[index]) - Number(time[index - 1]);
+      const bpm = Number(hr[index]);
+      // длинные дыры — паузы записи, их в нагрузку не считаем
+      if (!Number.isFinite(dt) || dt <= 0 || dt > 30) continue;
+      if (!Number.isFinite(bpm) || bpm < 60 || bpm > 230) continue;
+      weightedMinutes += (hrZoneWeight(bpm / estimatedHrMax) * dt) / 60;
+      coveredSeconds += dt;
+    }
+    if (coveredSeconds >= 300) {
+      return Math.round(weightedMinutes * 10) / 10;
+    }
+  }
+
+  // фолбэк без стрима: средний пульс на всё время движения
+  const averageHr = Number(row.average_heartrate);
+  const movingTime = toFiniteNumber(row.moving_time_seconds);
+  if (Number.isFinite(averageHr) && averageHr >= 60 && averageHr <= 230 && movingTime > 0) {
+    return Math.round(((hrZoneWeight(averageHr / estimatedHrMax) * movingTime) / 60) * 10) / 10;
+  }
+
+  return null;
+}
+
 async function getEstimatedHrMax(userId: number) {
   const { rows } = await pool.query<EstimatedHrMaxRow>(
     `
@@ -68,7 +116,7 @@ async function getEstimatedHrMax(userId: number) {
   return Number.isFinite(estimated) ? estimated : null;
 }
 
-function checkStreamQuality(distanceStream: number[], timeStream: number[], summaryDistanceMeters: number) {
+export function checkStreamQuality(distanceStream: number[], timeStream: number[], summaryDistanceMeters: number) {
   if (distanceStream.length < MIN_STREAM_POINTS || timeStream.length < MIN_STREAM_POINTS) {
     return { ok: false, reason: "stream_too_short" };
   }
@@ -122,7 +170,12 @@ function checkStreamQuality(distanceStream: number[], timeStream: number[], summ
   return { ok: true, reason: "reliable" };
 }
 
-function buildSkippedAnalysis(reason: string, row: WorkoutAnalysisInput, estimatedHrMax: number | null) {
+function buildSkippedAnalysis(
+  reason: string,
+  row: WorkoutAnalysisInput,
+  estimatedHrMax: number | null,
+  trainingLoad: number | null
+) {
   return {
     status: "skipped" as const,
     reason,
@@ -131,11 +184,17 @@ function buildSkippedAnalysis(reason: string, row: WorkoutAnalysisInput, estimat
     estimatedHrMax,
     elevationAdjustedSpeed: null,
     elevationGainPerKm: null,
+    trainingLoad,
     sourceUpdatedAt: getSourceUpdatedAt(row)
   };
 }
 
-function buildUnreliableAnalysis(reason: string, row: WorkoutAnalysisInput, estimatedHrMax: number | null) {
+function buildUnreliableAnalysis(
+  reason: string,
+  row: WorkoutAnalysisInput,
+  estimatedHrMax: number | null,
+  trainingLoad: number | null
+) {
   return {
     status: "unreliable" as const,
     reason,
@@ -144,51 +203,54 @@ function buildUnreliableAnalysis(reason: string, row: WorkoutAnalysisInput, esti
     estimatedHrMax,
     elevationAdjustedSpeed: null,
     elevationGainPerKm: null,
+    trainingLoad,
     sourceUpdatedAt: getSourceUpdatedAt(row)
   };
 }
 
 async function calculateWorkoutAnalysis(row: WorkoutAnalysisInput) {
   const estimatedHrMax = await getEstimatedHrMax(row.user_id);
+  // нагрузка не зависит от GPS и порогов фитнес-оценки — считаем всегда
+  const trainingLoad = computeHrTrainingLoad(row, estimatedHrMax);
   const distanceMeters = toFiniteNumber(row.distance_meters);
   const movingTimeSeconds = toFiniteNumber(row.moving_time_seconds);
   const elevationGain = toFiniteNumber(row.elevation_gain);
   const averageHeartrate = Number(row.average_heartrate ?? NaN);
 
   if (row.sport_type !== "Run") {
-    return buildSkippedAnalysis("not_run", row, estimatedHrMax);
+    return buildSkippedAnalysis("not_run", row, estimatedHrMax, trainingLoad);
   }
   if (row.correction_kind) {
-    return buildSkippedAnalysis(`has_correction:${row.correction_kind}`, row, estimatedHrMax);
+    return buildSkippedAnalysis(`has_correction:${row.correction_kind}`, row, estimatedHrMax, trainingLoad);
   }
   if (distanceMeters < MIN_DISTANCE_METERS) {
-    return buildSkippedAnalysis("distance_too_short", row, estimatedHrMax);
+    return buildSkippedAnalysis("distance_too_short", row, estimatedHrMax, trainingLoad);
   }
   if (movingTimeSeconds < MIN_MOVING_TIME_SECONDS) {
-    return buildSkippedAnalysis("time_too_short", row, estimatedHrMax);
+    return buildSkippedAnalysis("time_too_short", row, estimatedHrMax, trainingLoad);
   }
   if (!estimatedHrMax || estimatedHrMax < 120 || estimatedHrMax > 230) {
-    return buildSkippedAnalysis("hrmax_unavailable", row, estimatedHrMax);
+    return buildSkippedAnalysis("hrmax_unavailable", row, estimatedHrMax, trainingLoad);
   }
   if (!Number.isFinite(averageHeartrate) || averageHeartrate < 90 || averageHeartrate > 220) {
-    return buildSkippedAnalysis("heartrate_unavailable", row, estimatedHrMax);
+    return buildSkippedAnalysis("heartrate_unavailable", row, estimatedHrMax, trainingLoad);
   }
 
   const paceSecondsPerKm = movingTimeSeconds / (distanceMeters / 1000);
   if (paceSecondsPerKm < MIN_PACE_SECONDS_PER_KM || paceSecondsPerKm > MAX_PACE_SECONDS_PER_KM) {
-    return buildSkippedAnalysis("pace_out_of_range", row, estimatedHrMax);
+    return buildSkippedAnalysis("pace_out_of_range", row, estimatedHrMax, trainingLoad);
   }
 
   const distanceStream = numericArray(row.distance_stream);
   const timeStream = numericArray(row.time_stream);
   const streamQuality = checkStreamQuality(distanceStream, timeStream, distanceMeters);
   if (!streamQuality.ok) {
-    return buildUnreliableAnalysis(streamQuality.reason, row, estimatedHrMax);
+    return buildUnreliableAnalysis(streamQuality.reason, row, estimatedHrMax, trainingLoad);
   }
 
   const elevationGainPerKm = elevationGain / (distanceMeters / 1000);
   if (!Number.isFinite(elevationGainPerKm) || elevationGainPerKm > MAX_ELEVATION_GAIN_PER_KM) {
-    return buildSkippedAnalysis("elevation_too_high", row, estimatedHrMax);
+    return buildSkippedAnalysis("elevation_too_high", row, estimatedHrMax, trainingLoad);
   }
 
   const excessGainMeters = Math.max(elevationGain - (distanceMeters / 1000) * 10, 0);
@@ -200,7 +262,7 @@ async function calculateWorkoutAnalysis(row: WorkoutAnalysisInput) {
   const heartRateFraction = averageHeartrate / estimatedHrMax;
 
   if (heartRateFraction < 0.58 || heartRateFraction > 0.98) {
-    return buildSkippedAnalysis("heartrate_fraction_out_of_range", row, estimatedHrMax);
+    return buildSkippedAnalysis("heartrate_fraction_out_of_range", row, estimatedHrMax, trainingLoad);
   }
 
   const fitnessScore = elevationAdjustedSpeed / heartRateFraction;
@@ -215,6 +277,7 @@ async function calculateWorkoutAnalysis(row: WorkoutAnalysisInput) {
     estimatedHrMax,
     elevationAdjustedSpeed,
     elevationGainPerKm,
+    trainingLoad,
     sourceUpdatedAt: getSourceUpdatedAt(row)
   };
 }
@@ -232,10 +295,11 @@ async function upsertAnalysis(workoutId: number, analysis: Awaited<ReturnType<ty
         estimated_hrmax,
         elevation_adjusted_speed,
         elevation_gain_per_km,
+        training_load,
         source_updated_at,
         analyzed_at
       )
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now())
       on conflict (workout_id) do update
       set analysis_version = excluded.analysis_version,
           gps_quality_status = excluded.gps_quality_status,
@@ -245,6 +309,7 @@ async function upsertAnalysis(workoutId: number, analysis: Awaited<ReturnType<ty
           estimated_hrmax = excluded.estimated_hrmax,
           elevation_adjusted_speed = excluded.elevation_adjusted_speed,
           elevation_gain_per_km = excluded.elevation_gain_per_km,
+          training_load = excluded.training_load,
           source_updated_at = excluded.source_updated_at,
           analyzed_at = now()
     `,
@@ -258,6 +323,7 @@ async function upsertAnalysis(workoutId: number, analysis: Awaited<ReturnType<ty
       analysis.estimatedHrMax,
       analysis.elevationAdjustedSpeed,
       analysis.elevationGainPerKm,
+      analysis.trainingLoad,
       analysis.sourceUpdatedAt.toISOString()
     ]
   );
@@ -279,7 +345,8 @@ export async function analyzeWorkout(workoutId: number) {
         wc.updated_at as correction_updated_at,
         ws.fetched_at as streams_fetched_at,
         ws.distance_stream,
-        ws.time_stream
+        ws.time_stream,
+        ws.heartrate_stream
       from workouts w
       left join lateral (
         select max(updated_at) as updated_at, min(kind) as kind
