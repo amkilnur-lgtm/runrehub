@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import { AthleteAccountHeader, type PeriodStats, type StatsPeriodKey } from "../components/AthleteAccountHeader";
+import { AthleteTrends } from "../components/AthleteTrends";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
 
@@ -107,6 +108,8 @@ export function TrainerAthletePage() {
           onPeriodChange={setSelectedPeriod}
         />
       </section>
+
+      <AthleteTrends athleteId={data.athlete.id} />
 
       <section className="card trainer-dashboard-list-section">
         <div className="trainer-dashboard-heading">
