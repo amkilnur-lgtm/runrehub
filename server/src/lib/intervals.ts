@@ -19,6 +19,8 @@ const INTERVALS_API_BASE = "https://intervals.icu/api/v1";
 const INTERVALS_SYNC_LOCK_NAMESPACE = 4272;
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
 const FIRST_SYNC_DAYS = 90;
+const DEEP_SYNC_DAYS = 30;
+const DEEP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RUN_TYPES = new Set(["run", "trailrun", "virtualrun"]);
 
 export type IntervalsActivity = {
@@ -132,6 +134,7 @@ export async function connectIntervalsAccount(userId: number, icuAthleteId: stri
           api_key = excluded.api_key,
           connected_at = now(),
           last_synced_at = null,
+          last_deep_synced_at = null,
           sync_started_at = null,
           last_sync_error = null
     `,
@@ -146,7 +149,7 @@ export async function disconnectIntervalsAccount(userId: number) {
 async function getConnection(userId: number) {
   const { rows } = await pool.query(
     `
-      select user_id, icu_athlete_id, api_key, connected_at, last_synced_at
+      select user_id, icu_athlete_id, api_key, connected_at, last_synced_at, last_deep_synced_at
       from intervals_connections
       where user_id = $1
     `,
@@ -382,10 +385,16 @@ async function markSyncStarted(userId: number, startedAt: Date) {
   );
 }
 
-async function markSyncCompleted(userId: number, finishedAt: Date) {
+async function markSyncCompleted(userId: number, finishedAt: Date, wasDeep: boolean) {
   await pool.query(
-    `update intervals_connections set last_synced_at = $2, sync_started_at = null where user_id = $1`,
-    [userId, finishedAt.toISOString()]
+    `
+      update intervals_connections
+      set last_synced_at = $2,
+          last_deep_synced_at = case when $3 then $2 else last_deep_synced_at end,
+          sync_started_at = null
+      where user_id = $1
+    `,
+    [userId, finishedAt.toISOString(), wasDeep]
   );
 }
 
@@ -418,9 +427,17 @@ export async function syncIntervalsLatestActivities(userId: number): Promise<Int
     await markSyncStarted(userId, startedAt);
 
     const apiKey = decryptToken(connection.api_key);
-    const oldest = connection.last_synced_at
-      ? new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS)
-      : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 60 * 60 * 1000);
+    // Обычный тик смотрит на 36ч назад — дешево, но не видит тренировки,
+    // загруженные в intervals.icu задним числом. Раз в сутки делаем
+    // глубокий проход на DEEP_SYNC_DAYS, который их подбирает.
+    const deepDue =
+      !connection.last_deep_synced_at ||
+      Date.now() - new Date(connection.last_deep_synced_at).getTime() > DEEP_SYNC_INTERVAL_MS;
+    const oldest = !connection.last_synced_at
+      ? new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 60 * 60 * 1000)
+      : deepDue
+        ? new Date(Date.now() - DEEP_SYNC_DAYS * 24 * 60 * 60 * 1000)
+        : new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS);
 
     const response = await intervalsFetch(
       apiKey,
@@ -445,7 +462,7 @@ export async function syncIntervalsLatestActivities(userId: number): Promise<Int
     }
 
     const finishedAt = new Date();
-    await markSyncCompleted(userId, finishedAt);
+    await markSyncCompleted(userId, finishedAt, deepDue || !connection.last_synced_at);
 
     return {
       synced: true,
