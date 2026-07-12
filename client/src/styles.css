@@ -3021,3 +3021,8 @@ button.trend-bar-slot:focus-visible {
 .trend-load-card .trend-bars-labels {
   margin-left: 0;
 }
+
+.trend-records-note {
+  margin: -8px 0 16px;
+  font-size: 12px;
+}

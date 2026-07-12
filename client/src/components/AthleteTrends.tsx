@@ -439,6 +439,7 @@ export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
         <span className="muted trainer-dashboard-eyebrow">Тренды</span>
       </div>
       {data.records.length > 0 ? (
+        <>
         <div className="trend-records">
           {data.records.map((record) => (
             <Link
@@ -455,6 +456,11 @@ export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
             </Link>
           ))}
         </div>
+        <div className="muted trend-records-note">
+          Лучший непрерывный отрезок ровно этой длины внутри тренировки — может быть на секунды
+          быстрее официального времени забега.
+        </div>
+        </>
       ) : null}
       <div className="trends-grid">
         <WeeklyDistanceChart weekly={data.weekly} />
