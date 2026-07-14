@@ -12,6 +12,7 @@ const paginationModule = await import("./lib/pagination.js");
 const stravaModule = await import("./lib/strava.js");
 const intervalsModule = await import("./lib/intervals.js");
 const analysisModule = await import("./lib/workout-analysis.js");
+const gpsFixModule = await import("./lib/workout-gps-fix.js");
 const dbModule = await import("./lib/db.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
@@ -83,6 +84,56 @@ await runTest("syncIntervalsLatestActivities returns already_running when adviso
   } finally {
     queryMock.mock.restore();
   }
+});
+
+await runTest("buildTrimPreview keeps only the requested distance range", () => {
+  // 6 км ровным темпом 5:00/км (300 с/км), точки каждые 100 м / 30 с
+  const distance: number[] = [];
+  const time: number[] = [];
+  const heartrate: number[] = [];
+  for (let i = 0; i <= 60; i += 1) {
+    distance.push(i * 100);
+    time.push(i * 30);
+    heartrate.push(i <= 40 ? 140 : 180); // хвост с высоким пульсом уйдёт под обрезку
+  }
+  const workout = {
+    distance_meters: 6000,
+    moving_time_seconds: 1800,
+    elapsed_time_seconds: 1800,
+    elevation_gain: 0,
+    average_speed: 6000 / 1800,
+    average_heartrate: null,
+    max_heartrate: null
+  };
+  const streams = {
+    distance,
+    time,
+    heartrate,
+    cadence: [],
+    altitude: [],
+    velocity_smooth: [],
+    latlng: [] as [number, number][]
+  };
+
+  const preview = gpsFixModule.buildTrimPreview(workout, streams as any, 0, 4000);
+  assert.ok(preview, "preview should be built");
+  assert.equal(Math.round(preview!.correctedWorkout.distance_meters), 4000);
+  assert.equal(preview!.correctedWorkout.moving_time_seconds, 1200);
+  assert.equal(preview!.correctedWorkout.max_heartrate, 140);
+  assert.equal(preview!.correctedLaps.length, 4);
+  assert.equal(preview!.metadata.trim_end_meters, 4000);
+
+  // обрезка начала: остаётся [2 км, 6 км], дистанция и время с нуля
+  const tail = gpsFixModule.buildTrimPreview(workout, streams as any, 2000, 6000);
+  assert.ok(tail, "tail preview should be built");
+  assert.equal(Math.round(tail!.correctedWorkout.distance_meters), 4000);
+  assert.equal(tail!.correctedStreams.distance[0], 0);
+  assert.equal(tail!.correctedStreams.time[0], 0);
+
+  // без реального среза превью не строится
+  assert.equal(gpsFixModule.buildTrimPreview(workout, streams as any, 0, 6000), null);
+  // слишком короткий остаток — тоже
+  assert.equal(gpsFixModule.buildTrimPreview(workout, streams as any, 0, 100), null);
 });
 
 await runTest("computeHrTrainingLoad weights minutes by Edwards zones", () => {

@@ -74,6 +74,14 @@ type ManualTimeMetadata = {
   split_strategy: SplitStrategy;
 };
 
+type TrimMetadata = {
+  trim_start_meters: number;
+  trim_end_meters: number;
+  source_distance_meters: number;
+  source_moving_time_seconds: number;
+  split_strategy: SplitStrategy;
+};
+
 type SplitStrategy = "stream" | "synthetic_even";
 
 type CorrectedStreamsPayload = {
@@ -149,8 +157,23 @@ type ManualTimePreview = {
   metadata: ManualTimeMetadata;
 };
 
-export type WorkoutCorrectionPreview = GpsFixPreview | ManualDistancePreview | ManualTimePreview;
-export type WorkoutCorrectionKind = "gps_autofix" | "manual_distance" | "manual_time";
+type TrimPreview = {
+  correctedWorkout: {
+    distance_meters: number;
+    moving_time_seconds: number;
+    elapsed_time_seconds: number;
+    elevation_gain: number;
+    average_speed: number | null;
+    average_heartrate: number | null;
+    max_heartrate: number | null;
+  };
+  correctedStreams: CorrectedStreamsPayload;
+  correctedLaps: CorrectedLapPayload[];
+  metadata: TrimMetadata;
+};
+
+export type WorkoutCorrectionPreview = GpsFixPreview | ManualDistancePreview | ManualTimePreview | TrimPreview;
+export type WorkoutCorrectionKind = "gps_autofix" | "manual_distance" | "manual_time" | "trim";
 
 type StoredCorrectionRow = {
   workout_id: number;
@@ -1663,6 +1686,116 @@ export function buildManualTimePreview(
       split_strategy: splitStrategy
     }
   } satisfies ManualTimePreview;
+}
+
+// Обрезка: оставить только отрезок [startMeters, endMeters] по дистанции.
+// Типовой случай — не выключенные после финиша часы: хвост (или начало) отсекается,
+// стримы, круги и агрегаты пересчитываются по оставшемуся куску.
+export function buildTrimPreview(
+  workout: WorkoutSummaryLike,
+  streams: ActivityStreams | CorrectedStreamsPayload | null,
+  startMeters: number,
+  endMeters: number
+) {
+  if (!streams?.distance?.length || !streams.time?.length) {
+    return null;
+  }
+
+  const size = Math.min(streams.distance.length, streams.time.length);
+  const totalDistanceMeters = toFiniteNumber(streams.distance[size - 1]);
+  const totalMovingTimeSeconds = Math.round(toFiniteNumber(streams.time[size - 1]));
+  if (totalDistanceMeters <= 0 || totalMovingTimeSeconds <= 0) {
+    return null;
+  }
+
+  const fromMeters = Math.max(0, Math.min(startMeters, endMeters));
+  const toMeters = Math.min(totalDistanceMeters, Math.max(startMeters, endMeters));
+  const keptLength = toMeters - fromMeters;
+  const isActualCut = fromMeters > 1 || toMeters < totalDistanceMeters - 1;
+  if (keptLength < MIN_MANUAL_DISTANCE_METERS || !isActualCut) {
+    return null;
+  }
+
+  let firstIndex = 0;
+  while (firstIndex < size && toFiniteNumber(streams.distance[firstIndex]) < fromMeters) {
+    firstIndex += 1;
+  }
+  let lastIndex = size - 1;
+  while (lastIndex > firstIndex && toFiniteNumber(streams.distance[lastIndex]) > toMeters) {
+    lastIndex -= 1;
+  }
+  if (lastIndex - firstIndex < 2) {
+    return null;
+  }
+
+  const baseDistance = toFiniteNumber(streams.distance[firstIndex]);
+  const baseTime = toFiniteNumber(streams.time[firstIndex]);
+  const sliceStream = (values: number[]) =>
+    values.length ? values.slice(firstIndex, lastIndex + 1).map((value) => toFiniteNumber(value, NaN)) : [];
+
+  const correctedStreams = {
+    distance: streams.distance
+      .slice(firstIndex, lastIndex + 1)
+      .map((value) => Math.max(0, toFiniteNumber(value) - baseDistance)),
+    time: streams.time
+      .slice(firstIndex, lastIndex + 1)
+      .map((value) => Math.max(0, toFiniteNumber(value) - baseTime)),
+    heartrate: sliceStream(streams.heartrate),
+    cadence: sliceStream(streams.cadence),
+    altitude: sliceStream(streams.altitude),
+    velocity_smooth: sliceStream(streams.velocity_smooth),
+    latlng: streams.latlng
+      .slice(firstIndex, lastIndex + 1)
+      .filter(
+        (point): point is [number, number] =>
+          Array.isArray(point) &&
+          point.length >= 2 &&
+          Number.isFinite(point[0]) &&
+          Number.isFinite(point[1])
+      )
+  } satisfies CorrectedStreamsPayload;
+
+  const correctedDistanceMeters =
+    correctedStreams.distance[correctedStreams.distance.length - 1] ?? 0;
+  const correctedMovingTimeSeconds = Math.round(
+    correctedStreams.time[correctedStreams.time.length - 1] ?? 0
+  );
+  if (correctedDistanceMeters <= 0 || correctedMovingTimeSeconds <= 0) {
+    return null;
+  }
+
+  const validHeartRates = correctedStreams.heartrate.filter(
+    (value) => Number.isFinite(value) && value > 0
+  );
+  const finiteAltitude = correctedStreams.altitude.filter((value) => Number.isFinite(value));
+  const { splitStrategy, correctedLaps } = buildCorrectedSplits(
+    workout,
+    correctedStreams,
+    correctedDistanceMeters,
+    correctedMovingTimeSeconds
+  );
+
+  return {
+    correctedWorkout: {
+      distance_meters: correctedDistanceMeters,
+      moving_time_seconds: correctedMovingTimeSeconds,
+      elapsed_time_seconds: correctedMovingTimeSeconds,
+      elevation_gain: computePositiveElevationGain(finiteAltitude),
+      average_speed:
+        correctedMovingTimeSeconds > 0 ? correctedDistanceMeters / correctedMovingTimeSeconds : null,
+      average_heartrate: computeAverageHeartRate(correctedStreams.heartrate),
+      max_heartrate: validHeartRates.length ? Math.max(...validHeartRates) : null
+    },
+    correctedStreams,
+    correctedLaps,
+    metadata: {
+      trim_start_meters: fromMeters,
+      trim_end_meters: toMeters,
+      source_distance_meters: totalDistanceMeters,
+      source_moving_time_seconds: totalMovingTimeSeconds,
+      split_strategy: splitStrategy
+    }
+  } satisfies TrimPreview;
 }
 
 export async function getActiveWorkoutCorrection(workoutId: number) {

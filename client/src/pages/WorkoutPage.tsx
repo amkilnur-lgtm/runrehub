@@ -61,6 +61,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [isFixingGps, setIsFixingGps] = useState(false);
   const [isUpdatingDistance, setIsUpdatingDistance] = useState(false);
   const [isUpdatingTime, setIsUpdatingTime] = useState(false);
+  const [isTrimming, setIsTrimming] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const backHref =
@@ -275,7 +276,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   }
 
   async function handlePreviewAndApplyDistanceFix() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming) {
       return;
     }
 
@@ -377,7 +378,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   }
 
   async function handlePreviewAndApplyTimeFix() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming) {
       return;
     }
 
@@ -448,8 +449,95 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     }
   }
 
+  function parseTrimRangeInput(value: string) {
+    const match = value.trim().match(/^([\d.,]+)\s*[-–—]\s*([\d.,]+)$/);
+    if (!match) {
+      return null;
+    }
+
+    const startKm = Number(match[1].replace(",", "."));
+    const endKm = Number(match[2].replace(",", "."));
+    if (!Number.isFinite(startKm) || !Number.isFinite(endKm) || startKm < 0 || endKm <= startKm) {
+      return null;
+    }
+
+    return { startKm, endKm };
+  }
+
+  async function handlePreviewAndApplyTrim() {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming) {
+      return;
+    }
+
+    setIsMenuOpen(false);
+    const rangeInput = window.prompt(
+      "Какой отрезок пробежки оставить, км (от-до).\nВсё до и после будет обрезано.",
+      `0-${(data.workout.distance_meters / 1000).toFixed(2)}`
+    );
+    if (rangeInput === null) {
+      return;
+    }
+
+    const range = parseTrimRangeInput(rangeInput);
+    if (!range) {
+      showToast("error", "Введите отрезок в километрах в формате от-до, например 0-8.5.");
+      return;
+    }
+
+    setIsTrimming(true);
+
+    try {
+      const preview = await api<{
+        ok: true;
+        preview: {
+          before: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          after: {
+            distance_meters: number;
+            moving_time_seconds: number;
+            average_speed: number | null;
+            elevation_gain: number;
+          };
+          splitCount: number;
+        };
+      }>(`/api/trainer/workouts/${data.workout.id}/trim/preview`, {
+        method: "POST",
+        body: JSON.stringify(range)
+      });
+
+      const { before, after, splitCount } = preview.preview;
+      const confirmed = window.confirm(
+        `Дистанция: ${formatDistance(before.distance_meters)} → ${formatDistance(after.distance_meters)}` +
+          `\nВремя: ${formatDuration(before.moving_time_seconds)} → ${formatDuration(after.moving_time_seconds)}` +
+          `\nТемп: ${formatPace(before.average_speed)} → ${formatPace(after.average_speed)}` +
+          `\nОтрезки по 1 км: ${splitCount}` +
+          `\n\nОбрезать пробежку?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await api(`/api/trainer/workouts/${data.workout.id}/trim/apply`, {
+        method: "POST",
+        body: JSON.stringify(range)
+      });
+      refresh();
+    } catch (trimError) {
+      showToast("error",
+        trimError instanceof Error ? trimError.message : "Не удалось обрезать пробежку"
+      );
+    } finally {
+      setIsTrimming(false);
+    }
+  }
+
   async function handleResetCorrection() {
-    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime) {
+    if (!data?.workout.id || mode !== "trainer" || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming) {
       return;
     }
 
@@ -546,7 +634,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         <button
                           type="button"
                           className="workout-menu-item"
-                          disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
+                          disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming || isRenaming || isDeleting}
                           onClick={handlePreviewAndApplyGpsFix}
                         >
                           {isFixingGps ? "Обрабатываем..." : "Исправить пробежку"}
@@ -554,7 +642,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         <button
                           type="button"
                           className="workout-menu-item"
-                          disabled={isUpdatingDistance || isFixingGps || isUpdatingTime || isRenaming || isDeleting}
+                          disabled={isUpdatingDistance || isFixingGps || isUpdatingTime || isTrimming || isRenaming || isDeleting}
                           onClick={handlePreviewAndApplyDistanceFix}
                         >
                           {isUpdatingDistance ? "Пересчитываем..." : "Изменить дистанцию"}
@@ -562,16 +650,24 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         <button
                           type="button"
                           className="workout-menu-item"
-                          disabled={isUpdatingTime || isFixingGps || isUpdatingDistance || isRenaming || isDeleting}
+                          disabled={isUpdatingTime || isFixingGps || isUpdatingDistance || isTrimming || isRenaming || isDeleting}
                           onClick={handlePreviewAndApplyTimeFix}
                         >
                           {isUpdatingTime ? "Пересчитываем..." : "Изменить время"}
+                        </button>
+                        <button
+                          type="button"
+                          className="workout-menu-item"
+                          disabled={isTrimming || isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
+                          onClick={handlePreviewAndApplyTrim}
+                        >
+                          {isTrimming ? "Обрезаем..." : "Обрезать пробежку"}
                         </button>
                         {data.workout.gps_fix?.is_corrected ? (
                           <button
                             type="button"
                             className="workout-menu-item"
-                            disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
+                            disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming || isRenaming || isDeleting}
                             onClick={handleResetCorrection}
                           >
                             Отменить исправление
@@ -582,7 +678,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <button
                       type="button"
                       className="workout-menu-item"
-                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance || isUpdatingTime}
+                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming}
                       onClick={handleRename}
                     >
                       {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
@@ -590,7 +686,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     <button
                       type="button"
                       className="workout-menu-item workout-menu-item-danger"
-                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance || isUpdatingTime}
+                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming}
                       onClick={handleDelete}
                     >
                       {isDeleting ? "Удаляем..." : "Удалить тренировку"}
@@ -612,7 +708,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                     ? "Дистанция исправлена"
                     : data.workout.gps_fix.kind === "manual_time"
                       ? "Время исправлено"
-                      : "GPS исправлено"}
+                      : data.workout.gps_fix.kind === "trim"
+                        ? "Пробежка обрезана"
+                        : "GPS исправлено"}
                 </span>
               ) : null}
             </div>

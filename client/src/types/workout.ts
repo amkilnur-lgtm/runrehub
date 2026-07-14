@@ -23,7 +23,7 @@ export type WorkoutData = {
     athlete_id?: number;
     gps_fix?: {
       is_corrected: boolean;
-      kind: "gps_autofix" | "manual_distance" | "manual_time";
+      kind: "gps_autofix" | "manual_distance" | "manual_time" | "trim";
       removed_segments: Array<{
         startIndex: number;
         endIndex: number;
@@ -39,6 +39,12 @@ export type WorkoutData = {
         target_moving_time_seconds: number;
         source_moving_time_seconds: number;
         scale_factor: number;
+        split_strategy: "stream" | "synthetic_even";
+      } | {
+        trim_start_meters: number;
+        trim_end_meters: number;
+        source_distance_meters: number;
+        source_moving_time_seconds: number;
         split_strategy: "stream" | "synthetic_even";
       };
       created_by_user_id: number;

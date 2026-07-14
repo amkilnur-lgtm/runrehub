@@ -13,6 +13,7 @@ import {
   buildManualDistancePreview,
   buildManualTimePreview,
   buildGpsFixPreview,
+  buildTrimPreview,
   deleteWorkoutCorrection,
   getActiveWorkoutCorrection,
   upsertWorkoutCorrection
@@ -33,6 +34,11 @@ const workoutDistanceFixSchema = z.object({
 
 const workoutTimeFixSchema = z.object({
   movingTimeSeconds: z.coerce.number().int().positive().max(60 * 60 * 24)
+});
+
+const workoutTrimSchema = z.object({
+  startKm: z.coerce.number().min(0).max(500),
+  endKm: z.coerce.number().positive().max(500)
 });
 
 const ATHLETE_WORKOUTS_PAGE_SIZE = 20;
@@ -865,6 +871,130 @@ export async function trainerRoutes(app: FastifyInstance) {
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_time", preview);
+    scheduleWorkoutAnalysis(workoutId);
+    const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
+    const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
+
+    return {
+      ok: true,
+      workout: finalView.workout,
+      laps: finalView.laps,
+      streams: finalView.streams
+    };
+  });
+
+  app.post("/api/trainer/workouts/:id/trim/preview", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const body = workoutTrimSchema.parse(request.body);
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await getStoredActivityStreams(workoutId);
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
+    const currentWorkout = correctedView.workout as typeof workout & {
+      distance_meters: number;
+      moving_time_seconds: number;
+      elapsed_time_seconds: number;
+      elevation_gain: number;
+      average_speed: number | null;
+      average_heartrate: number | null;
+      max_heartrate: number | null;
+    };
+
+    const preview = buildTrimPreview(
+      currentWorkout,
+      correctedView.streams,
+      Math.round(body.startKm * 1000),
+      Math.round(body.endKm * 1000)
+    );
+    if (!preview) {
+      return reply.code(400).send({ message: "Не удалось обрезать: проверь границы отрезка" });
+    }
+
+    return {
+      ok: true,
+      preview: {
+        before: {
+          distance_meters: currentWorkout.distance_meters,
+          moving_time_seconds: currentWorkout.moving_time_seconds,
+          average_speed: currentWorkout.average_speed,
+          elevation_gain: currentWorkout.elevation_gain
+        },
+        after: preview.correctedWorkout,
+        splitCount: preview.correctedLaps.length
+      }
+    };
+  });
+
+  app.post("/api/trainer/workouts/:id/trim/apply", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const params = request.params as { id: string };
+    const body = workoutTrimSchema.parse(request.body);
+    const workoutId = Number(params.id);
+
+    const workoutResult = await pool.query(
+      `
+        select w.*
+        from workouts w
+        join users u on u.id = w.user_id
+        where w.id = $1 and u.coach_id = $2
+      `,
+      [workoutId, request.user.id]
+    );
+
+    const workout = workoutResult.rows[0];
+    if (!workout) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+
+    const lapsResult = await pool.query(
+      `select * from workout_laps where workout_id = $1 order by id asc`,
+      [workoutId]
+    );
+    const streams = await getStoredActivityStreams(workoutId);
+    const correction = await getActiveWorkoutCorrection(workoutId);
+    const correctedView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, correction);
+    const currentWorkout = correctedView.workout as typeof workout & {
+      distance_meters: number;
+      moving_time_seconds: number;
+      elapsed_time_seconds: number;
+      elevation_gain: number;
+      average_speed: number | null;
+      average_heartrate: number | null;
+      max_heartrate: number | null;
+    };
+
+    const preview = buildTrimPreview(
+      currentWorkout,
+      correctedView.streams,
+      Math.round(body.startKm * 1000),
+      Math.round(body.endKm * 1000)
+    );
+    if (!preview) {
+      return reply.code(400).send({ message: "Не удалось обрезать: проверь границы отрезка" });
+    }
+
+    await upsertWorkoutCorrection(workoutId, request.user.id, "trim", preview);
     scheduleWorkoutAnalysis(workoutId);
     const updatedCorrection = await getActiveWorkoutCorrection(workoutId);
     const finalView = applyWorkoutCorrectionToView(workout, lapsResult.rows, streams, updatedCorrection);
