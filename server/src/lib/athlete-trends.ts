@@ -78,11 +78,15 @@ async function getAerobicPace(userId: number, hrRange: { low: number; high: numb
         count(*)::int as runs
       from workouts w
       left join workout_corrections wc on wc.workout_id = w.id
+      left join workout_analysis wa on wa.workout_id = w.id
       where w.user_id = $1
         and w.start_date >= date_trunc('month', now()) - make_interval(months => $2::int - 1)
         and coalesce(wc.corrected_average_heartrate, w.average_heartrate) between $3 and $4
         and coalesce(wc.corrected_distance_meters, w.distance_meters) >= 3000
         and coalesce(wc.corrected_average_speed, w.average_speed) > 0
+        -- сбой GPS не должен утаскивать тренд: без исправленной скорости
+        -- доверяем только тренировкам с надёжным GPS-стримом
+        and (wc.corrected_average_speed is not null or wa.gps_quality_status = 'reliable')
       group by 1
       order by 1 asc
     `,
