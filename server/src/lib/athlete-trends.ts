@@ -1,5 +1,4 @@
 import { pool } from "./db.js";
-import { checkStreamQuality } from "./workout-analysis.js";
 
 const WEEKS = 12;
 const PACE_MONTHS = 6;
@@ -7,7 +6,6 @@ const PACE_MONTHS = 6;
 const AEROBIC_HR_LOW_RATIO = 0.62;
 const AEROBIC_HR_HIGH_RATIO = 0.79;
 const FALLBACK_HR_RANGE = { low: 120, high: 152 };
-const RECORD_TARGETS_METERS = [1000, 5000, 10000];
 
 export type WeeklyTrendRow = {
   week_start: string;
@@ -25,14 +23,6 @@ export type WeeklyLoadRow = {
   week_start: string;
   load: number;
   acwr: number | null;
-};
-
-export type DistanceRecord = {
-  target_meters: number;
-  seconds: number;
-  workout_id: number;
-  workout_name: string;
-  start_date: string;
 };
 
 async function getAerobicHrRange(userId: number) {
@@ -101,74 +91,6 @@ async function getAerobicPace(userId: number, hrRange: { low: number; high: numb
   return rows;
 }
 
-// Лучшее скользящее время на целевую дистанцию по стримам (метод двух указателей).
-// Стрим дистанции кумулятивный; немонотонные глюки пропускаем.
-export function bestRollingTime(distance: number[], time: number[], targetMeters: number) {
-  const size = Math.min(distance.length, time.length);
-  let best: number | null = null;
-  let start = 0;
-  for (let end = 0; end < size; end += 1) {
-    while (start < end && (distance[end] ?? 0) - (distance[start + 1] ?? 0) >= targetMeters) {
-      start += 1;
-    }
-    if ((distance[end] ?? 0) - (distance[start] ?? 0) >= targetMeters) {
-      const elapsed = (time[end] ?? 0) - (time[start] ?? 0);
-      if (elapsed > 0 && (best === null || elapsed < best)) {
-        best = elapsed;
-      }
-    }
-  }
-  return best;
-}
-
-async function getDistanceRecords(userId: number): Promise<DistanceRecord[]> {
-  const minTarget = Math.min(...RECORD_TARGETS_METERS);
-  // Статус анализа не используем: он бракует тренировки и по пульсу,
-  // а для рекорда на дистанцию важно только качество GPS-стрима.
-  const { rows } = await pool.query(
-    `
-      select w.id, w.name, w.start_date::text as start_date,
-             w.distance_meters,
-             s.distance_stream, s.time_stream
-      from workouts w
-      join workout_streams s on s.workout_id = w.id
-      where w.user_id = $1
-        and w.distance_meters >= $2
-    `,
-    [userId, minTarget]
-  );
-
-  const best = new Map<number, DistanceRecord>();
-  for (const row of rows) {
-    const distance = Array.isArray(row.distance_stream) ? (row.distance_stream as number[]) : [];
-    const time = Array.isArray(row.time_stream) ? (row.time_stream as number[]) : [];
-    if (distance.length < 2) continue;
-    if (!checkStreamQuality(distance, time, Number(row.distance_meters)).ok) continue;
-
-    for (const target of RECORD_TARGETS_METERS) {
-      const totalDistance = distance[distance.length - 1]! - distance[0]!;
-      if (totalDistance < target) continue;
-      const seconds = bestRollingTime(distance, time, target);
-      if (seconds === null) continue;
-      const current = best.get(target);
-      if (!current || seconds < current.seconds) {
-        best.set(target, {
-          target_meters: target,
-          seconds: Math.round(seconds),
-          workout_id: row.id as number,
-          workout_name: row.name as string,
-          start_date: row.start_date as string
-        });
-      }
-    }
-  }
-
-  return RECORD_TARGETS_METERS.flatMap((target) => {
-    const record = best.get(target);
-    return record ? [record] : [];
-  });
-}
-
 // ACWR: острая нагрузка (неделя) к хронической (среднее за 4 недели, включая текущую).
 // Для хроники нужны 3 недели до окна — берем WEEKS + 3 и отбрасываем хвост.
 async function getWeeklyLoad(userId: number): Promise<WeeklyLoadRow[]> {
@@ -212,11 +134,10 @@ async function getWeeklyLoad(userId: number): Promise<WeeklyLoadRow[]> {
 
 export async function getAthleteTrends(userId: number) {
   const hrRange = await getAerobicHrRange(userId);
-  const [weekly, aerobicPace, records, loadWeekly] = await Promise.all([
+  const [weekly, aerobicPace, loadWeekly] = await Promise.all([
     getWeeklyDistance(userId),
     getAerobicPace(userId, hrRange),
-    getDistanceRecords(userId),
     getWeeklyLoad(userId)
   ]);
-  return { weekly, aerobicPace, aerobicHrRange: hrRange, records, loadWeekly };
+  return { weekly, aerobicPace, aerobicHrRange: hrRange, loadWeekly };
 }

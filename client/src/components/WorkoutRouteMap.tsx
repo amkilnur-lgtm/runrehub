@@ -1,35 +1,60 @@
 import { useEffect, useRef, useState } from "react";
 import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
+import { useResolvedTheme, type ResolvedTheme } from "../hooks/useResolvedTheme";
 
 const DEFAULT_BOUNDS_PADDING = 10;
 const DEFAULT_MAX_ZOOM = 17;
 const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/dataviz-v4/style.json?key={API_KEY}";
+/* У MapTiler тёмный вариант dataviz называется dataviz-dark (dataviz-dark-v4 не существует) */
+const DEFAULT_MAPTILER_DARK_STYLE_URL = "https://api.maptiler.com/maps/dataviz-dark/style.json?key={API_KEY}";
 
-function createFallbackStyle(): StyleSpecification {
+const ROUTE_COLORS: Record<ResolvedTheme, {
+  casing: string;
+  line: string;
+  startFill: string;
+  startStroke: string;
+  endFill: string;
+  endStroke: string;
+}> = {
+  light: {
+    casing: "#ffffff",
+    line: "#fc4c02",
+    startFill: "#181510",
+    startStroke: "#ffffff",
+    endFill: "#ffffff",
+    endStroke: "#fc4c02"
+  },
+  dark: {
+    casing: "#181b26",
+    line: "#fc4c02",
+    startFill: "#f2f3f7",
+    startStroke: "#181b26",
+    endFill: "#181b26",
+    endStroke: "#ff6a3a"
+  }
+};
+
+function createFallbackStyle(theme: ResolvedTheme): StyleSpecification {
+  const variant = theme === "dark" ? "dark" : "light";
+  const cartoTiles = (layer: string) =>
+    ["a", "b", "c", "d"].map(
+      (host) => `https://${host}.basemaps.cartocdn.com/${variant}_${layer}/{z}/{x}/{y}{r}.png`
+    );
+
   return {
     version: 8,
     glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
       cartoBase: {
         type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-          "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-          "https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-          "https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-        ],
+        tiles: cartoTiles("nolabels"),
         tileSize: 256,
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       },
       cartoLabels: {
         type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-          "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-          "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-          "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-        ],
+        tiles: cartoTiles("only_labels"),
         tileSize: 256,
         attribution: ""
       }
@@ -88,6 +113,79 @@ function buildRouteFeatureCollection(points: [number, number][]) {
   };
 }
 
+/* Вызывается на каждый style.load: setStyle полностью очищает источники и слои,
+   поэтому маршрут добавляется заново при каждой смене стиля/темы. */
+function addRouteLayers(
+  map: MapLibreMap,
+  theme: ResolvedTheme,
+  routeData: ReturnType<typeof buildRouteFeatureCollection>
+) {
+  const colors = ROUTE_COLORS[theme];
+
+  map.addSource("route", {
+    type: "geojson",
+    data: routeData
+  });
+
+  map.addLayer({
+    id: "route-shadow",
+    type: "line",
+    source: "route",
+    filter: ["==", ["get", "kind"], "route"],
+    layout: {
+      "line-cap": "round",
+      "line-join": "round"
+    },
+    paint: {
+      "line-color": colors.casing,
+      "line-width": 7.6,
+      "line-opacity": 0.98
+    }
+  });
+
+  map.addLayer({
+    id: "route-line",
+    type: "line",
+    source: "route",
+    filter: ["==", ["get", "kind"], "route"],
+    layout: {
+      "line-cap": "round",
+      "line-join": "round"
+    },
+    paint: {
+      "line-color": colors.line,
+      "line-width": 4.2,
+      "line-opacity": 1
+    }
+  });
+
+  map.addLayer({
+    id: "route-start",
+    type: "circle",
+    source: "route",
+    filter: ["==", ["get", "kind"], "start"],
+    paint: {
+      "circle-radius": 6.2,
+      "circle-color": colors.startFill,
+      "circle-stroke-width": 2.3,
+      "circle-stroke-color": colors.startStroke
+    }
+  });
+
+  map.addLayer({
+    id: "route-end",
+    type: "circle",
+    source: "route",
+    filter: ["==", ["get", "kind"], "end"],
+    paint: {
+      "circle-radius": 5.6,
+      "circle-color": colors.endFill,
+      "circle-stroke-width": 2.1,
+      "circle-stroke-color": colors.endStroke
+    }
+  });
+}
+
 function getBounds(points: [number, number][]): LngLatBoundsLike {
   const coordinates = points.map(([lat, lng]) => [lng, lat] as [number, number]);
   let minLng = coordinates[0][0];
@@ -108,23 +206,33 @@ function getBounds(points: [number, number][]): LngLatBoundsLike {
   ];
 }
 
-function resolveStyleUrl() {
-  const styleUrl = import.meta.env.VITE_MAP_STYLE_URL?.trim();
+function resolveStyleUrl(theme: ResolvedTheme) {
   const apiKey = import.meta.env.VITE_MAP_API_KEY?.trim();
+  const lightUrl = import.meta.env.VITE_MAP_STYLE_URL?.trim() || (apiKey ? DEFAULT_MAPTILER_STYLE_URL : null);
+  const darkUrl = import.meta.env.VITE_MAP_STYLE_URL_DARK?.trim();
 
-  if (styleUrl) {
-    if (apiKey && styleUrl.includes("{API_KEY}")) {
-      return styleUrl.replaceAll("{API_KEY}", apiKey);
+  let url = lightUrl;
+  if (theme === "dark") {
+    if (darkUrl) {
+      url = darkUrl;
+    } else if (lightUrl?.includes("/maps/dataviz-v4/")) {
+      url = lightUrl.replace("/maps/dataviz-v4/", "/maps/dataviz-dark/");
     }
-
-    return styleUrl;
   }
 
-  if (apiKey) {
-    return DEFAULT_MAPTILER_STYLE_URL.replaceAll("{API_KEY}", apiKey);
+  if (!url) {
+    return null;
   }
 
-  return null;
+  if (apiKey && url.includes("{API_KEY}")) {
+    return url.replaceAll("{API_KEY}", apiKey);
+  }
+
+  return url;
+}
+
+function resolveMapStyle(theme: ResolvedTheme): string | StyleSpecification {
+  return resolveStyleUrl(theme) ?? createFallbackStyle(theme);
 }
 
 export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
@@ -141,6 +249,22 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const resolvedTheme = useResolvedTheme();
+  const themeRef = useRef(resolvedTheme);
+
+  useEffect(() => {
+    const changed = themeRef.current !== resolvedTheme;
+    themeRef.current = resolvedTheme;
+    const map = mapRef.current;
+
+    if (!map || !changed) {
+      return;
+    }
+
+    /* diff: false — стили тем структурно разные, диф всё равно не сработает;
+       полная перезагрузка гарантирует style.load и переустановку маршрута */
+    map.setStyle(resolveMapStyle(resolvedTheme), { diff: false });
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const shell = shellRef.current;
@@ -185,7 +309,7 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         return;
       }
 
-      const style = resolveStyleUrl() ?? createFallbackStyle();
+      const style = resolveMapStyle(themeRef.current);
       const routeData = buildRouteFeatureCollection(points);
       const bounds = getBounds(points);
       const isTouchDevice =
@@ -223,73 +347,18 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
         }
       });
 
-      map.on("load", () => {
+      map.on("style.load", () => {
         if (cancelled) {
           return;
         }
 
-        map.addSource("route", {
-          type: "geojson",
-          data: routeData
-        });
+        addRouteLayers(map, themeRef.current, routeData);
+      });
 
-        map.addLayer({
-          id: "route-shadow",
-          type: "line",
-          source: "route",
-          filter: ["==", ["get", "kind"], "route"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round"
-          },
-          paint: {
-            "line-color": "#ffffff",
-            "line-width": 7.6,
-            "line-opacity": 0.98
-          }
-        });
-
-        map.addLayer({
-          id: "route-line",
-          type: "line",
-          source: "route",
-          filter: ["==", ["get", "kind"], "route"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round"
-          },
-          paint: {
-            "line-color": "#fc4c02",
-            "line-width": 4.2,
-            "line-opacity": 1
-          }
-        });
-
-        map.addLayer({
-          id: "route-start",
-          type: "circle",
-          source: "route",
-          filter: ["==", ["get", "kind"], "start"],
-          paint: {
-            "circle-radius": 6.2,
-            "circle-color": "#181510",
-            "circle-stroke-width": 2.3,
-            "circle-stroke-color": "#ffffff"
-          }
-        });
-
-        map.addLayer({
-          id: "route-end",
-          type: "circle",
-          source: "route",
-          filter: ["==", ["get", "kind"], "end"],
-          paint: {
-            "circle-radius": 5.6,
-            "circle-color": "#ffffff",
-            "circle-stroke-width": 2.1,
-            "circle-stroke-color": "#fc4c02"
-          }
-        });
+      map.on("load", () => {
+        if (cancelled) {
+          return;
+        }
 
         map.fitBounds(bounds, {
           padding: DEFAULT_BOUNDS_PADDING,

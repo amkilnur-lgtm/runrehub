@@ -61,14 +61,15 @@ export function StreamChart({
                 <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={color} stopOpacity="0.48" />
                   <stop offset="42%" stopColor={color} stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.03" />
+                  <stop offset="100%" stopColor={color} stopOpacity="0.02" />
                 </linearGradient>
               </defs>
               <path d={model.areaPath} fill={`url(#${title}-gradient)`} />
               <path
                 d={model.linePath}
                 fill="none"
-                stroke="rgba(255, 255, 255, 0.86)"
+                stroke="var(--surface)"
+                strokeOpacity="0.86"
                 strokeWidth="2.3"
                 strokeLinejoin="round"
                 strokeLinecap="round"

@@ -717,13 +717,13 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           <StreamChart
             title="Темп"
             model={paceChart}
-            color="#2476e5"
+            color="var(--chart-pace)"
             formatter={formatPaceSeconds}
           />
           <StreamChart
             title="Пульс"
             model={heartRateChart}
-            color="#d53a3a"
+            color="var(--chart-hr)"
             formatter={(value) => `${Math.round(value)}`}
           />
           <section className="card workout-comment-card">

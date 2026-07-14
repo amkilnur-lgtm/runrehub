@@ -28,6 +28,25 @@
   --danger-soft: oklch(0.95 0.025 25);
   --success: oklch(0.55 0.14 150);
 
+  /* Цвета линий графиков (пара провалидирована dataviz-валидатором в обеих темах) */
+  --chart-pace: oklch(0.58 0.186 258);
+  --chart-hr: oklch(0.582 0.192 25.5);
+  /* Плашка темпа в отрезках: фон + текст (контраст ≥3:1 для жирного 16px) */
+  --chart-pace-soft: oklch(0.954 0.022 263);
+  --chart-pace-ink: oklch(0.563 0.241 261);
+  /* Внутренний блик плиты графика */
+  --chart-grid-glow: oklch(1 0 0 / 0.2);
+
+  /* Карта: подложка до загрузки тайлов, плашка атрибуции, сетка скелетона */
+  --map-surface: oklch(0.924 0.013 244);
+  --map-attrib-bg: oklch(1 0 0 / 0.72);
+  --map-skeleton-line: oklch(1 0 0 / 0.55);
+
+  /* Бейдж «GPS-коррекция» на странице тренировки */
+  --gps-badge-bg: oklch(0.954 0.022 263 / 0.78);
+  --gps-badge-ring: oklch(0.58 0.186 258 / 0.1);
+  --gps-badge-ink: oklch(0.53 0.085 260);
+
   --radius-s: 8px;
   --radius-m: 12px;
   --radius-l: 16px;
@@ -68,6 +87,17 @@
   --danger: oklch(0.68 0.18 25);
   --danger-soft: oklch(0.29 0.055 25);
   --success: oklch(0.7 0.13 150);
+  --chart-pace: oklch(0.66 0.15 258);
+  --chart-hr: oklch(0.66 0.17 25);
+  --chart-pace-soft: oklch(0.3 0.06 258);
+  --chart-pace-ink: oklch(0.8 0.1 258);
+  --chart-grid-glow: oklch(1 0 0 / 0.045);
+  --map-surface: oklch(0.23 0.015 260);
+  --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
+  --map-skeleton-line: oklch(1 0 0 / 0.07);
+  --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
+  --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
+  --gps-badge-ink: oklch(0.78 0.06 258);
   --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
   --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
 }
@@ -89,6 +119,17 @@
     --danger: oklch(0.68 0.18 25);
     --danger-soft: oklch(0.29 0.055 25);
     --success: oklch(0.7 0.13 150);
+    --chart-pace: oklch(0.66 0.15 258);
+    --chart-hr: oklch(0.66 0.17 25);
+    --chart-pace-soft: oklch(0.3 0.06 258);
+    --chart-pace-ink: oklch(0.8 0.1 258);
+    --chart-grid-glow: oklch(1 0 0 / 0.045);
+    --map-surface: oklch(0.23 0.015 260);
+    --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
+    --map-skeleton-line: oklch(1 0 0 / 0.07);
+    --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
+    --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
+    --gps-badge-ink: oklch(0.78 0.06 258);
     --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
     --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
   }
@@ -933,8 +974,8 @@ select:focus-visible {
   min-height: 28px;
   padding: 0 12px;
   border-radius: 10px;
-  background: #e8f0ff;
-  color: #0066ff;
+  background: var(--chart-pace-soft);
+  color: var(--chart-pace-ink);
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1685,7 +1726,7 @@ select:focus-visible {
     var(--surface);
   box-shadow:
     inset 0 0 0 1px var(--border),
-    inset 0 16px 24px rgba(255, 255, 255, 0.2);
+    inset 0 16px 24px var(--chart-grid-glow);
 }
 
 .chart-grid-line {
@@ -1877,9 +1918,9 @@ select:focus-visible {
   margin-top: 2px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(232, 240, 255, 0.78);
-  box-shadow: inset 0 0 0 1px rgba(36, 118, 229, 0.1);
-  color: #4f6c9d;
+  background: var(--gps-badge-bg);
+  box-shadow: inset 0 0 0 1px var(--gps-badge-ring);
+  color: var(--gps-badge-ink);
   font-size: 12px;
   line-height: 1;
 }
@@ -1920,7 +1961,7 @@ select:focus-visible {
   min-width: 0;
   border-radius: 24px;
   overflow: hidden;
-  background: #dfe7ee;
+  background: var(--map-surface);
   box-shadow: inset 0 0 0 1px var(--border);
   align-self: stretch;
 }
@@ -1945,7 +1986,7 @@ select:focus-visible {
 }
 
 .workout-route-maplibre {
-  background: #dfe7ee;
+  background: var(--map-surface);
   font: inherit;
   opacity: 0;
   transition: opacity 180ms ease;
@@ -1964,7 +2005,7 @@ select:focus-visible {
 }
 
 .workout-route-maplibre .maplibregl-map {
-  background: #dfe7ee;
+  background: var(--map-surface);
 }
 
 .workout-route-maplibre .maplibregl-ctrl-bottom-right,
@@ -1973,7 +2014,7 @@ select:focus-visible {
 }
 
 .workout-route-maplibre .maplibregl-ctrl-attrib {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--map-attrib-bg);
   color: var(--ink-muted);
   font-size: 9px;
   backdrop-filter: blur(6px);
@@ -2025,8 +2066,8 @@ select:focus-visible {
   width: 100%;
   height: 100%;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+    linear-gradient(var(--map-skeleton-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--map-skeleton-line) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 
@@ -2776,38 +2817,6 @@ select:focus-visible {
 }
 
 /* --- Тренды атлета --- */
-.trend-records {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.trend-record {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px 14px;
-  border-radius: var(--radius-m);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  transition: border-color 150ms var(--ease-out);
-}
-
-.trend-record:hover {
-  border-color: var(--border-strong);
-}
-
-.trend-record strong {
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.trend-record-date {
-  font-size: 12px;
-}
-
 .trends-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -3022,7 +3031,3 @@ button.trend-bar-slot:focus-visible {
   margin-left: 0;
 }
 
-.trend-records-note {
-  margin: -8px 0 16px;
-  font-size: 12px;
-}

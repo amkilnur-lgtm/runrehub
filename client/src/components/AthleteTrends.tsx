@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import { useApi } from "../hooks/useApi";
 import { formatPace } from "../lib";
@@ -16,14 +15,6 @@ type AerobicPaceRow = {
   runs: number;
 };
 
-type DistanceRecord = {
-  target_meters: number;
-  seconds: number;
-  workout_id: number;
-  workout_name: string;
-  start_date: string;
-};
-
 type WeeklyLoadRow = {
   week_start: string;
   load: number;
@@ -34,7 +25,6 @@ type TrendsData = {
   weekly: WeeklyRow[];
   aerobicPace: AerobicPaceRow[];
   aerobicHrRange: { low: number; high: number };
-  records: DistanceRecord[];
   loadWeekly: WeeklyLoadRow[];
 };
 
@@ -68,20 +58,6 @@ function formatWeekLabel(weekStart: string) {
 function formatMonthLabel(monthStart: string) {
   const date = new Date(`${monthStart}T00:00:00`);
   return MONTH_LABELS[date.getMonth()] ?? monthStart;
-}
-
-function formatRecordTime(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(secs).padStart(2, "0")}`;
-}
-
-function formatRecordDistance(meters: number) {
-  return meters >= 1000 ? `${meters / 1000} км` : `${meters} м`;
 }
 
 function formatKm(meters: number) {
@@ -223,7 +199,7 @@ function AerobicPaceChart({
       {/* подписи — HTML поверх svg, чтобы не масштабировались вместе с графикой */}
       <div className="trend-line-plot">
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="trend-line-svg" role="img" aria-label="Линия тренда аэробного темпа по месяцам">
-          <path d={linePath} fill="none" stroke="rgba(255,255,255,0.86)" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />
+          <path d={linePath} fill="none" stroke="var(--surface)" strokeOpacity="0.86" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />
           <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
           {points.map((point, index) => {
             const row = rows[index];
@@ -364,7 +340,7 @@ function TrainingLoadChart({ rows }: { rows: WeeklyLoadRow[] }) {
           />
           {acwrPath ? (
             <>
-              <path d={acwrPath} fill="none" stroke="rgba(255,255,255,0.86)" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />
+              <path d={acwrPath} fill="none" stroke="var(--surface)" strokeOpacity="0.86" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />
               <path d={acwrPath} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             </>
           ) : null}
@@ -418,7 +394,6 @@ type AthleteTrendsProps = {
 
 export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
   const endpoint = athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends";
-  const workoutBase = athleteId != null ? "/trainer/workouts" : "/athlete/workouts";
   const { data, loading, error } = useApi<TrendsData>(endpoint);
 
   if (loading || error || !data) {
@@ -426,7 +401,6 @@ export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
   }
 
   const hasAnything =
-    data.records.length > 0 ||
     data.weekly.some((week) => week.distance_meters > 0) ||
     data.aerobicPace.length > 0;
   if (!hasAnything) {
@@ -438,30 +412,6 @@ export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
       <div className="trainer-dashboard-heading">
         <span className="muted trainer-dashboard-eyebrow">Тренды</span>
       </div>
-      {data.records.length > 0 ? (
-        <>
-        <div className="trend-records">
-          {data.records.map((record) => (
-            <Link
-              key={record.target_meters}
-              className="trend-record"
-              to={`${workoutBase}/${record.workout_id}`}
-              title={`${record.workout_name} · ${new Date(record.start_date).toLocaleDateString("ru-RU")}`}
-            >
-              <span className="muted">Лучшие {formatRecordDistance(record.target_meters)}</span>
-              <strong>{formatRecordTime(record.seconds)}</strong>
-              <span className="muted trend-record-date">
-                {new Date(record.start_date).toLocaleDateString("ru-RU")}
-              </span>
-            </Link>
-          ))}
-        </div>
-        <div className="muted trend-records-note">
-          Лучший непрерывный отрезок ровно этой длины внутри тренировки — может быть на секунды
-          быстрее официального времени забега.
-        </div>
-        </>
-      ) : null}
       <div className="trends-grid">
         <WeeklyDistanceChart weekly={data.weekly} />
         <AerobicPaceChart rows={data.aerobicPace} hrRange={data.aerobicHrRange} />
