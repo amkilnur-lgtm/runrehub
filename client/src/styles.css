@@ -47,6 +47,10 @@
   --gps-badge-ring: oklch(0.58 0.186 258 / 0.1);
   --gps-badge-ink: oklch(0.53 0.085 260);
 
+  /* Navy-текст на переднем плане (логотип, инициалы аватара): theme-aware,
+     в тёмной теме светлеет до контраста к тёмным поверхностям */
+  --brand-ink: var(--brand-navy);
+
   --radius-s: 8px;
   --radius-m: 12px;
   --radius-l: 16px;
@@ -98,6 +102,7 @@
   --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
   --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
   --gps-badge-ink: oklch(0.78 0.06 258);
+  --brand-ink: oklch(0.82 0.06 272);
   --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
   --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
 }
@@ -130,6 +135,7 @@
     --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
     --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
     --gps-badge-ink: oklch(0.78 0.06 258);
+    --brand-ink: oklch(0.82 0.06 272);
     --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
     --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
   }
@@ -342,7 +348,7 @@ select {
   left: 50%;
   transform: translate(-50%, -50%);
   font-weight: 800;
-  color: var(--brand-navy);
+  color: var(--brand-ink);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -392,7 +398,7 @@ select {
   border-radius: 50%;
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--border);
-  color: var(--brand-navy);
+  color: var(--brand-ink);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;

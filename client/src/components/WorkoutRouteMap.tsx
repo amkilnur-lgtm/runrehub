@@ -5,8 +5,8 @@ import { useResolvedTheme, type ResolvedTheme } from "../hooks/useResolvedTheme"
 const DEFAULT_BOUNDS_PADDING = 10;
 const DEFAULT_MAX_ZOOM = 17;
 const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/dataviz-v4/style.json?key={API_KEY}";
-/* У MapTiler тёмный вариант dataviz называется dataviz-dark (dataviz-dark-v4 не существует) */
-const DEFAULT_MAPTILER_DARK_STYLE_URL = "https://api.maptiler.com/maps/dataviz-dark/style.json?key={API_KEY}";
+/* Тёмная тема — MapTiler Streets Dark (streets-v2-dark) */
+const DEFAULT_MAPTILER_DARK_STYLE_URL = "https://api.maptiler.com/maps/streets-v2-dark/style.json?key={API_KEY}";
 
 const ROUTE_COLORS: Record<ResolvedTheme, {
   casing: string;
@@ -215,8 +215,8 @@ function resolveStyleUrl(theme: ResolvedTheme) {
   if (theme === "dark") {
     if (darkUrl) {
       url = darkUrl;
-    } else if (lightUrl?.includes("/maps/dataviz-v4/")) {
-      url = lightUrl.replace("/maps/dataviz-v4/", "/maps/dataviz-dark/");
+    } else if (apiKey) {
+      url = DEFAULT_MAPTILER_DARK_STYLE_URL;
     }
   }
 
