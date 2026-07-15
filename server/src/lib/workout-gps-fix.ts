@@ -1693,6 +1693,7 @@ export function buildManualTimePreview(
 // стримы, круги и агрегаты пересчитываются по оставшемуся куску.
 export function buildTrimPreview(
   workout: WorkoutSummaryLike,
+  laps: WorkoutLapRow[],
   streams: ActivityStreams | CorrectedStreamsPayload | null,
   startMeters: number,
   endMeters: number
@@ -1768,12 +1769,30 @@ export function buildTrimPreview(
     (value) => Number.isFinite(value) && value > 0
   );
   const finiteAltitude = correctedStreams.altitude.filter((value) => Number.isFinite(value));
-  const { splitStrategy, correctedLaps } = buildCorrectedSplits(
-    workout,
-    correctedStreams,
-    correctedDistanceMeters,
-    correctedMovingTimeSeconds
-  );
+
+  // Обрезка сохраняет оригинальные круги атлета (интервалы и т.п.), подрезая их
+  // по новым границам: индекс i исходного стрима -> (i - firstIndex) в обрезанном.
+  // Километровые сплиты — только фолбэк для тренировок без кругов с индексами.
+  const originalToCorrectedIndex = new Map<number, number>();
+  for (let index = firstIndex; index <= lastIndex; index += 1) {
+    originalToCorrectedIndex.set(index, index - firstIndex);
+  }
+  const preservedLaps = rebuildCorrectedLaps(laps, correctedStreams, originalToCorrectedIndex);
+  let correctedLaps: CorrectedLapPayload[];
+  let splitStrategy: SplitStrategy;
+  if (preservedLaps.length) {
+    correctedLaps = preservedLaps;
+    splitStrategy = "stream";
+  } else {
+    const fallback = buildCorrectedSplits(
+      workout,
+      correctedStreams,
+      correctedDistanceMeters,
+      correctedMovingTimeSeconds
+    );
+    correctedLaps = fallback.correctedLaps;
+    splitStrategy = fallback.splitStrategy;
+  }
 
   return {
     correctedWorkout: {

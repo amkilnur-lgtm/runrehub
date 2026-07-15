@@ -921,8 +921,12 @@ export async function trainerRoutes(app: FastifyInstance) {
       max_heartrate: number | null;
     };
 
+    // Круги хранят индексы исходного стрима; gps-автофикс его переиндексирует,
+    // поэтому поверх автофикса круги не переносим (там их и нет — только сплиты).
+    const trimLaps = correction?.kind === "gps_autofix" ? [] : lapsResult.rows;
     const preview = buildTrimPreview(
       currentWorkout,
+      trimLaps,
       correctedView.streams,
       Math.round(body.startKm * 1000),
       Math.round(body.endKm * 1000)
@@ -984,8 +988,10 @@ export async function trainerRoutes(app: FastifyInstance) {
       max_heartrate: number | null;
     };
 
+    const trimLaps = correction?.kind === "gps_autofix" ? [] : lapsResult.rows;
     const preview = buildTrimPreview(
       currentWorkout,
+      trimLaps,
       correctedView.streams,
       Math.round(body.startKm * 1000),
       Math.round(body.endKm * 1000)

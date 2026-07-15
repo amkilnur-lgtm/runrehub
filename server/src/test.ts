@@ -115,25 +115,40 @@ await runTest("buildTrimPreview keeps only the requested distance range", () => 
     latlng: [] as [number, number][]
   };
 
-  const preview = gpsFixModule.buildTrimPreview(workout, streams as any, 0, 4000);
+  // круги атлета по 2 км (не километровые) — должны пережить обрезку, а не стать сплитами
+  const laps = [
+    { id: 1, name: "Разминка", distance_meters: 2000, elapsed_time_seconds: 600, average_speed: null, average_heartrate: null, elevation_gain: null, start_index: 0, end_index: 20 },
+    { id: 2, name: "Работа", distance_meters: 2000, elapsed_time_seconds: 600, average_speed: null, average_heartrate: null, elevation_gain: null, start_index: 20, end_index: 40 },
+    { id: 3, name: "Заминка", distance_meters: 2000, elapsed_time_seconds: 600, average_speed: null, average_heartrate: null, elevation_gain: null, start_index: 40, end_index: 60 }
+  ];
+
+  const preview = gpsFixModule.buildTrimPreview(workout, laps as any, streams as any, 0, 4000);
   assert.ok(preview, "preview should be built");
   assert.equal(Math.round(preview!.correctedWorkout.distance_meters), 4000);
   assert.equal(preview!.correctedWorkout.moving_time_seconds, 1200);
   assert.equal(preview!.correctedWorkout.max_heartrate, 140);
-  assert.equal(preview!.correctedLaps.length, 4);
+  // сохранены первые два круга атлета (третий за границей обрезки), а не 4 км-сплита
+  assert.equal(preview!.correctedLaps.length, 2);
+  assert.equal(preview!.correctedLaps[0]!.name, "Разминка");
+  assert.equal(preview!.correctedLaps[1]!.name, "Работа");
+  assert.equal(preview!.metadata.split_strategy, "stream");
   assert.equal(preview!.metadata.trim_end_meters, 4000);
 
+  // без кругов с индексами — фолбэк на километровые сплиты
+  const noLaps = gpsFixModule.buildTrimPreview(workout, [] as any, streams as any, 0, 4000);
+  assert.equal(noLaps!.correctedLaps.length, 4);
+
   // обрезка начала: остаётся [2 км, 6 км], дистанция и время с нуля
-  const tail = gpsFixModule.buildTrimPreview(workout, streams as any, 2000, 6000);
+  const tail = gpsFixModule.buildTrimPreview(workout, laps as any, streams as any, 2000, 6000);
   assert.ok(tail, "tail preview should be built");
   assert.equal(Math.round(tail!.correctedWorkout.distance_meters), 4000);
   assert.equal(tail!.correctedStreams.distance[0], 0);
   assert.equal(tail!.correctedStreams.time[0], 0);
 
   // без реального среза превью не строится
-  assert.equal(gpsFixModule.buildTrimPreview(workout, streams as any, 0, 6000), null);
+  assert.equal(gpsFixModule.buildTrimPreview(workout, laps as any, streams as any, 0, 6000), null);
   // слишком короткий остаток — тоже
-  assert.equal(gpsFixModule.buildTrimPreview(workout, streams as any, 0, 100), null);
+  assert.equal(gpsFixModule.buildTrimPreview(workout, laps as any, streams as any, 0, 100), null);
 });
 
 await runTest("computeHrTrainingLoad weights minutes by Edwards zones", () => {
