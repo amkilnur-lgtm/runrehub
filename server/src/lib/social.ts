@@ -2,7 +2,7 @@ import { pool } from "./db.js";
 import { buildNextCursor, type WorkoutCursor } from "./pagination.js";
 
 export const FEED_PAGE_SIZE = 15;
-const ROUTE_MAX_POINTS = 96;
+const ROUTE_MAX_POINTS = 128;
 const OVERVIEW_WORKOUTS_PAGE_SIZE = 10;
 
 export type FeedItem = {
