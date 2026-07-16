@@ -12,6 +12,7 @@ import { TrainerDashboardPage } from "./pages/TrainerDashboardPage";
 import { TrainerAthletePage } from "./pages/TrainerAthletePage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
+import { AthleteProfilePage } from "./pages/AthleteProfilePage";
 import "@fontsource-variable/manrope";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
           { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
           { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> },
           { path: "/athlete", element: <AthleteDashboardPage /> },
+          { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
           { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> },
           { path: "*", element: <Navigate to="/" replace /> }
         ]

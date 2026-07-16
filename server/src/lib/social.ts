@@ -2,7 +2,8 @@ import { pool } from "./db.js";
 import { buildNextCursor, type WorkoutCursor } from "./pagination.js";
 
 export const FEED_PAGE_SIZE = 15;
-const ROUTE_MAX_POINTS = 48;
+const ROUTE_MAX_POINTS = 96;
+const OVERVIEW_WORKOUTS_PAGE_SIZE = 10;
 
 export type FeedItem = {
   id: number;
@@ -67,6 +68,136 @@ export async function isWorkoutInGroup(viewerId: number, workoutId: number): Pro
     [workoutId, viewerId]
   );
   return rows.length > 0;
+}
+
+// Атлет-одногруппник: та же группа (общий тренер) либо сам зритель
+export async function isAthleteInGroup(viewerId: number, athleteId: number): Promise<boolean> {
+  if (viewerId === athleteId) {
+    return true;
+  }
+  const { rows } = await pool.query(
+    `
+      select 1
+      from users a
+      join users me on me.id = $1
+      where a.id = $2
+        and a.role = 'athlete'
+        and me.coach_id is not null
+        and a.coach_id = me.coach_id
+      limit 1
+    `,
+    [viewerId, athleteId]
+  );
+  return rows.length > 0;
+}
+
+// Профиль атлета для просмотра одногруппником: шапка + сводка + пробежки.
+// Формат совпадает с /api/trainer/athletes/:id, чтобы страница могла переиспользовать вёрстку.
+export async function getAthleteOverview(athleteId: number, cursor: WorkoutCursor | null) {
+  const hasCursor = cursor !== null;
+
+  const profileResult = await pool.query(
+    `
+      select
+        u.id, u.full_name, u.username, u.avatar_url,
+        ic.connected_at as connected_at,
+        ic.last_synced_at as last_synced_at,
+        case when ic.user_id is not null then 'intervals' end as provider
+      from users u
+      left join intervals_connections ic on ic.user_id = u.id
+      where u.id = $1 and u.role = 'athlete'
+    `,
+    [athleteId]
+  );
+  if (!profileResult.rows[0]) {
+    return null;
+  }
+
+  const workoutsQuery = hasCursor
+    ? pool.query(
+        `
+          select
+            w.id, w.name, w.sport_type, w.start_date,
+            coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+            coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+            coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+            coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+          from workouts w
+          left join workout_corrections wc on wc.workout_id = w.id
+          where w.user_id = $1
+            and (w.start_date < $2::timestamptz or (w.start_date = $2::timestamptz and w.id < $3))
+          order by w.start_date desc, w.id desc
+          limit $4
+        `,
+        [athleteId, cursor!.beforeDate, cursor!.beforeId, OVERVIEW_WORKOUTS_PAGE_SIZE]
+      )
+    : pool.query(
+        `
+          select
+            w.id, w.name, w.sport_type, w.start_date,
+            coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+            coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+            coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+            coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+          from workouts w
+          left join workout_corrections wc on wc.workout_id = w.id
+          where w.user_id = $1
+          order by w.start_date desc, w.id desc
+          limit $2
+        `,
+        [athleteId, OVERVIEW_WORKOUTS_PAGE_SIZE]
+      );
+
+  const statsQuery = pool.query(
+    `
+      select
+        coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_distance_meters,
+        coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_moving_time_seconds,
+        coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('week', now())), 0) as week_elevation_gain,
+        count(*) filter (where w.start_date >= date_trunc('week', now())) as week_workout_count,
+        coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_distance_meters,
+        coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_moving_time_seconds,
+        coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('month', now())), 0) as month_elevation_gain,
+        count(*) filter (where w.start_date >= date_trunc('month', now())) as month_workout_count,
+        coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_distance_meters,
+        coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_moving_time_seconds,
+        coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)) filter (where w.start_date >= date_trunc('year', now())), 0) as year_elevation_gain,
+        count(*) filter (where w.start_date >= date_trunc('year', now())) as year_workout_count,
+        coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0) as all_time_distance_meters,
+        coalesce(sum(coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)), 0) as all_time_moving_time_seconds,
+        coalesce(sum(coalesce(wc.corrected_elevation_gain, w.elevation_gain)), 0) as all_time_elevation_gain,
+        count(*) as all_time_workout_count
+      from workouts w
+      left join workout_corrections wc on wc.workout_id = w.id
+      where w.user_id = $1
+    `,
+    [athleteId]
+  );
+
+  const [workoutsResult, statsResult] = await Promise.all([workoutsQuery, statsQuery]);
+  const workouts = workoutsResult.rows;
+  const stats = statsResult.rows[0] as Record<string, number | string | null>;
+  const period = (prefix: string) => ({
+    distance_meters: Number(stats?.[`${prefix}_distance_meters`] ?? 0),
+    moving_time_seconds: Number(stats?.[`${prefix}_moving_time_seconds`] ?? 0),
+    elevation_gain: Number(stats?.[`${prefix}_elevation_gain`] ?? 0),
+    workout_count: Number(stats?.[`${prefix}_workout_count`] ?? 0)
+  });
+
+  return {
+    athlete: profileResult.rows[0],
+    stats: {
+      week: period("week"),
+      month: period("month"),
+      year: period("year"),
+      allTime: period("all_time")
+    },
+    workouts,
+    nextCursor: buildNextCursor(
+      workouts as Array<{ id: number; start_date: string }>,
+      OVERVIEW_WORKOUTS_PAGE_SIZE
+    )
+  };
 }
 
 export async function getWorkoutLikeState(workoutId: number, viewerId: number) {

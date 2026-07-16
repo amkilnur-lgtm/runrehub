@@ -388,12 +388,16 @@ function TrainingLoadChart({ rows }: { rows: WeeklyLoadRow[] }) {
 }
 
 type AthleteTrendsProps = {
-  // без athleteId — собственный кабинет атлета; с athleteId — взгляд тренера
+  // без athleteId — собственный кабинет атлета; с athleteId — взгляд тренера;
+  // trendsEndpoint — явный эндпоинт (страница одногруппника)
   athleteId?: number;
+  trendsEndpoint?: string;
 };
 
-export function AthleteTrends({ athleteId }: AthleteTrendsProps) {
-  const endpoint = athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends";
+export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps) {
+  const endpoint =
+    trendsEndpoint ??
+    (athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends");
   const { data, loading, error } = useApi<TrendsData>(endpoint);
 
   if (loading || error || !data) {
