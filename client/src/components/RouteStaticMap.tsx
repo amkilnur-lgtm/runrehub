@@ -2,15 +2,23 @@ import { useEffect, useRef, useState } from "react";
 
 import { useResolvedTheme, type ResolvedTheme } from "../hooks/useResolvedTheme";
 
-// Статичная карта для ленты: мозаика растровых тайлов CARTO + маршрут поверх.
+// Статичная карта для ленты: мозаика растровых тайлов + маршрут поверх.
 // Выглядит как настоящая карта, но без MapLibre на каждую карточку —
 // это просто <img> тайлы, которые браузер кэширует.
+// С ключом MapTiler используем те же стили, что на большой карте разбора
+// (streets-v2 / streets-v2-dark); без ключа — фолбэк на CARTO.
 const TILE_SIZE = 256;
 const PADDING = 26;
 const MIN_ZOOM = 3;
-const MAX_ZOOM = 16;
+// z18 хватает, чтобы круги по стадиону заняли весь баннер, а не сжались в комок
+const MAX_ZOOM = 18;
 
-const TILE_VARIANT: Record<ResolvedTheme, string> = {
+const MAPTILER_STYLE: Record<ResolvedTheme, string> = {
+  light: "streets-v2",
+  dark: "streets-v2-dark"
+};
+
+const CARTO_VARIANT: Record<ResolvedTheme, string> = {
   light: "rastertiles/voyager",
   dark: "dark_all"
 };
@@ -39,6 +47,35 @@ function mercatorY(lat: number) {
 
 function tileSubdomain(x: number, y: number) {
   return ["a", "b", "c", "d"][(x + y) % 4];
+}
+
+function tileUrl(theme: ResolvedTheme, z: number, x: number, y: number) {
+  const apiKey = import.meta.env.VITE_MAP_API_KEY?.trim();
+  if (apiKey) {
+    return `https://api.maptiler.com/maps/${MAPTILER_STYLE[theme]}/256/${z}/${x}/${y}@2x.png?key=${apiKey}`;
+  }
+  return `https://${tileSubdomain(x, y)}.basemaps.cartocdn.com/${CARTO_VARIANT[theme]}/${z}/${x}/${y}@2x.png`;
+}
+
+// Сглаживание трека (Catmull-Rom -> кубические Безье): GPS-ломаная из
+// прореженных точек выглядит угловатой, особенно на коротких кругах.
+function smoothPath(points: Array<[number, number]>) {
+  if (points.length < 3) {
+    return `M${points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" L")}`;
+  }
+  let d = `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
 }
 
 export function RouteStaticMap({ points }: { points: [number, number][] | null }) {
@@ -72,7 +109,7 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
   }
 
   let tiles: Array<{ key: string; src: string; left: number; top: number; size: number }> = [];
-  let polyline = "";
+  let routePath = "";
   let start: [number, number] | null = null;
   let end: [number, number] | null = null;
 
@@ -109,7 +146,6 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
     const lastTileX = Math.floor((originX + size.width) / tileScreen);
     const firstTileY = Math.max(0, Math.floor(originY / tileScreen));
     const lastTileY = Math.min(tileCount - 1, Math.floor((originY + size.height) / tileScreen));
-    const variant = TILE_VARIANT[theme];
 
     for (let tx = firstTileX; tx <= lastTileX; tx += 1) {
       for (let ty = firstTileY; ty <= lastTileY; ty += 1) {
@@ -117,7 +153,7 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
         const wrappedX = ((tx % tileCount) + tileCount) % tileCount;
         tiles.push({
           key: `${zi}-${tx}-${ty}-${theme}`,
-          src: `https://${tileSubdomain(wrappedX, ty)}.basemaps.cartocdn.com/${variant}/${zi}/${wrappedX}/${ty}@2x.png`,
+          src: tileUrl(theme, zi, wrappedX, ty),
           left: tx * tileScreen - originX,
           top: ty * tileScreen - originY,
           size: tileScreen
@@ -129,7 +165,7 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
       mercatorX(lng) * world - originX,
       mercatorY(lat) * world - originY
     ]);
-    polyline = projected.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    routePath = smoothPath(projected);
     start = projected[0];
     end = projected[projected.length - 1];
   }
@@ -148,14 +184,14 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
           />
         ))}
       </div>
-      {size && polyline ? (
+      {size && routePath ? (
         <svg
           className="feed-map-overlay"
           viewBox={`0 0 ${size.width} ${size.height}`}
           aria-hidden="true"
         >
-          <polyline
-            points={polyline}
+          <path
+            d={routePath}
             fill="none"
             stroke={ROUTE_COLORS[theme].casing}
             strokeOpacity="0.92"
@@ -163,8 +199,8 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <polyline
-            points={polyline}
+          <path
+            d={routePath}
             fill="none"
             stroke="#fc4c02"
             strokeWidth="3.6"
@@ -179,7 +215,9 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
           ) : null}
         </svg>
       ) : null}
-      <span className="feed-map-attrib">© OpenStreetMap · © CARTO</span>
+      <span className="feed-map-attrib">
+        {import.meta.env.VITE_MAP_API_KEY?.trim() ? "© MapTiler · © OpenStreetMap" : "© OpenStreetMap · © CARTO"}
+      </span>
     </div>
   );
 }
