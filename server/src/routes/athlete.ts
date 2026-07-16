@@ -5,6 +5,11 @@ import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
+import {
+  getAthleteFeed,
+  getWorkoutLikeState,
+  isWorkoutInGroup
+} from "../lib/social.js";
 import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
@@ -175,12 +180,64 @@ export async function athleteRoutes(app: FastifyInstance) {
     return getAthleteTrends(request.user.id);
   });
 
+  // Лента команды: свежие пробежки своей группы (тот же тренер) + свои
+  app.get("/api/athlete/feed", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const query = workoutCursorQuerySchema.parse(request.query);
+    if (hasPartialCursor(query)) {
+      return reply.code(400).send({ message: "Invalid feed cursor" });
+    }
+    const cursor =
+      query.beforeDate && query.beforeId
+        ? { beforeDate: query.beforeDate, beforeId: query.beforeId }
+        : null;
+    return getAthleteFeed(request.user.id, cursor);
+  });
+
+  app.post("/api/athlete/workouts/:id/like", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    await pool.query(
+      `insert into workout_likes (workout_id, user_id) values ($1, $2)
+       on conflict (workout_id, user_id) do nothing`,
+      [workoutId, request.user.id]
+    );
+    return { ok: true, ...(await getWorkoutLikeState(workoutId, request.user.id)) };
+  });
+
+  app.delete("/api/athlete/workouts/:id/like", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    await pool.query(
+      `delete from workout_likes where workout_id = $1 and user_id = $2`,
+      [workoutId, request.user.id]
+    );
+    return { ok: true, ...(await getWorkoutLikeState(workoutId, request.user.id)) };
+  });
+
   app.get("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["athlete"]);
     const params = request.params as { id: string };
     const workoutId = Number(params.id);
+    // Свою тренировку или тренировку одногруппника (тот же тренер) — read-only
     const workoutResult = await pool.query(
-      `select * from workouts where id = $1 and user_id = $2`,
+      `
+        select w.*, (w.user_id = $2) as is_owner
+        from workouts w
+        join users a on a.id = w.user_id
+        join users me on me.id = $2
+        where w.id = $1
+          and (
+            w.user_id = $2
+            or (a.role = 'athlete' and me.coach_id is not null and a.coach_id = me.coach_id)
+          )
+      `,
       [workoutId, request.user.id]
     );
 
@@ -203,7 +260,7 @@ export async function athleteRoutes(app: FastifyInstance) {
       correction
     );
 
-    return correctedView;
+    return { ...correctedView, like: await getWorkoutLikeState(workoutId, request.user.id) };
   });
 
   app.delete("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
