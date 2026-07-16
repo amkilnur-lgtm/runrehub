@@ -595,6 +595,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     !Array.isArray(data.workout.gps_fix.removed_segments) &&
     data.workout.gps_fix.removed_segments.split_strategy === "synthetic_even";
 
+  // Атлет, открывший тренировку одногруппника из ленты, видит её только на чтение.
+  const canEdit = mode === "trainer" || data.workout.is_owner !== false;
+
   return (
     <div className="stack">
       <Link to={backHref} className="inline-link workout-back-link">
@@ -608,6 +611,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           <div className="workout-summary-header">
             <div className="workout-summary-topbar">
               <span className="muted trainer-dashboard-eyebrow">СВОДКА</span>
+              {canEdit ? (
               <div className="workout-menu" ref={menuRef}>
                 <button
                   type="button"
@@ -694,6 +698,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   </div>
                 ) : null}
               </div>
+              ) : null}
             </div>
 
             <div className="trainer-dashboard-heading workout-summary-heading">

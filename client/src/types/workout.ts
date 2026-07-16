@@ -21,6 +21,7 @@ export type WorkoutData = {
     coach_comment?: string | null;
     athlete_name?: string;
     athlete_id?: number;
+    is_owner?: boolean;
     gps_fix?: {
       is_corrected: boolean;
       kind: "gps_autofix" | "manual_distance" | "manual_time" | "trim";

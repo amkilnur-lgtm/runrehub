@@ -3,11 +3,14 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { AthleteAccountHeader, type PeriodStats, type StatsPeriodKey } from "../components/AthleteAccountHeader";
+import { AthleteFeed } from "../components/AthleteFeed";
 import { AthleteTrends } from "../components/AthleteTrends";
 import { useAuth } from "../components/AuthProvider";
 import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+
+type AthleteTab = "feed" | "mine";
 
 type AthleteDashboardData = {
   athlete: {
@@ -48,6 +51,7 @@ export function AthleteDashboardPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriodKey>("week");
+  const [tab, setTab] = useState<AthleteTab>("feed");
 
   useEffect(() => {
     if (data) {
@@ -116,13 +120,43 @@ export function AthleteDashboardPage() {
         }
       />
 
-      <AthleteTrends />
+      <div className="athlete-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "feed"}
+          className={`athlete-tab${tab === "feed" ? " active" : ""}`}
+          onClick={() => setTab("feed")}
+        >
+          Лента
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "mine"}
+          className={`athlete-tab${tab === "mine" ? " active" : ""}`}
+          onClick={() => setTab("mine")}
+        >
+          Мои тренировки
+        </button>
+      </div>
 
-      <section className="card trainer-dashboard-list-section">
-        <div className="trainer-dashboard-heading">
-          <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
-        </div>
-        {allWorkouts.length === 0 ? (
+      {tab === "feed" ? (
+        <>
+          <div className="feed-head">
+            <span className="muted trainer-dashboard-eyebrow">Лента команды</span>
+          </div>
+          <AthleteFeed />
+        </>
+      ) : (
+        <>
+          <AthleteTrends />
+
+          <section className="card trainer-dashboard-list-section">
+            <div className="trainer-dashboard-heading">
+              <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
+            </div>
+            {allWorkouts.length === 0 ? (
           <div className="trainer-dashboard-leader-empty">
             <strong>Пока нет тренировок.</strong>
             <div className="muted">
@@ -153,14 +187,16 @@ export function AthleteDashboardPage() {
             ))}
           </div>
         )}
-        {allWorkouts.length > 0 && hasMore ? (
-          <div style={{ marginTop: "16px", textAlign: "center" }}>
-            <button className="ghost-button" disabled={isLoadingMore} onClick={loadMore}>
-              {isLoadingMore ? "Загрузка..." : "Загрузить ещё"}
-            </button>
-          </div>
-        ) : null}
-      </section>
+            {allWorkouts.length > 0 && hasMore ? (
+              <div style={{ marginTop: "16px", textAlign: "center" }}>
+                <button className="ghost-button" disabled={isLoadingMore} onClick={loadMore}>
+                  {isLoadingMore ? "Загрузка..." : "Загрузить ещё"}
+                </button>
+              </div>
+            ) : null}
+          </section>
+        </>
+      )}
     </div>
   );
 }
