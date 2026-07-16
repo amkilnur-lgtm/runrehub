@@ -7,7 +7,9 @@ import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
   getAthleteFeed,
+  getAthleteOverview,
   getWorkoutLikeState,
+  isAthleteInGroup,
   isWorkoutInGroup
 } from "../lib/social.js";
 import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
@@ -192,6 +194,37 @@ export async function athleteRoutes(app: FastifyInstance) {
         ? { beforeDate: query.beforeDate, beforeId: query.beforeId }
         : null;
     return getAthleteFeed(request.user.id, cursor);
+  });
+
+  // Профиль одногруппника (или свой): шапка, сводка, пробежки — только чтение
+  app.get("/api/athlete/athletes/:id", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    const query = workoutCursorQuerySchema.parse(request.query);
+    if (hasPartialCursor(query)) {
+      return reply.code(400).send({ message: "Invalid workout cursor" });
+    }
+    if (!(await isAthleteInGroup(request.user.id, athleteId))) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    const cursor =
+      query.beforeDate && query.beforeId
+        ? { beforeDate: query.beforeDate, beforeId: query.beforeId }
+        : null;
+    const overview = await getAthleteOverview(athleteId, cursor);
+    if (!overview) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    return overview;
+  });
+
+  app.get("/api/athlete/athletes/:id/trends", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await isAthleteInGroup(request.user.id, athleteId))) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    return getAthleteTrends(athleteId);
   });
 
   app.post("/api/athlete/workouts/:id/like", { preHandler: requireAuth }, async (request, reply) => {

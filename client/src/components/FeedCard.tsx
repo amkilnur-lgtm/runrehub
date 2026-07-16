@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
-import { RouteTrack } from "./RouteTrack";
+import { RouteStaticMap } from "./RouteStaticMap";
 import { formatAgo, formatDistance, formatDuration, formatPace } from "../lib";
 
 export type FeedItem = {
@@ -82,7 +82,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
   return (
     <article className="feed-card">
       <header className="feed-top">
-        <div className="feed-author">
+        <Link to={`/athlete/athletes/${item.athlete_id}`} className="feed-author">
           <UserAvatar
             fullName={item.athlete_name}
             avatarUrl={item.athlete_avatar_url}
@@ -95,12 +95,12 @@ export function FeedCard({ item }: { item: FeedItem }) {
             </div>
             <span className="feed-ago">{formatAgo(item.start_date)}</span>
           </div>
-        </div>
+        </Link>
       </header>
 
       <Link to={`/athlete/workouts/${item.id}`} className="feed-run-link">
         <div className="feed-run-title">{item.name}</div>
-        {item.route ? <RouteTrack points={item.route} /> : null}
+        {item.route ? <RouteStaticMap points={item.route} /> : null}
         <div className="feed-stats">
           {stats.map(([value, label]) => (
             <div className="feed-stat" key={label}>
