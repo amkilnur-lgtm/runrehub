@@ -830,6 +830,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             color="var(--chart-hr)"
             formatter={(value) => `${Math.round(value)}`}
           />
+          {/* Разбор тренера — приватный: одногруппникам не показываем */}
+          {canEdit ? (
           <section className="card workout-comment-card">
             <div className="chart-title-row">
               <strong>Комментарий тренера</strong>
@@ -863,6 +865,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </div>
             )}
           </section>
+          ) : null}
           <section className="card workout-comment-card">
             <div className="chart-title-row">
               <strong>Комментарии</strong>

@@ -415,7 +415,10 @@ function formatOldest(date: Date) {
   return date.toISOString().slice(0, 19);
 }
 
-export async function syncIntervalsLatestActivities(userId: number): Promise<IntervalsSyncResult> {
+export async function syncIntervalsLatestActivities(
+  userId: number,
+  options?: { forceDeep?: boolean }
+): Promise<IntervalsSyncResult> {
   const lockAcquired = await tryAcquireSyncLock(userId);
   if (!lockAcquired) {
     return { synced: false, reason: "already_running" };
@@ -435,7 +438,10 @@ export async function syncIntervalsLatestActivities(userId: number): Promise<Int
     // Обычный тик смотрит на 36ч назад — дешево, но не видит тренировки,
     // загруженные в intervals.icu задним числом. Раз в сутки делаем
     // глубокий проход на DEEP_SYNC_DAYS, который их подбирает.
+    // Ручная синхронизация из админки всегда глубокая: intervals.icu заносит
+    // историю с часов (COROS backfill) с задержкой, обычный 36ч-тик её не видит
     const deepDue =
+      Boolean(options?.forceDeep) ||
       !connection.last_deep_synced_at ||
       Date.now() - new Date(connection.last_deep_synced_at).getTime() > DEEP_SYNC_INTERVAL_MS;
     const oldestByMode = !connection.last_synced_at

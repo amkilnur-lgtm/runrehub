@@ -351,6 +351,11 @@ export async function athleteRoutes(app: FastifyInstance) {
       correction
     );
 
+    // Разбор тренера — приватный: его видят только сам атлет и тренер
+    if (!workoutResult.rows[0].is_owner) {
+      (correctedView.workout as Record<string, unknown>).coach_comment = null;
+    }
+
     return { ...correctedView, like: await getWorkoutLikeState(workoutId, request.user.id) };
   });
 
