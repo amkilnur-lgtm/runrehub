@@ -3292,3 +3292,19 @@ button.trend-bar-slot:focus-visible {
 @media (max-width: 900px) {
   .trends-skeleton { min-height: 620px; }
 }
+
+.feed-leaders-toggle {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.feed-leaders-toggle:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.feed-leaders-card { display: flex; flex-direction: column; }
+.feed-leaders-loading { font-size: 13px; padding: 6px 0; }

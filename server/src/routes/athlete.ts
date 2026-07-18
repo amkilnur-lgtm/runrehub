@@ -9,6 +9,7 @@ import {
   addWorkoutComment,
   getAthleteFeed,
   getAthleteOverview,
+  getGroupLeaderboard,
   getGroupLeaders,
   getWorkoutLikers,
   getWorkoutLikeState,
@@ -241,6 +242,14 @@ export async function athleteRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Спортсмен не найден" });
     }
     return getAthleteTrends(athleteId);
+  });
+
+  // Полный недельный лидерборд группы (разворот «Посмотреть всех» под Топ-3)
+  app.get("/api/athlete/leaderboard", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["athlete"]);
+    const { rows } = await pool.query(`select coach_id from users where id = $1`, [request.user.id]);
+    const coachId = rows[0]?.coach_id as number | null;
+    return { leaderboard: coachId ? await getGroupLeaderboard(coachId) : [] };
   });
 
   app.post("/api/athlete/workouts/:id/like", { preHandler: requireAuth }, async (request, reply) => {

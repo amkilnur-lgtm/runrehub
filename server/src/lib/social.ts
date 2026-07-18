@@ -293,8 +293,9 @@ export async function getWorkoutLikeState(workoutId: number, viewerId: number) {
   };
 }
 
-// Топ-3 недели по километражу — тот же расчёт, что в тренерском дашборде
-export async function getGroupLeaders(coachId: number) {
+// Недельный лидерборд группы по километражу; onlyActive+limit 3 — блок «Топ-3»
+async function queryGroupLeaderboard(coachId: number, options?: { top3?: boolean }) {
+  const top3 = Boolean(options?.top3);
   const { rows } = await pool.query(
     `
       select
@@ -307,13 +308,22 @@ export async function getGroupLeaders(coachId: number) {
       left join workout_corrections wc on wc.workout_id = w.id
       where u.role = 'athlete' and u.coach_id = $1
       group by u.id
-      having count(w.id) filter (where w.start_date >= date_trunc('week', now())) > 0
+      ${top3 ? `having count(w.id) filter (where w.start_date >= date_trunc('week', now())) > 0` : ""}
       order by week_distance_meters desc, week_workout_count desc, u.full_name asc
-      limit 3
+      ${top3 ? "limit 3" : ""}
     `,
     [coachId]
   );
   return rows;
+}
+
+export async function getGroupLeaders(coachId: number) {
+  return queryGroupLeaderboard(coachId, { top3: true });
+}
+
+// Полный список группы, включая тех, кто на этой неделе ещё не бегал
+export async function getGroupLeaderboard(coachId: number) {
+  return queryGroupLeaderboard(coachId);
 }
 
 // Общее тело фида: viewer ($1) для liked_by_me + условие принадлежности группе
