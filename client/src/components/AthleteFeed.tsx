@@ -28,6 +28,21 @@ export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trai
   const [extra, setExtra] = useState<FeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedData["nextCursor"]>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<FeedLeader[] | null>(null);
+
+  async function toggleLeaderboard() {
+    const next = !leaderboardOpen;
+    setLeaderboardOpen(next);
+    if (next && leaderboard === null) {
+      try {
+        const res = await api<{ leaderboard: FeedLeader[] }>("/api/athlete/leaderboard");
+        setLeaderboard(res.leaderboard);
+      } catch {
+        setLeaderboard([]);
+      }
+    }
+  }
 
   useEffect(() => {
     if (data) {
@@ -69,14 +84,17 @@ export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trai
 
   const items = [...data.feed, ...extra];
   const leaders = data.leaders ?? [];
+  const shownLeaders = leaderboardOpen && leaderboard !== null ? leaderboard : leaders;
   const leadersBlock =
     leaders.length > 0 ? (
       <section className="card feed-leaders-card">
         <div className="trainer-dashboard-heading">
-          <span className="muted trainer-dashboard-eyebrow">Топ-3 на неделе</span>
+          <span className="muted trainer-dashboard-eyebrow">
+            {leaderboardOpen ? "Километраж недели" : "Топ-3 на неделе"}
+          </span>
         </div>
         <div className="trainer-dashboard-leader-list">
-          {leaders.map((leader, index) => (
+          {shownLeaders.map((leader, index) => (
             <Link
               key={leader.id}
               className="trainer-dashboard-leader-row"
@@ -98,7 +116,13 @@ export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trai
               </div>
             </Link>
           ))}
+          {leaderboardOpen && leaderboard === null ? (
+            <div className="muted feed-leaders-loading">Загрузка…</div>
+          ) : null}
         </div>
+        <button type="button" className="feed-leaders-toggle" onClick={() => void toggleLeaderboard()}>
+          {leaderboardOpen ? "Свернуть" : "Посмотреть всех"}
+        </button>
       </section>
     ) : null;
 
