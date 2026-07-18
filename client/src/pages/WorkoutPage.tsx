@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
+import { WorkoutComments } from "../components/WorkoutComments";
 import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
 import { useApi } from "../hooks/useApi";
@@ -861,6 +862,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   "Тренер пока не оставил комментарий к этой тренировке."}
               </div>
             )}
+          </section>
+          <section className="card workout-comment-card">
+            <div className="chart-title-row">
+              <strong>Комментарии</strong>
+            </div>
+            <WorkoutComments workoutId={data.workout.id} viewer={mode} />
           </section>
         </div>
       </section>

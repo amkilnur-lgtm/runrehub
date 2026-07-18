@@ -4,8 +4,8 @@ import { useResolvedTheme, type ResolvedTheme } from "../hooks/useResolvedTheme"
 
 const DEFAULT_BOUNDS_PADDING = 10;
 const DEFAULT_MAX_ZOOM = 17;
-const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/dataviz-v4/style.json?key={API_KEY}";
-/* Тёмная тема — MapTiler Streets Dark (streets-v2-dark) */
+/* Стили согласованы с картами в ленте (RouteStaticMap): streets-v2 / streets-v2-dark */
+const DEFAULT_MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/streets-v2/style.json?key={API_KEY}";
 const DEFAULT_MAPTILER_DARK_STYLE_URL = "https://api.maptiler.com/maps/streets-v2-dark/style.json?key={API_KEY}";
 
 const ROUTE_COLORS: Record<ResolvedTheme, {

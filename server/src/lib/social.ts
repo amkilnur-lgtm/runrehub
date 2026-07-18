@@ -5,6 +5,12 @@ export const FEED_PAGE_SIZE = 15;
 const ROUTE_MAX_POINTS = 128;
 const OVERVIEW_WORKOUTS_PAGE_SIZE = 10;
 
+export type FeedLiker = {
+  id: number;
+  full_name: string;
+  avatar_url: string | null;
+};
+
 export type FeedItem = {
   id: number;
   name: string;
@@ -21,8 +27,12 @@ export type FeedItem = {
   average_heartrate: number | null;
   like_count: number;
   liked_by_me: boolean;
+  comment_count: number;
+  likers: FeedLiker[];
   route: [number, number][] | null;
 };
+
+const FEED_LIKERS_PREVIEW = 3;
 
 // Прореживаем latlng до <= ROUTE_MAX_POINTS точек для лёгкого трека в ленте
 // (полная карта — только на странице разбора). Первую и последнюю точку сохраняем.
@@ -200,6 +210,74 @@ export async function getAthleteOverview(athleteId: number, cursor: WorkoutCurso
   };
 }
 
+export async function getWorkoutLikers(workoutId: number) {
+  const { rows } = await pool.query(
+    `
+      select u.id, u.full_name, u.username, u.avatar_url, u.role
+      from workout_likes wl
+      join users u on u.id = wl.user_id
+      where wl.workout_id = $1
+      order by wl.created_at desc
+    `,
+    [workoutId]
+  );
+  return rows;
+}
+
+export type WorkoutComment = {
+  id: number;
+  workout_id: number;
+  body: string;
+  created_at: string;
+  author_id: number;
+  author_name: string;
+  author_username: string;
+  author_avatar_url: string | null;
+  author_is_trainer: boolean;
+  can_delete: boolean;
+};
+
+// canModerate — тренер удаляет любые комментарии на тренировках своих атлетов
+export async function listWorkoutComments(
+  workoutId: number,
+  viewerId: number,
+  canModerate: boolean
+): Promise<WorkoutComment[]> {
+  const { rows } = await pool.query(
+    `
+      select
+        c.id, c.workout_id, c.body, c.created_at,
+        u.id as author_id, u.full_name as author_name, u.username as author_username,
+        u.avatar_url as author_avatar_url, (u.role = 'trainer') as author_is_trainer
+      from workout_comments c
+      join users u on u.id = c.author_id
+      where c.workout_id = $1
+      order by c.created_at asc, c.id asc
+    `,
+    [workoutId]
+  );
+  return rows.map((r) => ({
+    id: r.id as number,
+    workout_id: r.workout_id as number,
+    body: r.body as string,
+    created_at: r.created_at as string,
+    author_id: r.author_id as number,
+    author_name: r.author_name as string,
+    author_username: r.author_username as string,
+    author_avatar_url: (r.author_avatar_url as string | null) ?? null,
+    author_is_trainer: Boolean(r.author_is_trainer),
+    can_delete: canModerate || (r.author_id as number) === viewerId
+  }));
+}
+
+export async function addWorkoutComment(workoutId: number, authorId: number, body: string) {
+  const { rows } = await pool.query(
+    `insert into workout_comments (workout_id, author_id, body) values ($1, $2, $3) returning id`,
+    [workoutId, authorId, body]
+  );
+  return rows[0]?.id as number;
+}
+
 export async function getWorkoutLikeState(workoutId: number, viewerId: number) {
   const { rows } = await pool.query(
     `
@@ -247,7 +325,8 @@ export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | n
         coalesce(wc.corrected_average_speed, w.average_speed)::float8 as average_speed,
         coalesce(wc.corrected_average_heartrate, w.average_heartrate)::float8 as average_heartrate,
         (select count(*) from workout_likes wl where wl.workout_id = w.id)::int as like_count,
-        exists(select 1 from workout_likes wl where wl.workout_id = w.id and wl.user_id = $1) as liked_by_me
+        exists(select 1 from workout_likes wl where wl.workout_id = w.id and wl.user_id = $1) as liked_by_me,
+        (select count(*) from workout_comments cm where cm.workout_id = w.id)::int as comment_count
       from workouts w
       join users a on a.id = w.user_id
       join users me on me.id = $1
@@ -266,13 +345,37 @@ export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | n
   const items = rows as Array<Record<string, unknown>>;
   const ids = items.map((r) => r.id as number);
   const routeById = new Map<number, [number, number][] | null>();
+  const likersById = new Map<number, FeedLiker[]>();
   if (ids.length) {
-    const streamsResult = await pool.query(
-      `select workout_id, latlng_stream from workout_streams where workout_id = any($1::int[])`,
-      [ids]
-    );
+    const [streamsResult, likersResult] = await Promise.all([
+      pool.query(
+        `select workout_id, latlng_stream from workout_streams where workout_id = any($1::int[])`,
+        [ids]
+      ),
+      pool.query(
+        `
+          select wl.workout_id, u.id, u.full_name, u.avatar_url
+          from workout_likes wl
+          join users u on u.id = wl.user_id
+          where wl.workout_id = any($1::int[])
+          order by wl.created_at desc
+        `,
+        [ids]
+      )
+    ]);
     for (const row of streamsResult.rows) {
       routeById.set(row.workout_id as number, downsampleRoute(row.latlng_stream));
+    }
+    for (const row of likersResult.rows) {
+      const list = likersById.get(row.workout_id as number) ?? [];
+      if (list.length < FEED_LIKERS_PREVIEW) {
+        list.push({
+          id: row.id as number,
+          full_name: row.full_name as string,
+          avatar_url: (row.avatar_url as string | null) ?? null
+        });
+        likersById.set(row.workout_id as number, list);
+      }
     }
   }
 
@@ -292,6 +395,8 @@ export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | n
     average_heartrate: r.average_heartrate == null ? null : Number(r.average_heartrate),
     like_count: Number(r.like_count ?? 0),
     liked_by_me: Boolean(r.liked_by_me),
+    comment_count: Number(r.comment_count ?? 0),
+    likers: likersById.get(r.id as number) ?? [],
     route: routeById.get(r.id as number) ?? null
   }));
 
