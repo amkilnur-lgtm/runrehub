@@ -3284,3 +3284,11 @@ button.trend-bar-slot:focus-visible {
   outline-offset: 1px;
 }
 .wc-send { height: 40px; padding: 0 16px; }
+
+/* Скелетон трендов: держит место, пока грузятся графики */
+.trends-skeleton { min-height: 380px; }
+.feed-leaders-card { padding: 16px 18px; }
+
+@media (max-width: 900px) {
+  .trends-skeleton { min-height: 620px; }
+}

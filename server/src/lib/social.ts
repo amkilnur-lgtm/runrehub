@@ -293,7 +293,31 @@ export async function getWorkoutLikeState(workoutId: number, viewerId: number) {
   };
 }
 
-export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | null) {
+// Топ-3 недели по километражу — тот же расчёт, что в тренерском дашборде
+export async function getGroupLeaders(coachId: number) {
+  const { rows } = await pool.query(
+    `
+      select
+        u.id, u.full_name, u.username, u.avatar_url,
+        coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters))
+          filter (where w.start_date >= date_trunc('week', now())), 0)::float8 as week_distance_meters,
+        count(w.id) filter (where w.start_date >= date_trunc('week', now()))::int as week_workout_count
+      from users u
+      left join workouts w on w.user_id = u.id
+      left join workout_corrections wc on wc.workout_id = w.id
+      where u.role = 'athlete' and u.coach_id = $1
+      group by u.id
+      having count(w.id) filter (where w.start_date >= date_trunc('week', now())) > 0
+      order by week_distance_meters desc, week_workout_count desc, u.full_name asc
+      limit 3
+    `,
+    [coachId]
+  );
+  return rows;
+}
+
+// Общее тело фида: viewer ($1) для liked_by_me + условие принадлежности группе
+async function queryFeed(viewerId: number, groupClause: string, cursor: WorkoutCursor | null) {
   const hasCursor = cursor !== null;
   const params: unknown[] = [viewerId];
   let cursorClause = "";
@@ -332,17 +356,31 @@ export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | n
       join users me on me.id = $1
       left join workout_corrections wc on wc.workout_id = w.id
       where a.role = 'athlete'
-        and (
-          (me.coach_id is not null and a.coach_id = me.coach_id)
-          or a.id = $1
-        )${cursorClause}
+        and (${groupClause})${cursorClause}
       order by w.start_date desc, w.id desc
       limit $${limitIdx}
     `,
     params
   );
+  return rows as Array<Record<string, unknown>>;
+}
 
-  const items = rows as Array<Record<string, unknown>>;
+export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | null) {
+  const items = await queryFeed(
+    viewerId,
+    `(me.coach_id is not null and a.coach_id = me.coach_id) or a.id = $1`,
+    cursor
+  );
+  return hydrateFeed(items);
+}
+
+// Лента тренера: пробежки его атлетов; liked_by_me — лайки самого тренера
+export async function getTrainerFeed(trainerId: number, cursor: WorkoutCursor | null) {
+  const items = await queryFeed(trainerId, `a.coach_id = $1`, cursor);
+  return hydrateFeed(items);
+}
+
+async function hydrateFeed(items: Array<Record<string, unknown>>) {
   const ids = items.map((r) => r.id as number);
   const routeById = new Map<number, [number, number][] | null>();
   const likersById = new Map<number, FeedLiker[]>();

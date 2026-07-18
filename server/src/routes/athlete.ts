@@ -9,6 +9,7 @@ import {
   addWorkoutComment,
   getAthleteFeed,
   getAthleteOverview,
+  getGroupLeaders,
   getWorkoutLikers,
   getWorkoutLikeState,
   isAthleteInGroup,
@@ -200,7 +201,15 @@ export async function athleteRoutes(app: FastifyInstance) {
       query.beforeDate && query.beforeId
         ? { beforeDate: query.beforeDate, beforeId: query.beforeId }
         : null;
-    return getAthleteFeed(request.user.id, cursor);
+    const result = await getAthleteFeed(request.user.id, cursor);
+    if (cursor) {
+      return result;
+    }
+    // Топ-3 недели — только на первой странице ленты
+    const { rows } = await pool.query(`select coach_id from users where id = $1`, [request.user.id]);
+    const coachId = rows[0]?.coach_id as number | null;
+    const leaders = coachId ? await getGroupLeaders(coachId) : [];
+    return { ...result, leaders };
   });
 
   // Профиль одногруппника (или свой): шапка, сводка, пробежки — только чтение
