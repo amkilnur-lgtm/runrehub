@@ -6,11 +6,14 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
+  addWorkoutComment,
   getAthleteFeed,
   getAthleteOverview,
+  getWorkoutLikers,
   getWorkoutLikeState,
   isAthleteInGroup,
-  isWorkoutInGroup
+  isWorkoutInGroup,
+  listWorkoutComments
 } from "../lib/social.js";
 import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
@@ -22,6 +25,10 @@ const workoutCursorQuerySchema = z.object({
 
 const workoutRenameSchema = z.object({
   name: z.string().trim().min(1)
+});
+
+const workoutCommentSchema = z.object({
+  body: z.string().trim().min(1).max(1000)
 });
 
 const WORKOUTS_PAGE_SIZE = 10;
@@ -252,6 +259,48 @@ export async function athleteRoutes(app: FastifyInstance) {
       [workoutId, request.user.id]
     );
     return { ok: true, ...(await getWorkoutLikeState(workoutId, request.user.id)) };
+  });
+
+  app.get("/api/athlete/workouts/:id/likes", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    return { likers: await getWorkoutLikers(workoutId) };
+  });
+
+  app.get("/api/athlete/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    return { comments: await listWorkoutComments(workoutId, request.user.id, false) };
+  });
+
+  app.post("/api/athlete/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    const body = workoutCommentSchema.parse(request.body);
+    if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    await addWorkoutComment(workoutId, request.user.id, body.body);
+    return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, false) };
+  });
+
+  app.delete("/api/athlete/comments/:id", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const commentId = Number((request.params as { id: string }).id);
+    const { rowCount } = await pool.query(
+      `delete from workout_comments where id = $1 and author_id = $2`,
+      [commentId, request.user.id]
+    );
+    if (rowCount === 0) {
+      return reply.code(404).send({ message: "Комментарий не найден" });
+    }
+    return { ok: true };
   });
 
   app.get("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {
