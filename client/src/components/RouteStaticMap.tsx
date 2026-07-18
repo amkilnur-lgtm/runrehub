@@ -195,7 +195,7 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
             fill="none"
             stroke={ROUTE_COLORS[theme].casing}
             strokeOpacity="0.92"
-            strokeWidth="6.4"
+            strokeWidth="4.4"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -203,15 +203,15 @@ export function RouteStaticMap({ points }: { points: [number, number][] | null }
             d={routePath}
             fill="none"
             stroke="#fc4c02"
-            strokeWidth="3.6"
+            strokeWidth="2.4"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           {start ? (
-            <circle cx={start[0]} cy={start[1]} r="5.4" fill={ROUTE_COLORS[theme].startFill} stroke={ROUTE_COLORS[theme].startStroke} strokeWidth="2.2" />
+            <circle cx={start[0]} cy={start[1]} r="4.8" fill={ROUTE_COLORS[theme].startFill} stroke={ROUTE_COLORS[theme].startStroke} strokeWidth="2" />
           ) : null}
           {end ? (
-            <circle cx={end[0]} cy={end[1]} r="5" fill={ROUTE_COLORS[theme].endFill} stroke={ROUTE_COLORS[theme].endStroke} strokeWidth="2.2" />
+            <circle cx={end[0]} cy={end[1]} r="4.4" fill={ROUTE_COLORS[theme].endFill} stroke={ROUTE_COLORS[theme].endStroke} strokeWidth="2" />
           ) : null}
         </svg>
       ) : null}

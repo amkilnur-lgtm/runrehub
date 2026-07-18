@@ -2,7 +2,9 @@ import { pool } from "./db.js";
 import { buildNextCursor, type WorkoutCursor } from "./pagination.js";
 
 export const FEED_PAGE_SIZE = 15;
-const ROUTE_MAX_POINTS = 128;
+const ROUTE_MAX_POINTS = 500;
+// допуск упрощения: диагональ bbox маршрута / этот делитель
+const ROUTE_SIMPLIFY_DIVISOR = 240;
 const OVERVIEW_WORKOUTS_PAGE_SIZE = 10;
 
 export type FeedLiker = {
@@ -34,8 +36,48 @@ export type FeedItem = {
 
 const FEED_LIKERS_PREVIEW = 3;
 
-// Прореживаем latlng до <= ROUTE_MAX_POINTS точек для лёгкого трека в ленте
-// (полная карта — только на странице разбора). Первую и последнюю точку сохраняем.
+// Упрощение маршрута для превью в ленте (полная карта — только на разборе).
+// Равномерное прореживание ломало многокруговые пробежки (стадион: 4-5 точек
+// на круг рисовали хорды через центр), поэтому Дуглас-Пекер: он сохраняет
+// форму — на каждый круг остаётся достаточно точек, прямые сжимаются в 2 точки.
+function simplifyRdp(points: Array<[number, number]>, epsilon: number) {
+  const keep = new Array<boolean>(points.length).fill(false);
+  keep[0] = true;
+  keep[points.length - 1] = true;
+  const stack: Array<[number, number]> = [[0, points.length - 1]];
+
+  while (stack.length) {
+    const [first, last] = stack.pop()!;
+    const [x1, y1] = points[first]!;
+    const [x2, y2] = points[last]!;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const norm = Math.hypot(dx, dy);
+    let maxDist = -1;
+    let maxIndex = -1;
+
+    for (let i = first + 1; i < last; i += 1) {
+      const [x, y] = points[i]!;
+      // расстояние до хорды first-last (или до точки, если хорда выродилась)
+      const dist =
+        norm > 0
+          ? Math.abs(dy * x - dx * y + x2 * y1 - y2 * x1) / norm
+          : Math.hypot(x - x1, y - y1);
+      if (dist > maxDist) {
+        maxDist = dist;
+        maxIndex = i;
+      }
+    }
+
+    if (maxDist > epsilon && maxIndex > 0) {
+      keep[maxIndex] = true;
+      stack.push([first, maxIndex], [maxIndex, last]);
+    }
+  }
+
+  return keep;
+}
+
 function downsampleRoute(latlng: unknown): [number, number][] | null {
   if (!Array.isArray(latlng) || latlng.length < 2) {
     return null;
@@ -47,16 +89,42 @@ function downsampleRoute(latlng: unknown): [number, number][] | null {
   if (points.length < 2) {
     return null;
   }
-  if (points.length <= ROUTE_MAX_POINTS) {
-    return points;
+
+  // координаты в равном масштабе: долгота сжимается по широте
+  const latMid = (points.reduce((s, p) => s + p[0], 0) / points.length) * (Math.PI / 180);
+  const lngScale = Math.cos(latMid) || 1;
+  const scaled = points.map(([lat, lng]): [number, number] => [lng * lngScale, lat]);
+
+  let minX = scaled[0]![0];
+  let maxX = scaled[0]![0];
+  let minY = scaled[0]![1];
+  let maxY = scaled[0]![1];
+  for (const [x, y] of scaled) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
   }
-  const step = (points.length - 1) / (ROUTE_MAX_POINTS - 1);
-  const out: [number, number][] = [];
-  for (let i = 0; i < ROUTE_MAX_POINTS; i += 1) {
-    out.push(points[Math.round(i * step)]!);
+  const diagonal = Math.hypot(maxX - minX, maxY - minY);
+  if (diagonal <= 0) {
+    return [points[0]!, points[points.length - 1]!];
   }
-  out[out.length - 1] = points[points.length - 1]!;
-  return out;
+
+  const keep = simplifyRdp(scaled, diagonal / ROUTE_SIMPLIFY_DIVISOR);
+  let simplified = points.filter((_, index) => keep[index]);
+
+  // страховка от переусложнённых треков: добиваем равномерным прореживанием
+  if (simplified.length > ROUTE_MAX_POINTS) {
+    const step = (simplified.length - 1) / (ROUTE_MAX_POINTS - 1);
+    const out: [number, number][] = [];
+    for (let i = 0; i < ROUTE_MAX_POINTS; i += 1) {
+      out.push(simplified[Math.round(i * step)]!);
+    }
+    out[out.length - 1] = simplified[simplified.length - 1]!;
+    simplified = out;
+  }
+
+  return simplified.length >= 2 ? simplified : null;
 }
 
 // Тренировка доступна атлету в ленте, если её автор — он сам
