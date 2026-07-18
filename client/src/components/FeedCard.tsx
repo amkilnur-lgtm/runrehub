@@ -67,8 +67,13 @@ const BubbleIcon = () => (
   </svg>
 );
 
-export function FeedCard({ item }: { item: FeedItem }) {
+type FeedViewer = "athlete" | "trainer";
+
+export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?: FeedViewer }) {
   const { user } = useAuth();
+  const apiBase = `/api/${viewer}`;
+  const workoutHref = `/${viewer}/workouts/${item.id}`;
+  const athleteHref = viewer === "trainer" ? `/trainer/athletes/${item.athlete_id}` : `/athlete/athletes/${item.athlete_id}`;
   const showToast = useToast();
   const [liked, setLiked] = useState(item.liked_by_me);
   const [count, setCount] = useState(item.like_count);
@@ -105,7 +110,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
     setPending(true);
     try {
       const res = await api<{ ok: true; like_count: number; liked_by_me: boolean }>(
-        `/api/athlete/workouts/${item.id}/like`,
+        `${apiBase}/workouts/${item.id}/like`,
         { method: next ? "POST" : "DELETE" }
       );
       setLiked(res.liked_by_me);
@@ -125,7 +130,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
     setLikersOpen(next);
     if (next && likersList === null) {
       try {
-        const res = await api<{ likers: LikerRow[] }>(`/api/athlete/workouts/${item.id}/likes`);
+        const res = await api<{ likers: LikerRow[] }>(`${apiBase}/workouts/${item.id}/likes`);
         setLikersList(res.likers);
       } catch {
         setLikersList([]);
@@ -147,7 +152,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
   return (
     <article className="feed-card">
       <header className="feed-top">
-        <Link to={`/athlete/athletes/${item.athlete_id}`} className="feed-author">
+        <Link to={athleteHref} className="feed-author">
           <UserAvatar
             fullName={item.athlete_name}
             avatarUrl={item.athlete_avatar_url}
@@ -163,7 +168,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
         </Link>
       </header>
 
-      <Link to={`/athlete/workouts/${item.id}`} className="feed-run-link">
+      <Link to={workoutHref} className="feed-run-link">
         <div className="feed-run-title">{item.name}</div>
         {item.route ? <RouteStaticMap points={item.route} /> : null}
         <div className="feed-stats">
@@ -237,7 +242,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
 
       {showComments ? (
         <div className="feed-comments">
-          <WorkoutComments workoutId={item.id} viewer="athlete" onCountChange={setCommentCount} />
+          <WorkoutComments workoutId={item.id} viewer={viewer} onCountChange={setCommentCount} />
         </div>
       ) : null}
     </article>

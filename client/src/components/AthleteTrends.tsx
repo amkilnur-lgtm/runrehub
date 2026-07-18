@@ -400,7 +400,12 @@ export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps)
     (athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends");
   const { data, loading, error } = useApi<TrendsData>(endpoint);
 
-  if (loading || error || !data) {
+  if (loading) {
+    // резервируем место, чтобы список тренировок не прыгал вниз после загрузки
+    return <section className="card skeleton-card trends-skeleton" aria-hidden="true" />;
+  }
+
+  if (error || !data) {
     return null;
   }
 

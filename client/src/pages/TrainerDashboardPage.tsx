@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { AthleteFeed } from "../components/AthleteFeed";
 import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../components/AuthProvider";
 import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
@@ -127,7 +128,6 @@ export function TrainerDashboardPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi<DashboardData>("/api/trainer/dashboard");
   const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriodKey>("week");
-  const recentWorkoutsLimit = 8;
 
   if (loading) {
     return (
@@ -157,7 +157,6 @@ export function TrainerDashboardPage() {
   }
 
   const selectedStats = data.stats[selectedPeriod];
-  const recentWorkoutPreview = data.recentWorkouts.slice(0, recentWorkoutsLimit);
   const hasLeaderData = data.topAthletesThisWeek.some(
     (athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0
   );
@@ -307,39 +306,12 @@ export function TrainerDashboardPage() {
             </div>
         </section>
 
-        <section className="card trainer-dashboard-list-section">
-            <div className="trainer-dashboard-heading">
-              <span className="muted trainer-dashboard-eyebrow">Пробежки</span>
-            </div>
-            {recentWorkoutPreview.length > 0 ? (
-              <div className="trainer-dashboard-workout-list">
-                {recentWorkoutPreview.map((workout) => (
-                  <Link
-                    key={workout.id}
-                    className="trainer-dashboard-workout-row"
-                    to={`/trainer/workouts/${workout.id}`}
-                  >
-                    <div className="trainer-dashboard-workout-main">
-                      <strong>{workout.athlete_name}</strong>
-                      <div>{workout.name}</div>
-                      <div className="muted">{formatDate(workout.start_date)}</div>
-                    </div>
-                    <div className="trainer-dashboard-workout-meta">
-                      <div>{formatDistance(workout.distance_meters)}</div>
-                      <div className="muted">
-                        {formatDuration(workout.moving_time_seconds)} · {formatPace(workout.average_speed)}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="trainer-dashboard-leader-empty">
-                <strong>Пока нет недавних пробежек.</strong>
-                <div className="muted">Здесь появятся последние тренировки группы.</div>
-              </div>
-            )}
-        </section>
+        <div>
+          <div className="feed-head">
+            <span className="muted trainer-dashboard-eyebrow">Лента команды</span>
+          </div>
+          <AthleteFeed viewer="trainer" />
+        </div>
       </div>
     </div>
   );
