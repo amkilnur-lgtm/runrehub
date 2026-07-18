@@ -120,7 +120,7 @@ export async function adminRoutes(app: FastifyInstance) {
     requireRole(request, ["admin"]);
     const params = request.params as { id: string };
     try {
-      const result = await syncIntervalsLatestActivities(parseInt(params.id, 10));
+      const result = await syncIntervalsLatestActivities(parseInt(params.id, 10), { forceDeep: true });
       return result;
     } catch (error) {
       return reply.code(502).send({
