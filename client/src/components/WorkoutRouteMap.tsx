@@ -138,7 +138,7 @@ function addRouteLayers(
     },
     paint: {
       "line-color": colors.casing,
-      "line-width": 7.6,
+      "line-width": 6,
       "line-opacity": 0.98
     }
   });
@@ -154,7 +154,7 @@ function addRouteLayers(
     },
     paint: {
       "line-color": colors.line,
-      "line-width": 4.2,
+      "line-width": 3.2,
       "line-opacity": 1
     }
   });
