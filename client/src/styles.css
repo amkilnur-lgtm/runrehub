@@ -3365,3 +3365,7 @@ button.trend-bar-slot:focus-visible {
   flex-direction: column;
   gap: 10px;
 }
+
+.admin-settings-card { display: flex; flex-direction: column; gap: 12px; }
+.admin-settings-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.admin-settings-row .admin-telegram-field input { max-width: 140px; }

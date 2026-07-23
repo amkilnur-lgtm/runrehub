@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { hashPassword, requireAuth, requireRole } from "../lib/auth.js";
+import { getForceIntervalMinutes, setForceIntervalMinutes } from "../lib/app-settings.js";
 import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import {
@@ -135,6 +136,18 @@ export async function adminRoutes(app: FastifyInstance) {
         message: error instanceof Error ? error.message.slice(0, 300) : "Ошибка синхронизации"
       });
     }
+  });
+
+  app.get("/api/admin/settings", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    return { forceIntervalMinutes: await getForceIntervalMinutes() };
+  });
+
+  app.put("/api/admin/settings", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    const body = z.object({ forceIntervalMinutes: z.coerce.number().int().min(5).max(1440) }).parse(request.body);
+    const saved = await setForceIntervalMinutes(body.forceIntervalMinutes);
+    return { ok: true, forceIntervalMinutes: saved };
   });
 
   // Сохранить логин-пароль от аккаунта intervals.icu (для форс-синка)
