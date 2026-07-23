@@ -9,6 +9,8 @@ const configSchema = z
     APP_URL: z.string().default("http://localhost:3000"),
     APP_TIMEZONE: z.string().default("Europe/Moscow"),
     STRAVA_SYNC_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
+    // Как часто логиниться на intervals.icu и форсить activities-sync (подтяжка из COROS)
+    INTERVALS_FORCE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
     PORT: z.coerce.number().default(3000),
     JWT_SECRET: z.string().min(8),
     ADMIN_USERNAME: z.string().default("admin"),
