@@ -17,7 +17,7 @@ import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
-import { syncDueIntervalsAthletes } from "./lib/intervals.js";
+import { forceDueIntervalsAthletes, syncDueIntervalsAthletes } from "./lib/intervals.js";
 import {
   enqueueMonthlyTelegramReports,
   enqueueWeeklyTelegramReports,
@@ -172,6 +172,19 @@ setInterval(() => {
     app.log.error({ err: error }, "intervals cron tick failed");
   });
 }, syncIntervalMs);
+
+// Форс-подтяжка из COROS: раз в час логинимся на intervals.icu за атлетов
+// с сохранённым логином-паролем (обычный синк потом импортирует свежее).
+const forceIntervalMs = config.INTERVALS_FORCE_INTERVAL_MINUTES * 60 * 1000;
+app.log.info(
+  { intervalMinutes: config.INTERVALS_FORCE_INTERVAL_MINUTES },
+  "intervals force-refresh scheduler started"
+);
+setInterval(() => {
+  void forceDueIntervalsAthletes(app.log).catch((error) => {
+    app.log.error({ err: error }, "intervals force-refresh tick failed");
+  });
+}, forceIntervalMs);
 
 const telegramIntervalMs = 30 * 1000;
 app.log.info({ intervalMs: telegramIntervalMs }, "telegram notification worker started");

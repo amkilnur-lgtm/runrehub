@@ -550,6 +550,43 @@ export async function syncIntervalsLatestActivities(
   }
 }
 
+// Раз в час логинимся и дёргаем activities-sync за каждого атлета с сохранённым
+// логином-паролем — воспроизводит заход на сайт, форсит подтяжку из COROS.
+// Импорт к нам делает обычный 15-мин синк (свежая тренировка попадает в его окно).
+export async function forceDueIntervalsAthletes(logger?: FastifyBaseLogger) {
+  const { rows } = await pool.query(
+    `select user_id from intervals_connections where icu_email is not null and icu_password is not null`
+  );
+  logger?.info({ athletes: rows.length }, "intervals force-refresh tick");
+  let forced = 0;
+  for (const row of rows) {
+    const userId = row.user_id as number;
+    try {
+      const result = await forceIntervalsAccountRefresh(userId);
+      if (result.forced) {
+        forced += 1;
+      } else {
+        logger?.warn({ userId, reason: result.reason }, "intervals force-refresh skipped");
+      }
+    } catch (error) {
+      logger?.error({ err: error, userId }, "intervals force-refresh failed");
+      addStravaEvent({
+        source: "cron",
+        level: "error",
+        message: "intervals force-refresh failed",
+        details: { userId, error: error instanceof Error ? error.message : "Unknown error" }
+      });
+    }
+  }
+  addStravaEvent({
+    source: "cron",
+    level: "info",
+    message: "intervals force-refresh tick",
+    details: { athletes: rows.length, forced }
+  });
+  return forced;
+}
+
 export async function syncDueIntervalsAthletes(logger?: FastifyBaseLogger) {
   const intervalMinutes = config.STRAVA_SYNC_INTERVAL_MINUTES;
   const { rows } = await pool.query(
