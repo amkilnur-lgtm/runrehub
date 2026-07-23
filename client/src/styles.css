@@ -3356,3 +3356,12 @@ button.trend-bar-slot:focus-visible {
 .sync-chip.is-error { color: var(--danger); background: var(--danger-soft); box-shadow: none; }
 .sync-chip.is-wait { color: var(--accent); }
 .admin-sync-actions, .report-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.intervals-account-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

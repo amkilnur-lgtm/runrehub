@@ -151,6 +151,66 @@ export async function disconnectIntervalsAccount(userId: number) {
   await pool.query(`delete from intervals_connections where user_id = $1`, [userId]);
 }
 
+// Логин-пароль от аккаунта intervals.icu (не API-ключ) — нужны, чтобы дёрнуть
+// activities-sync (форсировать подтяжку из COROS). Хранятся зашифрованными.
+export async function setIntervalsAccountCredentials(userId: number, email: string, password: string) {
+  await pool.query(
+    `update intervals_connections set icu_email = $2, icu_password = $3 where user_id = $1`,
+    [userId, email, encryptToken(password)]
+  );
+}
+
+export type IntervalsForceResult =
+  | { forced: true }
+  | { forced: false; reason: "no_credentials" | "login_failed" | "sync_failed"; detail?: string };
+
+// Воспроизводит то, что делает сайт intervals.icu при заходе: логинится
+// (POST /api/login, multipart email+password) и дёргает activities-sync,
+// который заставляет intervals.icu подтянуть свежие тренировки из COROS.
+export async function forceIntervalsAccountRefresh(userId: number): Promise<IntervalsForceResult> {
+  const { rows } = await pool.query(
+    `select icu_athlete_id, icu_email, icu_password from intervals_connections where user_id = $1`,
+    [userId]
+  );
+  const conn = rows[0];
+  if (!conn?.icu_email || !conn?.icu_password) {
+    return { forced: false, reason: "no_credentials" };
+  }
+
+  const password = decryptToken(conn.icu_password);
+  const form = new FormData();
+  form.append("email", conn.icu_email);
+  form.append("password", password);
+
+  const loginResponse = await fetch("https://intervals.icu/api/login?deviceClass=desktop", {
+    method: "POST",
+    body: form
+  });
+  if (!loginResponse.ok) {
+    return { forced: false, reason: "login_failed", detail: `status=${loginResponse.status}` };
+  }
+
+  // куки сессии из Set-Cookie (athlete_id + locale)
+  const setCookies =
+    typeof loginResponse.headers.getSetCookie === "function"
+      ? loginResponse.headers.getSetCookie()
+      : [loginResponse.headers.get("set-cookie") ?? ""].filter(Boolean);
+  const cookieHeader = setCookies.map((c) => c.split(";")[0]).join("; ");
+  if (!cookieHeader) {
+    return { forced: false, reason: "login_failed", detail: "no session cookie" };
+  }
+
+  const syncResponse = await fetch(
+    `https://intervals.icu/api/athlete/${encodeURIComponent(conn.icu_athlete_id)}/activities-sync`,
+    { method: "POST", headers: { Cookie: cookieHeader } }
+  );
+  if (!syncResponse.ok) {
+    return { forced: false, reason: "sync_failed", detail: `status=${syncResponse.status}` };
+  }
+
+  return { forced: true };
+}
+
 async function getConnection(userId: number) {
   const { rows } = await pool.query(
     `

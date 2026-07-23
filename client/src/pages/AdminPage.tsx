@@ -24,6 +24,7 @@ type AdminUser = {
   icu_athlete_id: string | null;
   intervals_last_synced_at: string | null;
   intervals_last_sync_error: string | null;
+  intervals_has_account: boolean;
 };
 
 type Trainer = {
@@ -205,6 +206,9 @@ export function AdminPage() {
   >({});
   const [savingIntervalsId, setSavingIntervalsId] = useState<number | null>(null);
   const [syncingIntervalsId, setSyncingIntervalsId] = useState<number | null>(null);
+  const [forcingIntervalsId, setForcingIntervalsId] = useState<number | null>(null);
+  const [accountDrafts, setAccountDrafts] = useState<Record<number, { email: string; password: string }>>({});
+  const [savingAccountId, setSavingAccountId] = useState<number | null>(null);
   const [tab, setTab] = useState<AdminTab>("users");
 
   useEffect(() => {
@@ -529,6 +533,48 @@ export function AdminPage() {
     }
   }
 
+  async function saveIntervalsAccount(userId: number) {
+    const draft = accountDrafts[userId];
+    if (!draft?.email.trim() || !draft?.password.trim()) {
+      showToast("error", "Заполните email и пароль от intervals.icu");
+      return;
+    }
+    setSavingAccountId(userId);
+    try {
+      await api(`/api/admin/athletes/${userId}/intervals/account`, {
+        method: "PUT",
+        body: JSON.stringify({ email: draft.email.trim(), password: draft.password })
+      });
+      showToast("success", "Логин-пароль intervals.icu сохранён — доступен форс-синк");
+      setAccountDrafts((current) => ({ ...current, [userId]: { email: draft.email.trim(), password: "" } }));
+      usersApi.refresh();
+    } catch (err: any) {
+      showToast("error", `Не удалось сохранить: ${err.message}`);
+    } finally {
+      setSavingAccountId(null);
+    }
+  }
+
+  async function forceIntervalsSync(userId: number) {
+    setForcingIntervalsId(userId);
+    try {
+      const result = await api<{ synced?: boolean; imported?: number }>(
+        `/api/admin/athletes/${userId}/intervals/force-sync`,
+        { method: "POST" }
+      );
+      showToast(
+        "success",
+        `Форс-синк: intervals.icu обновлён, импортировано тренировок — ${result.imported ?? 0}`
+      );
+      usersApi.refresh();
+      eventsApi.refresh();
+    } catch (err: any) {
+      showToast("error", `Ошибка форс-синка: ${err.message}`);
+    } finally {
+      setForcingIntervalsId(null);
+    }
+  }
+
   async function sendAthleteWeeklyReport(athleteId: number, period: "current" | "previous") {
     setSendingAthleteWeeklyId(athleteId);
     try {
@@ -734,10 +780,21 @@ export function AdminPage() {
                     </div>
                   </div>
                   <div className="align-right admin-sync-actions">
-                    {user.icu_athlete_id ? (
+                    {user.icu_athlete_id && user.intervals_has_account ? (
                       <button
                         type="button"
                         className="primary-button compact-button"
+                        disabled={forcingIntervalsId === user.id}
+                        title="Логин на intervals.icu + activities-sync → подтягивает свежее из COROS"
+                        onClick={() => forceIntervalsSync(user.id)}
+                      >
+                        {forcingIntervalsId === user.id ? "Форсирую..." : "Форсировать"}
+                      </button>
+                    ) : null}
+                    {user.icu_athlete_id ? (
+                      <button
+                        type="button"
+                        className="ghost-button compact-button"
                         disabled={syncingIntervalsId === user.id}
                         onClick={() => syncIntervalsNow(user.id)}
                       >
@@ -810,6 +867,54 @@ export function AdminPage() {
                     <div className="muted">
                       Спортсмен берёт ключ в intervals.icu: Settings → Developer → API key. Athlete ID
                       виден в адресе профиля (например, i123456).
+                    </div>
+
+                    <div className="intervals-account-block">
+                      <div className="muted">
+                        Логин-пароль от аккаунта intervals.icu — для кнопки «Форсировать» (логинится и
+                        дёргает подтяжку из COROS, как заход на сайт). Хранится зашифрованным.
+                        {user.intervals_has_account ? " Сейчас: сохранён." : " Сейчас: не сохранён."}
+                      </div>
+                      <div className="intervals-panel-fields">
+                        <label className="admin-telegram-field">
+                          Email intervals.icu
+                          <input
+                            type="email"
+                            placeholder="athlete@example.com"
+                            value={accountDrafts[user.id]?.email ?? ""}
+                            onChange={(event) =>
+                              setAccountDrafts((current) => ({
+                                ...current,
+                                [user.id]: { email: event.target.value, password: current[user.id]?.password ?? "" }
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="admin-telegram-field">
+                          Пароль
+                          <input
+                            type="password"
+                            placeholder="пароль от intervals.icu"
+                            value={accountDrafts[user.id]?.password ?? ""}
+                            onChange={(event) =>
+                              setAccountDrafts((current) => ({
+                                ...current,
+                                [user.id]: { email: current[user.id]?.email ?? "", password: event.target.value }
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="admin-telegram-actions">
+                        <button
+                          type="button"
+                          className="ghost-button compact-button"
+                          disabled={savingAccountId === user.id}
+                          onClick={() => saveIntervalsAccount(user.id)}
+                        >
+                          {savingAccountId === user.id ? "Сохраняю..." : "Сохранить логин-пароль"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : null}
