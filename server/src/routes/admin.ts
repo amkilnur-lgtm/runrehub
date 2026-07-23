@@ -7,7 +7,9 @@ import { getStravaEvents } from "../lib/strava-events.js";
 import {
   connectIntervalsAccount,
   disconnectIntervalsAccount,
+  forceIntervalsAccountRefresh,
   normalizeIcuAthleteId,
+  setIntervalsAccountCredentials,
   syncIntervalsLatestActivities,
   verifyIntervalsCredentials
 } from "../lib/intervals.js";
@@ -41,6 +43,11 @@ const connectIntervalsSchema = z.object({
   apiKey: z.string().min(8).max(200)
 });
 
+const intervalsCredentialsSchema = z.object({
+  email: z.string().trim().email().max(200),
+  password: z.string().min(1).max(200)
+});
+
 const updateTrainerTelegramSchema = z.object({
   chatId: z.string().trim().max(128).nullable(),
   notificationsEnabled: z.boolean()
@@ -71,7 +78,8 @@ export async function adminRoutes(app: FastifyInstance) {
           u.id, u.username, u.full_name, u.role, u.coach_id, coach.full_name as coach_name,
           ic.icu_athlete_id,
           ic.last_synced_at as intervals_last_synced_at,
-          ic.last_sync_error as intervals_last_sync_error
+          ic.last_sync_error as intervals_last_sync_error,
+          (ic.icu_email is not null and ic.icu_password is not null) as intervals_has_account
         from users u
         left join users coach on coach.id = u.coach_id
         left join intervals_connections ic on ic.user_id = u.id
@@ -125,6 +133,48 @@ export async function adminRoutes(app: FastifyInstance) {
     } catch (error) {
       return reply.code(502).send({
         message: error instanceof Error ? error.message.slice(0, 300) : "Ошибка синхронизации"
+      });
+    }
+  });
+
+  // Сохранить логин-пароль от аккаунта intervals.icu (для форс-синка)
+  app.put("/api/admin/athletes/:id/intervals/account", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const athleteUserId = parseInt((request.params as { id: string }).id, 10);
+    const body = intervalsCredentialsSchema.parse(request.body);
+    const { rows } = await pool.query(
+      `select 1 from intervals_connections where user_id = $1`,
+      [athleteUserId]
+    );
+    if (!rows[0]) {
+      return reply.code(400).send({ message: "Сначала подключите intervals.icu (Athlete ID + API key)" });
+    }
+    await setIntervalsAccountCredentials(athleteUserId, body.email, body.password);
+    return { ok: true };
+  });
+
+  // Форс-синк: логин на intervals.icu + activities-sync (подтолкнуть COROS),
+  // подождать, пока intervals.icu заберёт из COROS, затем глубокий проход к нам.
+  app.post("/api/admin/athletes/:id/intervals/force-sync", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const athleteUserId = parseInt((request.params as { id: string }).id, 10);
+    try {
+      const forced = await forceIntervalsAccountRefresh(athleteUserId);
+      if (!forced.forced) {
+        if (forced.reason === "no_credentials") {
+          return reply.code(400).send({ message: "Не сохранён логин-пароль от intervals.icu" });
+        }
+        return reply.code(502).send({
+          message: `Не удалось форсировать intervals.icu (${forced.reason}${forced.detail ? `: ${forced.detail}` : ""})`
+        });
+      }
+      // даём intervals.icu время подтянуть из COROS
+      await new Promise((resolve) => setTimeout(resolve, 9000));
+      const result = await syncIntervalsLatestActivities(athleteUserId, { forceDeep: true });
+      return { ...result, forced: true };
+    } catch (error) {
+      return reply.code(502).send({
+        message: error instanceof Error ? error.message.slice(0, 300) : "Ошибка форс-синка"
       });
     }
   });
