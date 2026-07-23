@@ -18,6 +18,7 @@ import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
 import { forceDueIntervalsAthletes, syncDueIntervalsAthletes } from "./lib/intervals.js";
+import { getForceIntervalMinutes } from "./lib/app-settings.js";
 import {
   enqueueMonthlyTelegramReports,
   enqueueWeeklyTelegramReports,
@@ -173,18 +174,26 @@ setInterval(() => {
   });
 }, syncIntervalMs);
 
-// Форс-подтяжка из COROS: раз в час логинимся на intervals.icu за атлетов
-// с сохранённым логином-паролем (обычный синк потом импортирует свежее).
-const forceIntervalMs = config.INTERVALS_FORCE_INTERVAL_MINUTES * 60 * 1000;
-app.log.info(
-  { intervalMinutes: config.INTERVALS_FORCE_INTERVAL_MINUTES },
-  "intervals force-refresh scheduler started"
-);
-setInterval(() => {
-  void forceDueIntervalsAthletes(app.log).catch((error) => {
-    app.log.error({ err: error }, "intervals force-refresh tick failed");
-  });
-}, forceIntervalMs);
+// Форс-подтяжка из COROS: логинимся на intervals.icu за атлетов с сохранённым
+// логином-паролем (обычный синк потом импортирует свежее). Интервал меняется в
+// админке на лету — самоперепланирующийся таймер перечитывает его каждый тик.
+app.log.info("intervals force-refresh scheduler started");
+async function scheduleForceRefresh() {
+  let minutes = config.INTERVALS_FORCE_INTERVAL_MINUTES;
+  try {
+    minutes = await getForceIntervalMinutes();
+  } catch (error) {
+    app.log.error({ err: error }, "intervals force interval read failed");
+  }
+  setTimeout(() => {
+    void forceDueIntervalsAthletes(app.log)
+      .catch((error) => app.log.error({ err: error }, "intervals force-refresh tick failed"))
+      .finally(() => {
+        void scheduleForceRefresh();
+      });
+  }, minutes * 60 * 1000);
+}
+void scheduleForceRefresh();
 
 const telegramIntervalMs = 30 * 1000;
 app.log.info({ intervalMs: telegramIntervalMs }, "telegram notification worker started");

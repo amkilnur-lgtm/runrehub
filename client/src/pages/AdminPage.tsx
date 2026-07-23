@@ -210,6 +210,36 @@ export function AdminPage() {
   const [accountDrafts, setAccountDrafts] = useState<Record<number, { email: string; password: string }>>({});
   const [savingAccountId, setSavingAccountId] = useState<number | null>(null);
   const [tab, setTab] = useState<AdminTab>("users");
+  const settingsApi = useApi<{ forceIntervalMinutes: number }>("/api/admin/settings");
+  const [forceIntervalDraft, setForceIntervalDraft] = useState<string>("");
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    if (settingsApi.data) {
+      setForceIntervalDraft(String(settingsApi.data.forceIntervalMinutes));
+    }
+  }, [settingsApi.data]);
+
+  async function saveForceInterval() {
+    const minutes = Number(forceIntervalDraft);
+    if (!Number.isFinite(minutes) || minutes < 5 || minutes > 1440) {
+      showToast("error", "Интервал — от 5 до 1440 минут");
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const res = await api<{ forceIntervalMinutes: number }>("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ forceIntervalMinutes: minutes })
+      });
+      setForceIntervalDraft(String(res.forceIntervalMinutes));
+      showToast("success", `Авто-форс: раз в ${res.forceIntervalMinutes} мин`);
+    } catch (err: any) {
+      showToast("error", `Не удалось сохранить: ${err.message}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  }
 
   useEffect(() => {
     if (reportMenuUserId === null) {
@@ -744,6 +774,37 @@ export function AdminPage() {
       ) : null}
 
       {tab === "sync" ? (
+      <>
+      <section className="card admin-settings-card">
+        <div>
+          <h2>Авто-форс COROS</h2>
+          <p className="muted">
+            Как часто сервер сам логинится в intervals.icu и форсит подтяжку из COROS для атлетов
+            с сохранённым логином-паролем. Меньше интервал — свежее данные, больше запросов.
+          </p>
+        </div>
+        <div className="admin-settings-row">
+          <label className="admin-telegram-field" style={{ marginBottom: 0 }}>
+            Раз в (минут)
+            <input
+              type="number"
+              min={5}
+              max={1440}
+              value={forceIntervalDraft}
+              onChange={(event) => setForceIntervalDraft(event.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="primary-button compact-button"
+            disabled={savingSettings}
+            onClick={saveForceInterval}
+          >
+            {savingSettings ? "Сохраняю..." : "Сохранить"}
+          </button>
+        </div>
+      </section>
+
       <section className="card">
         <div className="section-header">
           <div>
@@ -924,6 +985,7 @@ export function AdminPage() {
           {athletes.length === 0 ? <div className="muted">Пока нет спортсменов.</div> : null}
         </div>
       </section>
+      </>
       ) : null}
 
       {tab === "diagnostics" ? (
