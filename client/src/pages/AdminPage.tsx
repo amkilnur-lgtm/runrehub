@@ -5,6 +5,15 @@ import { useToast } from "../components/ToastProvider";
 import { useApi } from "../hooks/useApi";
 import { formatDate } from "../lib";
 
+type AdminTab = "users" | "sync" | "telegram" | "diagnostics";
+
+const ADMIN_TABS: Array<{ key: AdminTab; label: string }> = [
+  { key: "users", label: "Пользователи" },
+  { key: "sync", label: "Синхронизация" },
+  { key: "telegram", label: "Telegram" },
+  { key: "diagnostics", label: "Диагностика" }
+];
+
 type AdminUser = {
   id: number;
   username: string;
@@ -196,6 +205,7 @@ export function AdminPage() {
   >({});
   const [savingIntervalsId, setSavingIntervalsId] = useState<number | null>(null);
   const [syncingIntervalsId, setSyncingIntervalsId] = useState<number | null>(null);
+  const [tab, setTab] = useState<AdminTab>("users");
 
   useEffect(() => {
     if (reportMenuUserId === null) {
@@ -569,9 +579,29 @@ export function AdminPage() {
   );
   const telegramTrainers = telegramApi.data?.trainers ?? [];
   const logText = events.map(formatLogLine).join("\n");
+  const athletes = users.filter((user) => user.role === "athlete");
+
+  const roleLabel = (role: string) =>
+    role === "admin" ? "Админ" : role === "trainer" ? "Тренер" : "Спортсмен";
 
   return (
     <div className="stack">
+      <div className="admin-tabs" role="tablist">
+        {ADMIN_TABS.map((adminTab) => (
+          <button
+            key={adminTab.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === adminTab.key}
+            className={`admin-tab${tab === adminTab.key ? " active" : ""}`}
+            onClick={() => setTab(adminTab.key)}
+          >
+            {adminTab.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "users" ? (
       <div className="grid two-columns">
         <section className="card">
           <h2>Создать учетку</h2>
@@ -638,199 +668,135 @@ export function AdminPage() {
             </p>
           ) : null}
           <div className="list">
-            {users.map((user) => {
-              const intervalsDraft = intervalsDrafts[user.id] ?? { icuAthleteId: "", apiKey: "" };
-              const isIntervalsFormOpen = intervalsFormUserId === user.id;
-              const intervalsStatus =
-                user.role !== "athlete"
-                  ? null
-                  : user.icu_athlete_id
-                    ? user.intervals_last_sync_error
-                      ? `intervals.icu: ${user.icu_athlete_id} · ошибка синхронизации`
-                      : user.intervals_last_synced_at
-                        ? `intervals.icu: ${user.icu_athlete_id} · синхр. ${formatDate(user.intervals_last_synced_at)}`
-                        : `intervals.icu: ${user.icu_athlete_id} · ждёт первой синхронизации`
-                    : "синхронизация не подключена";
-
-              return (
-              <Fragment key={user.id}>
-              <div className="list-row">
+            {users.map((user) => (
+              <div className="list-row" key={user.id}>
                 <div>
                   <strong>{user.full_name}</strong>
-                  <div className="muted">@{user.username}</div>
-                  {intervalsStatus ? (
-                    <div
-                      className="muted"
-                      style={
-                        user.intervals_last_sync_error ? { color: "var(--danger)" } : undefined
-                      }
-                    >
-                      {intervalsStatus}
-                    </div>
-                  ) : null}
+                  <div className="muted admin-user-meta">
+                    <span>@{user.username}</span>
+                    <span className={`role-chip role-${user.role}`}>{roleLabel(user.role)}</span>
+                    {user.coach_name ? <span>тренер: {user.coach_name}</span> : null}
+                  </div>
                 </div>
                 <div className="align-right">
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      marginBottom: "4px"
-                    }}
-                  >
-                    {user.role === "athlete" ? (
-                      <div className="report-menu">
-                        <button
-                          type="button"
-                          className="ghost-button compact-button"
-                          aria-haspopup="menu"
-                          aria-expanded={reportMenuUserId === user.id}
-                          disabled={
-                            sendingAthleteWeeklyId === user.id || sendingAthleteMonthlyId === user.id
-                          }
-                          onClick={() =>
-                            setReportMenuUserId(reportMenuUserId === user.id ? null : user.id)
-                          }
-                        >
-                          {sendingAthleteWeeklyId === user.id || sendingAthleteMonthlyId === user.id
-                            ? "Отправляю..."
-                            : "Отчёт в Telegram ▾"}
-                        </button>
-                        {reportMenuUserId === user.id ? (
-                          <div className="report-menu-popover" role="menu">
-                            <button
-                              type="button"
-                              className="report-menu-item"
-                              onClick={() => {
-                                setReportMenuUserId(null);
-                                sendAthleteWeeklyReport(user.id, "current");
-                              }}
-                            >
-                              Недельный · текущая неделя
-                            </button>
-                            <button
-                              type="button"
-                              className="report-menu-item"
-                              onClick={() => {
-                                setReportMenuUserId(null);
-                                sendAthleteWeeklyReport(user.id, "previous");
-                              }}
-                            >
-                              Недельный · прошлая неделя
-                            </button>
-                            <button
-                              type="button"
-                              className="report-menu-item"
-                              onClick={() => {
-                                setReportMenuUserId(null);
-                                sendAthleteMonthlyReport(user.id, "current");
-                              }}
-                            >
-                              Месячный · этот месяц
-                            </button>
-                            <button
-                              type="button"
-                              className="report-menu-item"
-                              onClick={() => {
-                                setReportMenuUserId(null);
-                                sendAthleteMonthlyReport(user.id, "previous");
-                              }}
-                            >
-                              Месячный · прошлый месяц
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {user.role === "athlete" && user.icu_athlete_id ? (
+                  {user.role !== "admin" ? (
+                    <button
+                      type="button"
+                      className="ghost-button compact-button"
+                      style={{ color: "var(--danger)" }}
+                      onClick={() => deleteUser(user.id, user.username)}
+                    >
+                      Удалить
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+      ) : null}
+
+      {tab === "sync" ? (
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <h2>Синхронизация intervals.icu</h2>
+            <p className="muted">
+              Подключение и подтяжка тренировок по каждому спортсмену. Кнопка «Синхронизировать» —
+              всегда глубокий проход.
+            </p>
+          </div>
+          <button type="button" className="ghost-button" onClick={usersApi.refresh}>
+            Обновить
+          </button>
+        </div>
+        <div className="list">
+          {athletes.map((user) => {
+            const intervalsDraft = intervalsDrafts[user.id] ?? { icuAthleteId: "", apiKey: "" };
+            const isIntervalsFormOpen = intervalsFormUserId === user.id;
+            const chip = !user.icu_athlete_id
+              ? { cls: "sync-chip", text: "не подключено" }
+              : user.intervals_last_sync_error
+                ? { cls: "sync-chip is-error", text: "ошибка" }
+                : user.intervals_last_synced_at
+                  ? { cls: "sync-chip is-ok", text: `синхр. ${formatDate(user.intervals_last_synced_at)}` }
+                  : { cls: "sync-chip is-wait", text: "ждёт первой синхронизации" };
+            return (
+              <Fragment key={user.id}>
+                <div className="list-row">
+                  <div>
+                    <strong>{user.full_name}</strong>
+                    <div className="muted admin-user-meta">
+                      <span>@{user.username}</span>
+                      <span className={chip.cls}>{chip.text}</span>
+                      {user.icu_athlete_id ? <span>{user.icu_athlete_id}</span> : null}
+                    </div>
+                  </div>
+                  <div className="align-right admin-sync-actions">
+                    {user.icu_athlete_id ? (
                       <button
                         type="button"
-                        className="ghost-button compact-button"
+                        className="primary-button compact-button"
                         disabled={syncingIntervalsId === user.id}
                         onClick={() => syncIntervalsNow(user.id)}
                       >
                         {syncingIntervalsId === user.id ? "Синхронизирую..." : "Синхронизировать"}
                       </button>
                     ) : null}
-                    {user.role === "athlete" ? (
-                      <button
-                        type="button"
-                        className="ghost-button compact-button"
-                        aria-expanded={isIntervalsFormOpen}
-                        onClick={() =>
-                          setIntervalsFormUserId(isIntervalsFormOpen ? null : user.id)
-                        }
-                      >
-                        intervals.icu
-                      </button>
-                    ) : null}
-                    {user.role !== "admin" ? (
-                      <button
-                        type="button"
-                        className="ghost-button compact-button"
-                        style={{ color: "var(--danger)" }}
-                        onClick={() => deleteUser(user.id, user.username)}
-                      >
-                        Удалить
-                      </button>
-                    ) : null}
-                  </div>
-                  {user.coach_name ? <div className="muted">Тренер: {user.coach_name}</div> : null}
-                </div>
-              </div>
-              {isIntervalsFormOpen ? (
-                <div className="intervals-panel">
-                  {user.intervals_last_sync_error ? (
-                    <div className="error-box">{user.intervals_last_sync_error}</div>
-                  ) : null}
-                  <div className="intervals-panel-fields">
-                    <label className="admin-telegram-field">
-                      Athlete ID
-                      <input
-                        placeholder="i123456"
-                        value={intervalsDraft.icuAthleteId}
-                        onChange={(event) =>
-                          setIntervalsDrafts((current) => ({
-                            ...current,
-                            [user.id]: { ...intervalsDraft, icuAthleteId: event.target.value }
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="admin-telegram-field">
-                      API key
-                      <input
-                        placeholder="ключ из Settings → Developer"
-                        value={intervalsDraft.apiKey}
-                        onChange={(event) =>
-                          setIntervalsDrafts((current) => ({
-                            ...current,
-                            [user.id]: { ...intervalsDraft, apiKey: event.target.value }
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="admin-telegram-actions">
                     <button
                       type="button"
-                      className="primary-button compact-button"
-                      onClick={() => saveIntervalsConnection(user.id)}
-                      disabled={savingIntervalsId === user.id}
+                      className="ghost-button compact-button"
+                      aria-expanded={isIntervalsFormOpen}
+                      onClick={() => setIntervalsFormUserId(isIntervalsFormOpen ? null : user.id)}
                     >
-                      {savingIntervalsId === user.id ? "Проверяю ключ..." : "Сохранить и проверить"}
+                      {user.icu_athlete_id ? "Изменить" : "Подключить"}
                     </button>
-                    {user.icu_athlete_id ? (
-                      <>
-                        <button
-                          type="button"
-                          className="ghost-button compact-button"
-                          onClick={() => syncIntervalsNow(user.id)}
-                          disabled={syncingIntervalsId === user.id}
-                        >
-                          {syncingIntervalsId === user.id ? "Синхронизирую..." : "Синхронизировать"}
-                        </button>
+                  </div>
+                </div>
+                {isIntervalsFormOpen ? (
+                  <div className="intervals-panel">
+                    {user.intervals_last_sync_error ? (
+                      <div className="error-box">{user.intervals_last_sync_error}</div>
+                    ) : null}
+                    <div className="intervals-panel-fields">
+                      <label className="admin-telegram-field">
+                        Athlete ID
+                        <input
+                          placeholder="i123456"
+                          value={intervalsDraft.icuAthleteId}
+                          onChange={(event) =>
+                            setIntervalsDrafts((current) => ({
+                              ...current,
+                              [user.id]: { ...intervalsDraft, icuAthleteId: event.target.value }
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="admin-telegram-field">
+                        API key
+                        <input
+                          placeholder="ключ из Settings → Developer"
+                          value={intervalsDraft.apiKey}
+                          onChange={(event) =>
+                            setIntervalsDrafts((current) => ({
+                              ...current,
+                              [user.id]: { ...intervalsDraft, apiKey: event.target.value }
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div className="admin-telegram-actions">
+                      <button
+                        type="button"
+                        className="primary-button compact-button"
+                        onClick={() => saveIntervalsConnection(user.id)}
+                        disabled={savingIntervalsId === user.id}
+                      >
+                        {savingIntervalsId === user.id ? "Проверяю ключ..." : "Сохранить и проверить"}
+                      </button>
+                      {user.icu_athlete_id ? (
                         <button
                           type="button"
                           className="ghost-button compact-button"
@@ -839,22 +805,24 @@ export function AdminPage() {
                         >
                           Отключить
                         </button>
-                      </>
-                    ) : null}
+                      ) : null}
+                    </div>
+                    <div className="muted">
+                      Спортсмен берёт ключ в intervals.icu: Settings → Developer → API key. Athlete ID
+                      виден в адресе профиля (например, i123456).
+                    </div>
                   </div>
-                  <div className="muted">
-                    Спортсмен берёт ключ в intervals.icu: Settings → Developer → API key. Athlete ID
-                    виден в адресе профиля (например, i123456).
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
               </Fragment>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+            );
+          })}
+          {athletes.length === 0 ? <div className="muted">Пока нет спортсменов.</div> : null}
+        </div>
+      </section>
+      ) : null}
 
+      {tab === "diagnostics" ? (
+      <>
       <section className="card">
         <div className="section-header">
           <div>
@@ -933,6 +901,44 @@ export function AdminPage() {
             ) : null}
           </div>
         ) : null}
+      </section>
+
+      </>
+      ) : null}
+
+      {tab === "telegram" ? (
+      <>
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <h2>Отчёты по спортсменам</h2>
+            <p className="muted">Ручная отправка недельного или месячного отчёта тренеру спортсмена.</p>
+          </div>
+        </div>
+        <div className="list">
+          {athletes.map((user) => {
+            const sending = sendingAthleteWeeklyId === user.id || sendingAthleteMonthlyId === user.id;
+            return (
+              <div className="list-row" key={user.id}>
+                <div>
+                  <strong>{user.full_name}</strong>
+                  <div className="muted">@{user.username}{user.coach_name ? ` · тренер: ${user.coach_name}` : ""}</div>
+                </div>
+                <div className="align-right report-buttons">
+                  <button type="button" className="ghost-button compact-button" disabled={sending}
+                    onClick={() => sendAthleteWeeklyReport(user.id, "current")}>Неделя</button>
+                  <button type="button" className="ghost-button compact-button" disabled={sending}
+                    onClick={() => sendAthleteWeeklyReport(user.id, "previous")}>Неделя −1</button>
+                  <button type="button" className="ghost-button compact-button" disabled={sending}
+                    onClick={() => sendAthleteMonthlyReport(user.id, "current")}>Месяц</button>
+                  <button type="button" className="ghost-button compact-button" disabled={sending}
+                    onClick={() => sendAthleteMonthlyReport(user.id, "previous")}>Месяц −1</button>
+                </div>
+              </div>
+            );
+          })}
+          {athletes.length === 0 ? <div className="muted">Пока нет спортсменов.</div> : null}
+        </div>
       </section>
 
       <section className="card">
@@ -1178,7 +1184,8 @@ export function AdminPage() {
           })}
         </div>
       </section>
-
+      </>
+      ) : null}
     </div>
   );
 }
