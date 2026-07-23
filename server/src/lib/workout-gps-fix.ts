@@ -741,12 +741,16 @@ function rebuildStreamsFromAthleteProfile(
       normalizedCadence,
       heartRateValue
     );
+    // База — медиана профиля атлета. workout.average_speed НЕ используем как
+    // базу: при сбое GPS (особенно без каденса, когда per-point оценка недоступна)
+    // это как раз испорченное значение, и rebuild бы воспроизвёл мусор.
+    const profileBaseSpeed =
+      profile.median_pace_seconds_per_km && profile.median_pace_seconds_per_km > 0
+        ? SPLIT_DISTANCE_METERS / profile.median_pace_seconds_per_km
+        : null;
     const fallbackSpeed =
-      toFiniteNumber(workout.average_speed, 0) > 0
-        ? toFiniteNumber(workout.average_speed, 0)
-        : profile.median_pace_seconds_per_km && profile.median_pace_seconds_per_km > 0
-          ? SPLIT_DISTANCE_METERS / profile.median_pace_seconds_per_km
-          : 1000 / 360;
+      profileBaseSpeed ??
+      (toFiniteNumber(workout.average_speed, 0) > 0 ? toFiniteNumber(workout.average_speed, 0) : 1000 / 360);
     let rawEstimatedSpeed = estimatedSpeedFromProfile ?? fallbackSpeed;
 
     if (
