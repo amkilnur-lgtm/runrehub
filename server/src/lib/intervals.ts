@@ -68,9 +68,11 @@ type StreamEntry = {
   data2?: unknown[] | null;
 };
 
-// В паузах записи intervals.icu кладет в watts null — заменяем на 0,
-// чтобы не терять весь стрим и сохранить выравнивание по индексам
-function parseWattsStream(values: unknown[] | undefined) {
+// В паузах записи (и на старте, пока часы не поймали каденс/пульс) intervals.icu
+// кладёт в поток null. Строгий parseNumberStream выбрасывал ВЕСЬ стрим из-за одного
+// null — так терялся каденс у COROS (нулей много в начале). Заменяем null→0,
+// сохраняя длину/выравнивание по индексам; downstream трактует 0 как «нет значения».
+function parseLenientNumberStream(values: unknown[] | undefined) {
   if (!Array.isArray(values)) {
     return [];
   }
@@ -245,13 +247,15 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
   return {
     distance: parseNumberStream(numberData("distance")),
     time: parseNumberStream(numberData("time")),
-    heartrate: parseNumberStream(numberData("heartrate")),
-    cadence: parseNumberStream(numberData("cadence")),
+    // лояльные (null→0, длина сохранена): в этих потоках COROS часто есть null
+    // на старте/в паузах, а строгий парсер выбрасывал весь массив
+    heartrate: parseLenientNumberStream(numberData("heartrate")),
+    cadence: parseLenientNumberStream(numberData("cadence")),
     altitude: parseNumberStream(numberData("fixed_altitude") ?? numberData("altitude")),
-    velocity_smooth: parseNumberStream(numberData("velocity_smooth")),
+    velocity_smooth: parseLenientNumberStream(numberData("velocity_smooth")),
     latlng:
       latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined),
-    watts: parseWattsStream(numberData("watts"))
+    watts: parseLenientNumberStream(numberData("watts"))
   } satisfies ActivityStreams;
 }
 
