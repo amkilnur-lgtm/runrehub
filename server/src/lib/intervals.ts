@@ -6,6 +6,7 @@ import { enqueueNewWorkoutTelegramNotification } from "./telegram-notifications.
 import {
   encryptToken,
   decryptToken,
+  getStoredActivityStreams,
   saveActivityStreams,
   applyLapElevationChanges,
   parseNumberStream,
@@ -13,7 +14,17 @@ import {
   type ActivityStreams
 } from "./strava.js";
 import { analyzeWorkout } from "./workout-analysis.js";
+import {
+  buildAthleteCadenceProfile,
+  buildGpsFixPreview,
+  getActiveWorkoutCorrection,
+  upsertWorkoutCorrection
+} from "./workout-gps-fix.js";
 import { config } from "../config.js";
+
+// Средняя скорость выше этой (≈3:02/км) для беговой тренировки нереальна —
+// признак GPS-сбоя с завышением дистанции. Дешёвый пред-фильтр перед авто-фиксом.
+const AUTOFIX_SUSPECT_SPEED_MPS = 5.5;
 
 const INTERVALS_API_BASE = "https://intervals.icu/api/v1";
 const INTERVALS_SYNC_LOCK_NAMESPACE = 4272;
@@ -410,6 +421,15 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
       await saveActivityStreams(workoutId, streamsData);
       await applyLapElevationChanges(workoutId, streamsData.altitude);
     }
+    // Авто-фикс GPS при поступлении — только явно битые заезды, не блокируя импорт
+    void maybeAutoFixWorkoutGps(userId, workoutId, activity.average_speed).catch((error) => {
+      addStravaEvent({
+        source: "system",
+        level: "warn",
+        message: "gps auto-fix failed",
+        details: { workoutId, error: error instanceof Error ? error.message : "Unknown error" }
+      });
+    });
     void analyzeWorkout(workoutId).catch((error) => {
       addStravaEvent({
         source: "system",
@@ -433,6 +453,48 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
   }
 
   return { workoutId, isNewWorkout, deduped: false };
+}
+
+// Авто-применение GPS-фикса при импорте. Консервативно:
+// 1) дешёвый пред-фильтр по среднему темпу (нереально быстрый = сбой);
+// 2) не трогаем, если уже есть коррекция (ручная или прежняя авто);
+// 3) применяем ТОЛЬКО уверенную полную реконструкцию (full_rebuild + high) —
+//    это катастрофический сбой; локальные всплески (segment_cleanup) оставляем
+//    тренеру, чтобы не портить в основном нормальные заезды.
+async function maybeAutoFixWorkoutGps(userId: number, workoutId: number, recordedSpeed: number | null) {
+  if (!recordedSpeed || recordedSpeed <= AUTOFIX_SUSPECT_SPEED_MPS) {
+    return;
+  }
+  if (await getActiveWorkoutCorrection(workoutId)) {
+    return;
+  }
+  const workoutResult = await pool.query(`select * from workouts where id = $1`, [workoutId]);
+  const workout = workoutResult.rows[0];
+  if (!workout || !/run/i.test(String(workout.sport_type ?? ""))) {
+    return;
+  }
+  const lapsResult = await pool.query(
+    `select * from workout_laps where workout_id = $1 order by id asc`,
+    [workoutId]
+  );
+  const streams = await getStoredActivityStreams(workoutId);
+  const profile = await buildAthleteCadenceProfile(userId, workoutId);
+  const preview = buildGpsFixPreview(workout, lapsResult.rows, streams, profile);
+  if (!preview || preview.metadata.mode !== "full_rebuild" || preview.metadata.confidence !== "high") {
+    return;
+  }
+  await upsertWorkoutCorrection(workoutId, userId, "gps_autofix", preview);
+  await analyzeWorkout(workoutId);
+  addStravaEvent({
+    source: "system",
+    level: "info",
+    message: "gps auto-fix applied",
+    details: {
+      workoutId,
+      from: Math.round(Number(workout.distance_meters) || 0),
+      to: Math.round(preview.correctedWorkout.distance_meters)
+    }
+  });
 }
 
 async function tryAcquireSyncLock(userId: number) {
