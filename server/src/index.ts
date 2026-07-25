@@ -168,11 +168,14 @@ addStravaEvent({
   message: "sync cron scheduler started",
   details: { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES }
 });
-setInterval(() => {
+const runSyncTick = () =>
   void syncDueIntervalsAthletes(app.log).catch((error) => {
     app.log.error({ err: error }, "intervals cron tick failed");
   });
-}, syncIntervalMs);
+setInterval(runSyncTick, syncIntervalMs);
+// немедленный первый тик после старта (setInterval иначе ждёт полный интервал —
+// после каждого деплоя/рестарта синк простаивал бы 15 минут)
+runSyncTick();
 
 // Форс-подтяжка из COROS: логинимся на intervals.icu за атлетов с сохранённым
 // логином-паролем (обычный синк потом импортирует свежее). Интервал меняется в
