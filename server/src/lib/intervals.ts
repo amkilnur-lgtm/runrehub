@@ -655,23 +655,24 @@ export async function forceDueIntervalsAthletes(logger?: FastifyBaseLogger) {
 
 export async function syncDueIntervalsAthletes(logger?: FastifyBaseLogger) {
   const intervalMinutes = config.STRAVA_SYNC_INTERVAL_MINUTES;
+  // Синкаем ВСЕХ подключённых на каждом тике. Раньше был фильтр
+  // last_synced_at < now() - 15мин, но при 15-мин тике это давало гонку на границе:
+  // атлеты «не дозревали» ровно на тик и расползались по разным 15-мин корзинам
+  // (у одних синк 10:22, у других 10:37). Один activities-запрос на атлета — дёшево.
   const { rows } = await pool.query(
     `
       select user_id
       from intervals_connections
-      where last_synced_at is null
-         or last_synced_at < now() - make_interval(mins => $1::int)
       order by coalesce(last_synced_at, to_timestamp(0)) asc
-    `,
-    [intervalMinutes]
+    `
   );
 
-  logger?.info({ dueAthletes: rows.length, intervalMinutes }, "intervals cron tick");
+  logger?.info({ athletes: rows.length, intervalMinutes }, "intervals cron tick");
   addStravaEvent({
     source: "cron",
     level: "info",
     message: "intervals cron tick",
-    details: { dueAthletes: rows.length, intervalMinutes }
+    details: { athletes: rows.length, intervalMinutes }
   });
 
   for (const row of rows) {
