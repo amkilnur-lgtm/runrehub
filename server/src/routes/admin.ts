@@ -2,7 +2,12 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { hashPassword, requireAuth, requireRole } from "../lib/auth.js";
-import { getForceIntervalMinutes, setForceIntervalMinutes } from "../lib/app-settings.js";
+import {
+  getAuthorizedTelegramChats,
+  getForceIntervalMinutes,
+  setAuthorizedTelegramChats,
+  setForceIntervalMinutes
+} from "../lib/app-settings.js";
 import { pool } from "../lib/db.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import {
@@ -140,7 +145,10 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get("/api/admin/settings", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["admin"]);
-    return { forceIntervalMinutes: await getForceIntervalMinutes() };
+    return {
+      forceIntervalMinutes: await getForceIntervalMinutes(),
+      telegramChats: (await getAuthorizedTelegramChats()).join(", ")
+    };
   });
 
   app.put("/api/admin/settings", { preHandler: requireAuth }, async (request) => {
@@ -148,6 +156,13 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = z.object({ forceIntervalMinutes: z.coerce.number().int().min(5).max(1440) }).parse(request.body);
     const saved = await setForceIntervalMinutes(body.forceIntervalMinutes);
     return { ok: true, forceIntervalMinutes: saved };
+  });
+
+  app.put("/api/admin/settings/telegram-chats", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["admin"]);
+    const body = z.object({ chats: z.string().max(500) }).parse(request.body);
+    const saved = await setAuthorizedTelegramChats(body.chats);
+    return { ok: true, telegramChats: saved.join(", ") };
   });
 
   // Сохранить логин-пароль от аккаунта intervals.icu (для форс-синка)

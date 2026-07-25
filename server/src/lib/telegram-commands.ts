@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 
 import { config } from "../config.js";
+import { getAuthorizedTelegramChats } from "./app-settings.js";
 import { pool } from "./db.js";
 import { forceAndSyncAllAthletes } from "./intervals.js";
 import {
@@ -22,6 +23,10 @@ type TelegramUpdate = {
 // (либо TELEGRAM_ADMIN_CHAT_ID из окружения).
 async function isAuthorizedChat(chatId: string): Promise<boolean> {
   if (config.TELEGRAM_ADMIN_CHAT_ID && config.TELEGRAM_ADMIN_CHAT_ID === chatId) {
+    return true;
+  }
+  const allowed = await getAuthorizedTelegramChats();
+  if (allowed.includes(chatId)) {
     return true;
   }
   const { rows } = await pool.query(
