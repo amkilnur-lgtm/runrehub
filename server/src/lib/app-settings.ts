@@ -27,3 +27,33 @@ export async function setForceIntervalMinutes(minutes: number): Promise<number> 
   );
   return clamped;
 }
+
+const TELEGRAM_CHATS_KEY = "telegram_bot_chats";
+
+// Chat_id, которым разрешено управлять ботом (форс всех) помимо привязанных тренеров
+export async function getAuthorizedTelegramChats(): Promise<string[]> {
+  const { rows } = await pool.query(`select value from app_settings where key = $1`, [
+    TELEGRAM_CHATS_KEY
+  ]);
+  return rows[0]?.value
+    ? String(rows[0].value)
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter(Boolean)
+    : [];
+}
+
+export async function setAuthorizedTelegramChats(raw: string): Promise<string[]> {
+  const list = raw
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  await pool.query(
+    `
+      insert into app_settings (key, value, updated_at) values ($1, $2, now())
+      on conflict (key) do update set value = excluded.value, updated_at = now()
+    `,
+    [TELEGRAM_CHATS_KEY, list.join(",")]
+  );
+  return list;
+}

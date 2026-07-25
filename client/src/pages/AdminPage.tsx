@@ -210,15 +210,34 @@ export function AdminPage() {
   const [accountDrafts, setAccountDrafts] = useState<Record<number, { email: string; password: string }>>({});
   const [savingAccountId, setSavingAccountId] = useState<number | null>(null);
   const [tab, setTab] = useState<AdminTab>("users");
-  const settingsApi = useApi<{ forceIntervalMinutes: number }>("/api/admin/settings");
+  const settingsApi = useApi<{ forceIntervalMinutes: number; telegramChats: string }>("/api/admin/settings");
   const [forceIntervalDraft, setForceIntervalDraft] = useState<string>("");
+  const [telegramChatsDraft, setTelegramChatsDraft] = useState<string>("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingTgChats, setSavingTgChats] = useState(false);
 
   useEffect(() => {
     if (settingsApi.data) {
       setForceIntervalDraft(String(settingsApi.data.forceIntervalMinutes));
+      setTelegramChatsDraft(settingsApi.data.telegramChats ?? "");
     }
   }, [settingsApi.data]);
+
+  async function saveTelegramChats() {
+    setSavingTgChats(true);
+    try {
+      const res = await api<{ telegramChats: string }>("/api/admin/settings/telegram-chats", {
+        method: "PUT",
+        body: JSON.stringify({ chats: telegramChatsDraft })
+      });
+      setTelegramChatsDraft(res.telegramChats);
+      showToast("success", "Доступ к боту обновлён");
+    } catch (err: any) {
+      showToast("error", `Не удалось сохранить: ${err.message}`);
+    } finally {
+      setSavingTgChats(false);
+    }
+  }
 
   async function saveForceInterval() {
     const minutes = Number(forceIntervalDraft);
@@ -802,6 +821,31 @@ export function AdminPage() {
           >
             {savingSettings ? "Сохраняю..." : "Сохранить"}
           </button>
+        </div>
+
+        <div>
+          <p className="muted" style={{ marginBottom: 8 }}>
+            Telegram-чаты с доступом к кнопке «Форсировать всех» (chat_id через запятую). Свой узнай
+            командой <code>/id</code> боту.
+          </p>
+          <div className="admin-settings-row">
+            <label className="admin-telegram-field" style={{ marginBottom: 0, flex: 1, minWidth: 220 }}>
+              Chat_id
+              <input
+                value={telegramChatsDraft}
+                placeholder="напр. 123456789, -100987654321"
+                onChange={(event) => setTelegramChatsDraft(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              disabled={savingTgChats}
+              onClick={saveTelegramChats}
+            >
+              {savingTgChats ? "Сохраняю..." : "Сохранить доступ"}
+            </button>
+          </div>
         </div>
       </section>
 
