@@ -656,18 +656,19 @@ export async function forceDueIntervalsAthletes(logger?: FastifyBaseLogger) {
 // Форс всех + синк всех: логинимся за каждого с сохранённым логином (подтолкнуть
 // COROS), ждём подтяжку, затем глубокий синк по всем подключённым. Для кнопки в TG.
 export async function forceAndSyncAllAthletes(): Promise<{
-  forced: number;
+  forcedNames: string[];
   imported: number;
   perAthlete: Array<{ username: string; imported: number }>;
 }> {
   const credentialed = await pool.query(
-    `select user_id from intervals_connections where icu_email is not null and icu_password is not null`
+    `select ic.user_id, u.full_name from intervals_connections ic join users u on u.id = ic.user_id
+     where ic.icu_email is not null and ic.icu_password is not null order by u.full_name`
   );
-  let forced = 0;
+  const forcedNames: string[] = [];
   for (const row of credentialed.rows) {
     try {
       const r = await forceIntervalsAccountRefresh(row.user_id as number);
-      if (r.forced) forced += 1;
+      if (r.forced) forcedNames.push(row.full_name as string);
     } catch {
       /* пропускаем — синк всё равно попробует */
     }
@@ -690,7 +691,7 @@ export async function forceAndSyncAllAthletes(): Promise<{
       /* игнорируем частные ошибки, отчитаемся по остальным */
     }
   }
-  return { forced, imported, perAthlete };
+  return { forcedNames, imported, perAthlete };
 }
 
 export async function syncDueIntervalsAthletes(logger?: FastifyBaseLogger) {

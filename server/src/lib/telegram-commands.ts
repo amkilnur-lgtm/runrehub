@@ -41,14 +41,14 @@ const FORCE_BUTTON = [[{ text: "🔄 Форсировать всех", callback_
 async function runForceAll(chatId: string, logger?: FastifyBaseLogger) {
   try {
     const result = await forceAndSyncAllAthletes();
-    const lines = result.perAthlete.length
-      ? result.perAthlete.map((a) => `• ${a.username}: +${a.imported}`).join("\n")
-      : "новых тренировок нет";
-    await sendTelegramMessageWithButtons(
-      chatId,
-      `✅ Готово. Форсировано аккаунтов: ${result.forced}, импортировано: ${result.imported}\n${lines}`,
-      FORCE_BUTTON
-    );
+    const forcedLine = result.forcedNames.length
+      ? `🔄 Форсировано (${result.forcedNames.length}): ${result.forcedNames.join(", ")}`
+      : "🔄 Нет аккаунтов с сохранённым логином";
+    const importedLine = result.perAthlete.length
+      ? `📥 Новых тренировок: ${result.imported}\n` +
+        result.perAthlete.map((a) => `• ${a.username}: +${a.imported}`).join("\n")
+      : "📥 Новых тренировок нет";
+    await sendTelegramMessageWithButtons(chatId, `✅ Готово\n${forcedLine}\n${importedLine}`, FORCE_BUTTON);
   } catch (error) {
     logger?.error({ err: error }, "telegram force-all failed");
     await sendTelegramMessage(chatId, "⚠️ Не удалось форсировать. Попробуй ещё раз.").catch(() => undefined);
