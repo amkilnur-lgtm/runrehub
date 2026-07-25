@@ -13,7 +13,7 @@ import { authRoutes } from "./routes/auth.js";
 import { adminRoutes } from "./routes/admin.js";
 import { athleteRoutes } from "./routes/athlete.js";
 import { handleTelegramUpdate } from "./lib/telegram-commands.js";
-import { registerTelegramWebhook, telegramWebhookSecret } from "./lib/telegram.js";
+import { registerTelegramCommands, registerTelegramWebhook, telegramWebhookSecret } from "./lib/telegram.js";
 import { trainerRoutes } from "./routes/trainer.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
@@ -159,10 +159,13 @@ await app.listen({
   host: "0.0.0.0"
 });
 
-// Регистрируем вебхук Telegram (кнопка «Форсировать всех»)
+// Регистрируем вебхук Telegram (кнопка «Форсировать всех») + меню команд
 void registerTelegramWebhook()
   .then(() => app.log.info("telegram webhook registered"))
   .catch((error) => app.log.error({ err: error }, "telegram webhook registration failed"));
+void registerTelegramCommands().catch((error) =>
+  app.log.error({ err: error }, "telegram commands registration failed")
+);
 
 // --- Graceful shutdown ---
 const shutdown = async () => {

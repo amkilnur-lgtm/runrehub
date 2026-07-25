@@ -47,6 +47,24 @@ export async function answerTelegramCallback(callbackQueryId: string, text?: str
   }).catch(() => undefined);
 }
 
+// Меню команд бота (список по «/» и кнопке Menu в Telegram)
+export async function registerTelegramCommands() {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    return;
+  }
+  await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/setMyCommands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      commands: [
+        { command: "force", description: "🔄 Форсировать синхронизацию всех" },
+        { command: "sync", description: "Синхронизировать всех сейчас" },
+        { command: "id", description: "Показать мой chat_id" }
+      ]
+    })
+  }).catch(() => undefined);
+}
+
 // Регистрируем вебхук на нашем публичном URL с секретом
 export async function registerTelegramWebhook() {
   if (!config.TELEGRAM_BOT_TOKEN) {
