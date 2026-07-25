@@ -653,6 +653,46 @@ export async function forceDueIntervalsAthletes(logger?: FastifyBaseLogger) {
   return forced;
 }
 
+// Форс всех + синк всех: логинимся за каждого с сохранённым логином (подтолкнуть
+// COROS), ждём подтяжку, затем глубокий синк по всем подключённым. Для кнопки в TG.
+export async function forceAndSyncAllAthletes(): Promise<{
+  forced: number;
+  imported: number;
+  perAthlete: Array<{ username: string; imported: number }>;
+}> {
+  const credentialed = await pool.query(
+    `select user_id from intervals_connections where icu_email is not null and icu_password is not null`
+  );
+  let forced = 0;
+  for (const row of credentialed.rows) {
+    try {
+      const r = await forceIntervalsAccountRefresh(row.user_id as number);
+      if (r.forced) forced += 1;
+    } catch {
+      /* пропускаем — синк всё равно попробует */
+    }
+  }
+  // даём intervals.icu время подтянуть из COROS
+  await new Promise((resolve) => setTimeout(resolve, 9000));
+
+  const connected = await pool.query(
+    `select ic.user_id, u.full_name from intervals_connections ic join users u on u.id = ic.user_id order by u.full_name`
+  );
+  let imported = 0;
+  const perAthlete: Array<{ username: string; imported: number }> = [];
+  for (const row of connected.rows) {
+    try {
+      const result = await syncIntervalsLatestActivities(row.user_id as number, { forceDeep: true });
+      const n = result.synced ? result.imported : 0;
+      imported += n;
+      if (n > 0) perAthlete.push({ username: row.full_name as string, imported: n });
+    } catch {
+      /* игнорируем частные ошибки, отчитаемся по остальным */
+    }
+  }
+  return { forced, imported, perAthlete };
+}
+
 export async function syncDueIntervalsAthletes(logger?: FastifyBaseLogger) {
   const intervalMinutes = config.STRAVA_SYNC_INTERVAL_MINUTES;
   // Синкаем ВСЕХ подключённых на каждом тике. Раньше был фильтр
