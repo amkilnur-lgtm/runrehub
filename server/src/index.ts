@@ -12,6 +12,8 @@ import Fastify from "fastify";
 import { authRoutes } from "./routes/auth.js";
 import { adminRoutes } from "./routes/admin.js";
 import { athleteRoutes } from "./routes/athlete.js";
+import { handleTelegramUpdate } from "./lib/telegram-commands.js";
+import { registerTelegramWebhook, telegramWebhookSecret } from "./lib/telegram.js";
 import { trainerRoutes } from "./routes/trainer.js";
 import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
@@ -129,6 +131,20 @@ app.get("/api/health", async (_request, reply) => {
   }
 });
 
+// Вебхук Telegram: секрет в пути + заголовок; отвечаем 200 сразу, работаем в фоне
+app.post("/api/telegram/webhook/:secret", async (request, reply) => {
+  const { secret } = request.params as { secret: string };
+  const headerSecret = request.headers["x-telegram-bot-api-secret-token"];
+  const expected = telegramWebhookSecret();
+  if (!expected || secret !== expected || headerSecret !== expected) {
+    return reply.code(403).send({ ok: false });
+  }
+  void handleTelegramUpdate(request.body as Parameters<typeof handleTelegramUpdate>[0], app.log).catch(
+    (error) => app.log.error({ err: error }, "telegram update handling failed")
+  );
+  return { ok: true };
+});
+
 if (indexHtml) {
   app.setNotFoundHandler(async (request, reply) => {
     if (request.raw.url?.startsWith("/api/")) {
@@ -142,6 +158,11 @@ await app.listen({
   port: config.PORT,
   host: "0.0.0.0"
 });
+
+// Регистрируем вебхук Telegram (кнопка «Форсировать всех»)
+void registerTelegramWebhook()
+  .then(() => app.log.info("telegram webhook registered"))
+  .catch((error) => app.log.error({ err: error }, "telegram webhook registration failed"));
 
 // --- Graceful shutdown ---
 const shutdown = async () => {

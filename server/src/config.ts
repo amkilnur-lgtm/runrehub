@@ -20,7 +20,9 @@ const configSchema = z
     // Ключом зашифрованы api-ключи intervals.icu (имя осталось со времен Strava)
     STRAVA_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional(),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
-    TELEGRAM_BOT_USERNAME: z.string().optional()
+    TELEGRAM_BOT_USERNAME: z.string().optional(),
+    // Опционально: chat_id с полным доступом к управлению ботом (форс всех)
+    TELEGRAM_ADMIN_CHAT_ID: z.string().optional()
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && !value.STRAVA_TOKEN_ENCRYPTION_KEY) {

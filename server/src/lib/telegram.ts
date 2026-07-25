@@ -1,4 +1,68 @@
+import crypto from "node:crypto";
+
 import { config } from "../config.js";
+
+// Стабильный секрет вебхука из токена бота — в пути и в заголовке
+// X-Telegram-Bot-Api-Secret-Token, чтобы никто чужой не дёргал вебхук.
+export function telegramWebhookSecret() {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    return "";
+  }
+  return crypto.createHash("sha256").update(config.TELEGRAM_BOT_TOKEN).digest("hex").slice(0, 40);
+}
+
+type InlineKeyboard = Array<Array<{ text: string; callback_data: string }>>;
+
+export async function sendTelegramMessageWithButtons(
+  chatId: string,
+  text: string,
+  keyboard: InlineKeyboard
+) {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    throw new Error("TELEGRAM_NOT_CONFIGURED");
+  }
+  const response = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: keyboard }
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`TELEGRAM_SEND_FAILED: ${(await response.text()).slice(0, 300)}`);
+  }
+}
+
+export async function answerTelegramCallback(callbackQueryId: string, text?: string) {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    return;
+  }
+  await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callback_query_id: callbackQueryId, text: text?.slice(0, 200) })
+  }).catch(() => undefined);
+}
+
+// Регистрируем вебхук на нашем публичном URL с секретом
+export async function registerTelegramWebhook() {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    return;
+  }
+  const url = `${config.APP_URL.replace(/\/$/, "")}/api/telegram/webhook/${telegramWebhookSecret()}`;
+  await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url,
+      secret_token: telegramWebhookSecret(),
+      allowed_updates: ["message", "callback_query"]
+    })
+  }).catch(() => undefined);
+}
 
 function escapeTelegramHtml(value: string) {
   return value
