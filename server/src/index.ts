@@ -37,7 +37,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // trustProxy: приложение стоит за Caddy, реальный IP клиента приходит в X-Forwarded-For
-const app = Fastify({ logger: true, trustProxy: true });
+// bodyLimit 8 МБ: аватар шлётся как data URL в JSON; клиент пережимает в
+// маленький JPEG, но лимит с запасом, чтобы не ловить 413 на крупных исходниках
+const app = Fastify({ logger: true, trustProxy: true, bodyLimit: 8 * 1024 * 1024 });
 app.decorate("pg", pool);
 
 // --- CORS: в production разрешаем только свои домены ---

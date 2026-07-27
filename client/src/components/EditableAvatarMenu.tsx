@@ -2,6 +2,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
 import { User } from "../types";
+import { AvatarCropModal } from "./AvatarCropModal";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
@@ -19,6 +20,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isAvatarBusy, setIsAvatarBusy] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(avatarUrl ?? null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,43 +61,32 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
     fileInputRef.current?.click();
   }
 
-  async function fileToDataUrl(file: File) {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-          return;
-        }
-        reject(new Error("Не удалось прочитать файл"));
-      };
-      reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || isAvatarBusy) {
       return;
     }
-
-    if (!file.type.startsWith("image/")) {
+    // некоторые телефоны отдают HEIC с пустым/нестандартным type — открываем в кропе,
+    // где canvas всё равно пережмёт в JPEG; фильтруем только явно не-картинки
+    if (file.type && !file.type.startsWith("image/")) {
       showToast("error", "Можно загружать только изображения");
       return;
     }
+    setIsAvatarMenuOpen(false);
+    setCropFile(file);
+  }
 
+  async function handleCropConfirm(imageDataUrl: string) {
     setIsAvatarBusy(true);
     try {
-      const imageDataUrl = await fileToDataUrl(file);
       const result = await api<{ user: User }>("/api/auth/avatar", {
         method: "PUT",
         body: JSON.stringify({ imageDataUrl })
       });
       setUser(result.user);
       setCurrentAvatarUrl(result.user.avatarUrl);
-      setIsAvatarMenuOpen(false);
+      setCropFile(null);
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Не удалось загрузить фото");
     } finally {
@@ -142,10 +133,18 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/*"
         className="avatar-file-input"
         onChange={handleAvatarChange}
       />
+      {cropFile ? (
+        <AvatarCropModal
+          file={cropFile}
+          busy={isAvatarBusy}
+          onCancel={() => setCropFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      ) : null}
       {isAvatarMenuOpen ? (
         <div className="avatar-menu-popover">
           <button
