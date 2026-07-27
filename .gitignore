@@ -17,3 +17,7 @@ runrehab-repomix.xml
 .claude/
 .impeccable/
 .screenshots/
+
+# runtime upload artifacts (dev cwd quirk)
+server/server/
+server/uploads/
