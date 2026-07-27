@@ -3369,3 +3369,73 @@ button.trend-bar-slot:focus-visible {
 .admin-settings-card { display: flex; flex-direction: column; gap: 12px; }
 .admin-settings-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .admin-settings-row .admin-telegram-field input { max-width: 140px; }
+
+/* --- Модалка обрезки аватара --- */
+.avatar-crop-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: oklch(0.2 0.02 272 / 0.55);
+  backdrop-filter: blur(2px);
+}
+.avatar-crop-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-2);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.avatar-crop-card h3 { margin: 0; font-size: 17px; font-weight: 800; }
+.avatar-crop-viewport {
+  position: relative;
+  margin: 0 auto;
+  max-width: 100%;
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  background: var(--surface-2);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.avatar-crop-viewport:active { cursor: grabbing; }
+.avatar-crop-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  pointer-events: none;
+}
+.avatar-crop-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+/* круглая маска-подсказка поверх квадрата */
+.avatar-crop-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px oklch(0.2 0.02 272 / 0.45);
+}
+.avatar-crop-zoom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.avatar-crop-zoom input[type="range"] { flex: 1; accent-color: var(--accent); }
+.avatar-crop-actions { display: flex; justify-content: flex-end; gap: 10px; }
