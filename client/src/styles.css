@@ -37,6 +37,11 @@
   /* Внутренний блик плиты графика */
   --chart-grid-glow: oklch(1 0 0 / 0.2);
 
+  /* Рабочие отрезки интервальной тренировки: строка таблицы, полоса на графике */
+  --interval-row: oklch(0.972 0.015 28);
+  --interval-band: oklch(0.58 0.2 28 / 0.09);
+  --interval-ink: oklch(0.5 0.18 28);
+
   /* Карта: подложка до загрузки тайлов, плашка атрибуции, сетка скелетона */
   --map-surface: oklch(0.924 0.013 244);
   --map-attrib-bg: oklch(1 0 0 / 0.72);
@@ -96,6 +101,9 @@
   --chart-pace-soft: oklch(0.3 0.06 258);
   --chart-pace-ink: oklch(0.8 0.1 258);
   --chart-grid-glow: oklch(1 0 0 / 0.045);
+  --interval-row: oklch(0.275 0.042 28);
+  --interval-band: oklch(0.64 0.2 28 / 0.16);
+  --interval-ink: oklch(0.78 0.13 28);
   --map-surface: oklch(0.23 0.015 260);
   --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
   --map-skeleton-line: oklch(1 0 0 / 0.07);
@@ -129,6 +137,9 @@
     --chart-pace-soft: oklch(0.3 0.06 258);
     --chart-pace-ink: oklch(0.8 0.1 258);
     --chart-grid-glow: oklch(1 0 0 / 0.045);
+    --interval-row: oklch(0.275 0.042 28);
+    --interval-band: oklch(0.64 0.2 28 / 0.16);
+    --interval-ink: oklch(0.78 0.13 28);
     --map-surface: oklch(0.23 0.015 260);
     --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
     --map-skeleton-line: oklch(1 0 0 / 0.07);
@@ -1791,6 +1802,102 @@ select:focus-visible {
   text-align: center;
   font-size: 11px;
   color: var(--ink-muted);
+}
+
+/* --- Рабочие отрезки интервальной тренировки --- */
+
+.chart-work-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  /* Отдых часто записан внутрь того же круга, поэтому полосы повторов смыкаются.
+     Разделители по краям дают их пересчитать глазом. */
+  border-left: 1px solid var(--surface);
+  border-right: 1px solid var(--surface);
+  background: var(--interval-band);
+  pointer-events: none;
+}
+
+.chart-band-label-row {
+  margin-bottom: 4px;
+}
+
+.chart-band-labels {
+  position: relative;
+  height: 14px;
+}
+
+.chart-band-label {
+  position: absolute;
+  top: 0;
+  display: block;
+  overflow: hidden;
+  color: var(--interval-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
+.interval-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 4px;
+}
+
+.interval-summary-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-m);
+  background: var(--interval-row);
+  box-shadow: inset 0 0 0 1px var(--interval-band);
+  color: var(--interval-ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.interval-summary-chip strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.interval-summary-pace::after {
+  content: "/км";
+  opacity: 0.7;
+}
+
+.lap-report-row-work td {
+  background: var(--interval-row);
+}
+
+.lap-report-row-work td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.lap-report-row-work .lap-report-index {
+  color: var(--interval-ink);
+}
+
+.workout-structure-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--interval-row);
+  box-shadow: inset 0 0 0 1px var(--interval-band);
+  color: var(--interval-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .chart-empty {

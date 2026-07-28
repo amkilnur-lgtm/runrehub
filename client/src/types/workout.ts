@@ -61,8 +61,42 @@ export type WorkoutData = {
     average_speed: number | null;
     average_heartrate: number | null;
     elevation_gain: number | null;
+    start_index?: number | null;
+    end_index?: number | null;
   }>;
   streams: StreamSeries;
+  // Разметка рабочих отрезков интервальной тренировки, null для обычных пробежек
+  structure: WorkoutStructure | null;
+};
+
+export type WorkoutStructure = {
+  work_lap_ids: number[];
+  sets: Array<{
+    count: number;
+    distance_meters: number;
+    pace_seconds_per_km: number;
+    moving_time_seconds: number;
+    average_heartrate: number | null;
+    label: string;
+  }>;
+  segments: Array<{
+    set_index: number;
+    lap_ids: number[];
+    start_index: number | null;
+    end_index: number | null;
+  }>;
+};
+
+export type IntervalBand = {
+  left: string;
+  width: string;
+  setIndex: number;
+};
+
+export type IntervalBandLabel = {
+  left: string;
+  width: string;
+  label: string;
 };
 
 export type ChartPoint = {

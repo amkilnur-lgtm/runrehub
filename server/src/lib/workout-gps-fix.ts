@@ -1,5 +1,6 @@
 import { pool } from "./db.js";
 import type { ActivityStreams } from "./strava.js";
+import { detectWorkoutIntervals } from "./workout-intervals.js";
 
 type WorkoutSummary = {
   id: number;
@@ -102,6 +103,8 @@ type CorrectedLapPayload = {
   average_speed: number | null;
   average_heartrate: number | null;
   elevation_gain: number | null;
+  start_index?: number | null;
+  end_index?: number | null;
 };
 
 type GpsFixPreview = {
@@ -1229,7 +1232,10 @@ function rebuildCorrectedLaps(
       average_heartrate: lapHeartRateValues.length
         ? lapHeartRateValues.reduce((sum, value) => sum + value, 0) / lapHeartRateValues.length
         : null,
-      elevation_gain: 0
+      elevation_gain: 0,
+      // индексы нужны разметке рабочих отрезков, чтобы подсветить их на графиках
+      start_index: firstIndex,
+      end_index: lastIndex
     });
   }
 
@@ -1862,7 +1868,8 @@ export function applyWorkoutCorrectionToView(
         gps_fix: null
       },
       laps,
-      streams
+      streams,
+      structure: detectWorkoutIntervals(laps, workout as { average_speed?: number | null })
     };
   }
 
@@ -1889,7 +1896,10 @@ export function applyWorkoutCorrectionToView(
       }
     },
     laps: correctedLaps,
-    streams: correctedStreams
+    streams: correctedStreams,
+    structure: detectWorkoutIntervals(correctedLaps, {
+      average_speed: correction.corrected_average_speed
+    })
   };
 }
 

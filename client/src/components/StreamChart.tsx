@@ -1,16 +1,20 @@
 import { CHART_HEIGHT, CHART_WIDTH } from "../chart/chart-utils";
-import { ChartModel } from "../types/workout";
+import { ChartModel, IntervalBand, IntervalBandLabel } from "../types/workout";
 
 export function StreamChart({
   title,
   model,
   color,
-  formatter
+  formatter,
+  bands = [],
+  bandLabels = []
 }: {
   title: string;
   model: ChartModel | null;
   color: string;
   formatter: (value: number) => string;
+  bands?: IntervalBand[];
+  bandLabels?: IntervalBandLabel[];
 }) {
   if (!model) {
     return (
@@ -39,6 +43,23 @@ export function StreamChart({
           <div className="chart-metric-label">{model.summaryRightLabel}</div>
         </div>
       </div>
+      {bandLabels.length ? (
+        <div className="chart-x-wrap chart-band-label-row">
+          <div />
+          <div className="chart-band-labels">
+            {bandLabels.map((item) => (
+              <span
+                key={`${item.label}-${item.left}`}
+                className="chart-band-label"
+                style={{ left: item.left, width: item.width }}
+              >
+                {item.label}
+              </span>
+            ))}
+          </div>
+          <div className="chart-side-gutter" aria-hidden="true" />
+        </div>
+      ) : null}
       <div className="chart-frame">
         <div className="chart-grid-wrap">
           <div className="chart-y-axis">
@@ -49,6 +70,15 @@ export function StreamChart({
             ))}
           </div>
           <div className="chart-grid">
+            {/* Рабочие отрезки интервальной тренировки — подложка под линией */}
+            {bands.map((band, index) => (
+              <div
+                key={`band-${index}`}
+                className="chart-work-band"
+                style={{ left: band.left, width: band.width }}
+                aria-hidden="true"
+              />
+            ))}
             {model.yTicks.map((tick, index) => (
               <div
                 key={`${tick}-${index}`}
