@@ -13,6 +13,7 @@ const stravaModule = await import("./lib/strava.js");
 const intervalsModule = await import("./lib/intervals.js");
 const analysisModule = await import("./lib/workout-analysis.js");
 const gpsFixModule = await import("./lib/workout-gps-fix.js");
+const intervalsDetectorModule = await import("./lib/workout-intervals.js");
 const dbModule = await import("./lib/db.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
@@ -250,6 +251,175 @@ await runTest("monthly telegram report formatter accepts Date monthStart", () =>
   assert.match(message, /Test athlete/);
   assert.match(message, /2026/);
   assert.match(message, /120.00/);
+});
+
+// Фикстуры кругов — реальные тренировки с прода (см. detectWorkoutIntervals).
+// #58206 u5 2026-07-28 10.7км, average_speed=3.973
+const LAPS_58206 = [
+  { id: 684909, distance_meters: 1005, elapsed_time_seconds: 321, average_speed: 3.1308, average_heartrate: 111, start_index: 0, end_index: 321 },
+  { id: 684910, distance_meters: 1012.5, elapsed_time_seconds: 310, average_speed: 3.2661, average_heartrate: 117, start_index: 321, end_index: 631 },
+  { id: 684911, distance_meters: 1004.5, elapsed_time_seconds: 252, average_speed: 3.9861, average_heartrate: 132, start_index: 631, end_index: 883 },
+  { id: 684912, distance_meters: 276, elapsed_time_seconds: 1695, average_speed: 0.1628, average_heartrate: 119, start_index: 883, end_index: 988 },
+  { id: 684913, distance_meters: 1002, elapsed_time_seconds: 201, average_speed: 4.9851, average_heartrate: 147, start_index: 988, end_index: 1189 },
+  { id: 684914, distance_meters: 999, elapsed_time_seconds: 405, average_speed: 5.0711, average_heartrate: 157, start_index: 1189, end_index: 1387 },
+  { id: 684915, distance_meters: 989, elapsed_time_seconds: 395, average_speed: 4.945, average_heartrate: 160, start_index: 1387, end_index: 1588 },
+  { id: 684916, distance_meters: 414, elapsed_time_seconds: 276, average_speed: 5.5946, average_heartrate: 144, start_index: 1588, end_index: 1663 },
+  { id: 684917, distance_meters: 390, elapsed_time_seconds: 193, average_speed: 5.4167, average_heartrate: 146, start_index: 1663, end_index: 1736 },
+  { id: 684918, distance_meters: 408, elapsed_time_seconds: 197, average_speed: 5.3684, average_heartrate: 147, start_index: 1736, end_index: 1813 },
+  { id: 684919, distance_meters: 390, elapsed_time_seconds: 196, average_speed: 5.2703, average_heartrate: 147, start_index: 1813, end_index: 1888 },
+  { id: 684920, distance_meters: 399, elapsed_time_seconds: 195, average_speed: 5.32, average_heartrate: 145, start_index: 1888, end_index: 1964 },
+  { id: 684921, distance_meters: 1004, elapsed_time_seconds: 497, average_speed: 3.9528, average_heartrate: 143, start_index: 1964, end_index: 2219 },
+  { id: 684922, distance_meters: 1416.54, elapsed_time_seconds: 687, average_speed: 2.9822, average_heartrate: 119, start_index: 2219, end_index: 2696 }
+];
+
+// #2832 u5 2026-04-01 13.4км, average_speed=3.829
+const LAPS_2832 = [
+  { id: 64389, distance_meters: 1188.71, elapsed_time_seconds: 246, average_speed: 4.83, average_heartrate: 158, start_index: 0, end_index: 222 },
+  { id: 64390, distance_meters: 421.28, elapsed_time_seconds: 164, average_speed: 2.57, average_heartrate: 136, start_index: 223, end_index: 387 },
+  { id: 64391, distance_meters: 1192.63, elapsed_time_seconds: 243, average_speed: 4.91, average_heartrate: 162, start_index: 388, end_index: 631 },
+  { id: 64392, distance_meters: 409.59, elapsed_time_seconds: 166, average_speed: 2.47, average_heartrate: 136, start_index: 632, end_index: 797 },
+  { id: 64393, distance_meters: 1193.69, elapsed_time_seconds: 250, average_speed: 4.77, average_heartrate: 161, start_index: 798, end_index: 1047 },
+  { id: 64394, distance_meters: 399.21, elapsed_time_seconds: 184, average_speed: 2.48, average_heartrate: 128, start_index: 1048, end_index: 1209 },
+  { id: 64395, distance_meters: 1192.42, elapsed_time_seconds: 249, average_speed: 4.79, average_heartrate: 160, start_index: 1210, end_index: 1458 },
+  { id: 64396, distance_meters: 415.06, elapsed_time_seconds: 183, average_speed: 2.27, average_heartrate: 135, start_index: 1459, end_index: 1642 },
+  { id: 64397, distance_meters: 1191.7, elapsed_time_seconds: 248, average_speed: 4.81, average_heartrate: 161, start_index: 1643, end_index: 1891 },
+  { id: 64398, distance_meters: 198.35, elapsed_time_seconds: 351, average_speed: 5.51, average_heartrate: 128, start_index: 1892, end_index: 1928 },
+  { id: 64399, distance_meters: 202.32, elapsed_time_seconds: 79, average_speed: 2.56, average_heartrate: 143, start_index: 1929, end_index: 2008 },
+  { id: 64400, distance_meters: 200.49, elapsed_time_seconds: 37, average_speed: 5.42, average_heartrate: 145, start_index: 2009, end_index: 2046 },
+  { id: 64401, distance_meters: 198.37, elapsed_time_seconds: 80, average_speed: 2.48, average_heartrate: 144, start_index: 2047, end_index: 2126 },
+  { id: 64402, distance_meters: 201.41, elapsed_time_seconds: 37, average_speed: 5.44, average_heartrate: 144, start_index: 2127, end_index: 2164 },
+  { id: 64403, distance_meters: 209.72, elapsed_time_seconds: 84, average_speed: 2.5, average_heartrate: 144, start_index: 2165, end_index: 2248 },
+  { id: 64404, distance_meters: 194.83, elapsed_time_seconds: 37, average_speed: 5.27, average_heartrate: 145, start_index: 2249, end_index: 2285 },
+  { id: 64405, distance_meters: 205.8, elapsed_time_seconds: 75, average_speed: 2.74, average_heartrate: 147, start_index: 2286, end_index: 2361 },
+  { id: 64406, distance_meters: 196.96, elapsed_time_seconds: 37, average_speed: 5.32, average_heartrate: 145, start_index: 2362, end_index: 2398 },
+  { id: 64407, distance_meters: 206.52, elapsed_time_seconds: 90, average_speed: 2.68, average_heartrate: 148, start_index: 2399, end_index: 2475 },
+  { id: 64408, distance_meters: 193.67, elapsed_time_seconds: 36, average_speed: 5.38, average_heartrate: 144, start_index: 2476, end_index: 2511 },
+  { id: 64409, distance_meters: 201.48, elapsed_time_seconds: 72, average_speed: 2.8, average_heartrate: 147, start_index: 2512, end_index: 2584 },
+  { id: 64410, distance_meters: 198.04, elapsed_time_seconds: 38, average_speed: 5.21, average_heartrate: 147, start_index: 2585, end_index: 2622 },
+  { id: 64411, distance_meters: 207.64, elapsed_time_seconds: 82, average_speed: 2.53, average_heartrate: 146, start_index: 2623, end_index: 2704 },
+  { id: 64412, distance_meters: 192.82, elapsed_time_seconds: 37, average_speed: 5.21, average_heartrate: 144, start_index: 2705, end_index: 2742 },
+  { id: 64413, distance_meters: 201.53, elapsed_time_seconds: 102, average_speed: 2.88, average_heartrate: 137, start_index: 2743, end_index: 2812 },
+  { id: 64414, distance_meters: 200.3, elapsed_time_seconds: 38, average_speed: 5.27, average_heartrate: 146, start_index: 2813, end_index: 2851 },
+  { id: 64415, distance_meters: 207.73, elapsed_time_seconds: 73, average_speed: 2.85, average_heartrate: 148, start_index: 2852, end_index: 2925 },
+  { id: 64416, distance_meters: 196.2, elapsed_time_seconds: 38, average_speed: 5.16, average_heartrate: 147, start_index: 2926, end_index: 2963 },
+  { id: 64417, distance_meters: 1004.96, elapsed_time_seconds: 473, average_speed: 3.97, average_heartrate: 141, start_index: 2964, end_index: 3216 },
+  { id: 64418, distance_meters: 1003.91, elapsed_time_seconds: 267, average_speed: 3.76, average_heartrate: 145, start_index: 3217, end_index: 3461 }
+];
+
+// #52506 u5 2026-07-19 21.1км, average_speed=3.715
+const LAPS_52506 = [
+  { id: 676641, distance_meters: 1001.5, elapsed_time_seconds: 269, average_speed: 3.723, average_heartrate: 116, start_index: 0, end_index: 269 },
+  { id: 676642, distance_meters: 999, elapsed_time_seconds: 270, average_speed: 3.7, average_heartrate: 127, start_index: 269, end_index: 539 },
+  { id: 676643, distance_meters: 997.5, elapsed_time_seconds: 267, average_speed: 3.736, average_heartrate: 132, start_index: 539, end_index: 806 },
+  { id: 676644, distance_meters: 1001, elapsed_time_seconds: 268, average_speed: 3.7351, average_heartrate: 131, start_index: 806, end_index: 1074 },
+  { id: 676645, distance_meters: 1002.5, elapsed_time_seconds: 271, average_speed: 3.6993, average_heartrate: 134, start_index: 1074, end_index: 1345 },
+  { id: 676646, distance_meters: 998.5, elapsed_time_seconds: 267, average_speed: 3.7397, average_heartrate: 138, start_index: 1345, end_index: 1612 },
+  { id: 676647, distance_meters: 1004, elapsed_time_seconds: 273, average_speed: 3.6777, average_heartrate: 136, start_index: 1612, end_index: 1885 },
+  { id: 676648, distance_meters: 997, elapsed_time_seconds: 271, average_speed: 3.679, average_heartrate: 139, start_index: 1885, end_index: 2156 },
+  { id: 676649, distance_meters: 997, elapsed_time_seconds: 268, average_speed: 3.7201, average_heartrate: 137, start_index: 2156, end_index: 2424 },
+  { id: 676650, distance_meters: 1002, elapsed_time_seconds: 276, average_speed: 3.6304, average_heartrate: 140, start_index: 2424, end_index: 2700 },
+  { id: 676651, distance_meters: 1000.5, elapsed_time_seconds: 267, average_speed: 3.7472, average_heartrate: 134, start_index: 2700, end_index: 2967 },
+  { id: 676652, distance_meters: 997, elapsed_time_seconds: 272, average_speed: 3.6654, average_heartrate: 135, start_index: 2967, end_index: 3239 },
+  { id: 676653, distance_meters: 1002.5, elapsed_time_seconds: 273, average_speed: 3.6722, average_heartrate: 137, start_index: 3239, end_index: 3512 },
+  { id: 676654, distance_meters: 1001, elapsed_time_seconds: 271, average_speed: 3.6937, average_heartrate: 136, start_index: 3512, end_index: 3783 },
+  { id: 676655, distance_meters: 1000, elapsed_time_seconds: 267, average_speed: 3.7453, average_heartrate: 140, start_index: 3783, end_index: 4050 },
+  { id: 676656, distance_meters: 997, elapsed_time_seconds: 267, average_speed: 3.7341, average_heartrate: 139, start_index: 4050, end_index: 4317 },
+  { id: 676657, distance_meters: 1002, elapsed_time_seconds: 267, average_speed: 3.7528, average_heartrate: 142, start_index: 4317, end_index: 4584 },
+  { id: 676658, distance_meters: 1001.5, elapsed_time_seconds: 265, average_speed: 3.7792, average_heartrate: 145, start_index: 4584, end_index: 4849 },
+  { id: 676659, distance_meters: 996.5, elapsed_time_seconds: 264, average_speed: 3.7746, average_heartrate: 143, start_index: 4849, end_index: 5113 },
+  { id: 676660, distance_meters: 1001.5, elapsed_time_seconds: 268, average_speed: 3.7369, average_heartrate: 145, start_index: 5113, end_index: 5381 },
+  { id: 676661, distance_meters: 1002.5, elapsed_time_seconds: 272, average_speed: 3.6857, average_heartrate: 144, start_index: 5381, end_index: 5653 },
+  { id: 676662, distance_meters: 106, elapsed_time_seconds: 30, average_speed: 3.5333, average_heartrate: 144, start_index: 5653, end_index: 5683 }
+];
+
+// #51112 u11 2026-07-15 6.0км, average_speed=2.853
+const LAPS_51112 = [
+  { id: 683165, distance_meters: 1000, elapsed_time_seconds: 378, average_speed: 2.6455, average_heartrate: 122, start_index: 0, end_index: 378 },
+  { id: 683166, distance_meters: 1003, elapsed_time_seconds: 358, average_speed: 2.8017, average_heartrate: 128, start_index: 378, end_index: 736 },
+  { id: 683167, distance_meters: 999, elapsed_time_seconds: 346, average_speed: 2.8873, average_heartrate: 129, start_index: 736, end_index: 1082 },
+  { id: 683168, distance_meters: 999, elapsed_time_seconds: 349, average_speed: 2.8625, average_heartrate: 137, start_index: 1082, end_index: 1431 },
+  { id: 683169, distance_meters: 1000, elapsed_time_seconds: 338, average_speed: 2.9586, average_heartrate: 133, start_index: 1431, end_index: 1769 },
+  { id: 683170, distance_meters: 999, elapsed_time_seconds: 334, average_speed: 2.991, average_heartrate: 142, start_index: 1769, end_index: 2103 }
+];
+
+// #50433 u10 2026-07-08 10.0км, average_speed=2.836
+const LAPS_50433 = [
+  { id: 682646, distance_meters: 1003, elapsed_time_seconds: 431, average_speed: 2.7182, average_heartrate: 102, start_index: 0, end_index: 370 },
+  { id: 682647, distance_meters: 999.5, elapsed_time_seconds: 392, average_speed: 2.8804, average_heartrate: 110, start_index: 370, end_index: 718 },
+  { id: 682648, distance_meters: 999.5, elapsed_time_seconds: 373, average_speed: 2.7997, average_heartrate: 107, start_index: 718, end_index: 1076 },
+  { id: 682649, distance_meters: 1003, elapsed_time_seconds: 321, average_speed: 3.1246, average_heartrate: 110, start_index: 1076, end_index: 1397 },
+  { id: 682650, distance_meters: 996.5, elapsed_time_seconds: 297, average_speed: 3.3552, average_heartrate: 109, start_index: 1397, end_index: 1694 },
+  { id: 682651, distance_meters: 1000, elapsed_time_seconds: 398, average_speed: 2.5126, average_heartrate: 114, start_index: 1694, end_index: 2092 },
+  { id: 682652, distance_meters: 1002, elapsed_time_seconds: 1391, average_speed: 2.6508, average_heartrate: 107, start_index: 2092, end_index: 2471 },
+  { id: 682653, distance_meters: 999.5, elapsed_time_seconds: 561, average_speed: 2.761, average_heartrate: 104, start_index: 2471, end_index: 2836 },
+  { id: 682654, distance_meters: 998.5, elapsed_time_seconds: 321, average_speed: 3.1106, average_heartrate: 103, start_index: 2836, end_index: 3157 },
+  { id: 682655, distance_meters: 1002.5, elapsed_time_seconds: 370, average_speed: 2.7095, average_heartrate: 108, start_index: 3157, end_index: 3527 }
+];
+
+await runTest("interval detector finds mixed sets with rest inside the lap", () => {
+  // COROS: спортсмен жмёт круг раз на повтор, отдых записан внутрь того же круга
+  const structure = intervalsDetectorModule.detectWorkoutIntervals(LAPS_58206, {
+    average_speed: 3.973
+  });
+
+  assert.ok(structure);
+  assert.deepEqual(
+    structure.sets.map((set) => set.label),
+    ["3×1000 м", "5×400 м"]
+  );
+  assert.equal(structure.sets[0].pace_seconds_per_km, 201);
+  assert.equal(structure.sets[1].pace_seconds_per_km, 186);
+  assert.equal(structure.work_lap_ids.length, 8);
+  // разминочные и заключительные километры остаются вне разметки
+  assert.equal(structure.work_lap_ids.includes(LAPS_58206[0].id), false);
+  assert.equal(structure.work_lap_ids.includes(LAPS_58206[LAPS_58206.length - 1].id), false);
+  // отрезки отдаются с индексами стрима — по ним рисуются полосы на графиках
+  assert.ok(structure.segments.every((segment) => segment.start_index !== null));
+});
+
+await runTest("interval detector separates sets of different rep length", () => {
+  // 5×1200 по 3:28 и 10×200 по 3:09: единым порогом темпа они не разделяются
+  const structure = intervalsDetectorModule.detectWorkoutIntervals(LAPS_2832, {
+    average_speed: 3.829
+  });
+
+  assert.ok(structure);
+  assert.deepEqual(
+    structure.sets.map((set) => set.label),
+    ["5×1,2 км", "10×200 м"]
+  );
+});
+
+await runTest("interval detector ignores an even long run", () => {
+  // 21 км ровным темпом, нарезка автокругами часов
+  assert.equal(
+    intervalsDetectorModule.detectWorkoutIntervals(LAPS_52506, { average_speed: 3.715 }),
+    null
+  );
+});
+
+await runTest("interval detector ignores a progression run", () => {
+  // 6 км с разгоном 6:18 -> 5:34: структуры повторов нет
+  assert.equal(
+    intervalsDetectorModule.detectWorkoutIntervals(LAPS_51112, { average_speed: 2.853 }),
+    null
+  );
+});
+
+await runTest("interval detector ignores pace swings on watch auto-splits", () => {
+  // 10 км с разбросом темпа по километрам и без подтверждения пульсом
+  assert.equal(
+    intervalsDetectorModule.detectWorkoutIntervals(LAPS_50433, { average_speed: 2.836 }),
+    null
+  );
+});
+
+await runTest("interval detector needs laps to work with", () => {
+  assert.equal(intervalsDetectorModule.detectWorkoutIntervals([], { average_speed: 3 }), null);
+  assert.equal(
+    intervalsDetectorModule.detectWorkoutIntervals(LAPS_58206.slice(0, 2), { average_speed: 3.973 }),
+    null
+  );
 });
 
 console.log("All server tests passed.");

@@ -6,6 +6,7 @@ import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
 import { WorkoutComments } from "../components/WorkoutComments";
 import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
+import { buildIntervalBands } from "../chart/interval-bands";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
 import { useApi } from "../hooks/useApi";
 import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
@@ -77,6 +78,14 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const heartRateChart = useMemo(
     () => prepareHeartRateChart(data?.streams ?? null, data?.workout ?? null),
     [data]
+  );
+  const intervals = useMemo(
+    () => buildIntervalBands(data?.streams ?? null, data?.structure ?? null),
+    [data]
+  );
+  const workLapIds = useMemo(
+    () => new Set(data?.structure?.work_lap_ids ?? []),
+    [data?.structure]
   );
 
   useEffect(() => {
@@ -708,6 +717,11 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
                 {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
               </p>
+              {data.structure ? (
+                <span className="workout-structure-badge">
+                  Интервалы · {data.structure.sets.map((set) => set.label).join(" + ")}
+                </span>
+              ) : null}
               {data.workout.gps_fix?.is_corrected ? (
                 <span className="muted workout-gps-fix-badge">
                   {data.workout.gps_fix.kind === "manual_distance"
@@ -768,6 +782,21 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           {hasSyntheticCorrectedSplits ? (
             <p className="muted">Сплиты восстановлены приближённо по исправленной сводке тренировки.</p>
           ) : null}
+          {data.structure ? (
+            <div className="interval-summary">
+              {data.structure.sets.map((set, index) => (
+                <span key={`${set.label}-${index}`} className="interval-summary-chip">
+                  <strong>{set.label}</strong>
+                  <span className="interval-summary-pace">
+                    {formatPaceSeconds(set.pace_seconds_per_km)}
+                  </span>
+                  {set.average_heartrate ? (
+                    <span className="interval-summary-heart">♥ {set.average_heartrate}</span>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {data.laps.length ? (
             <div className="lap-report-wrap">
               <table className="lap-report-table" aria-label="Статистика по кругам">
@@ -791,7 +820,10 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 </thead>
                 <tbody>
                   {data.laps.map((lap, index) => (
-                    <tr key={lap.id} className="lap-report-row">
+                    <tr
+                      key={lap.id}
+                      className={`lap-report-row${workLapIds.has(lap.id) ? " lap-report-row-work" : ""}`}
+                    >
                       <td className="lap-report-index">{index + 1}</td>
                       <td className="lap-report-distance">{formatLapDistanceKilometers(lap.distance_meters)}</td>
                       <td className="lap-report-time">{formatLapTime(lap.elapsed_time_seconds)}</td>
@@ -823,12 +855,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             model={paceChart}
             color="var(--chart-pace)"
             formatter={formatPaceSeconds}
+            bands={intervals.bands}
+            bandLabels={intervals.labels}
           />
           <StreamChart
             title="Пульс"
             model={heartRateChart}
             color="var(--chart-hr)"
             formatter={(value) => `${Math.round(value)}`}
+            bands={intervals.bands}
           />
           {/* Разбор тренера — приватный: одногруппникам не показываем */}
           {canEdit ? (
