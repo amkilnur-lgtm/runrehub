@@ -209,17 +209,31 @@ function buildBlocks(laps: PreparedLap[]): Block[] {
   }));
 }
 
+// GPS меряет повтор в 400 м как 391–409, поэтому подпись притягиваем к ходовым
+// дистанциям — иначе в сводке появляется «5×390 м».
+const STANDARD_REP_DISTANCES = [
+  100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 1600, 2000, 3000, 5000
+];
+
 function formatDistanceLabel(distanceMeters: number) {
-  if (distanceMeters >= 950 && distanceMeters <= 1050) {
+  const snapped =
+    STANDARD_REP_DISTANCES.find(
+      (candidate) => Math.abs(distanceMeters - candidate) <= candidate * 0.08
+    ) ?? distanceMeters;
+
+  // километровые повторы принято писать «1000 м», а не «1 км»
+  if (snapped === 1000) {
     return "1000 м";
   }
 
-  if (distanceMeters >= 1000) {
-    return `${(distanceMeters / 1000).toFixed(1).replace(".", ",")} км`;
+  if (snapped >= 1000) {
+    const kilometers = snapped / 1000;
+    const text = Number.isInteger(kilometers) ? `${kilometers}` : kilometers.toFixed(1);
+    return `${text.replace(".", ",")} км`;
   }
 
-  const step = distanceMeters < 400 ? 10 : 50;
-  return `${Math.round(distanceMeters / step) * step} м`;
+  const step = snapped < 400 ? 10 : 50;
+  return `${Math.round(snapped / step) * step} м`;
 }
 
 export function detectWorkoutIntervals(
