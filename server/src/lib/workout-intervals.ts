@@ -60,6 +60,12 @@ const P = {
   SET_PACE_CV: 0.08,
   SET_PACE_VS_AVERAGE: 0.95, // серия должна быть быстрее среднего темпа тренировки
   PAIR_MIN_METERS: 400, // серия из двух повторов — только если повторы длинные
+  SOLO_MIN_METERS: 800, // одиночный темповый блок: минимальная длина
+  SOLO_MIN_SECONDS: 180,
+  SOLO_PACE_VS_AVERAGE: 0.85, // и минимум на 15% быстрее среднего темпа тренировки
+  SOLO_PACE_VS_REPEATS: 1.45, // и не сильно медленнее самой медленной серии повторов
+  GROW_REACH_MIN: 2, // доращивание серии: минимальный охват в блоках
+  GROW_REACH_MAX: 4,
   MAX_WORK_TIME_SHARE: 0.6,
   STUB_METERS: 200, // огрызок записи в начале/конце — не отдых и не повтор
   MICRO_METERS: 60, // мусор от двойного нажатия кнопки круга
@@ -236,6 +242,18 @@ function formatDistanceLabel(distanceMeters: number) {
   return `${Math.round(snapped / step) * step} м`;
 }
 
+// Одиночный длинный блок — это темповый отрезок (2 км в темпе перед интервалами,
+// километр после них). Повторов у него нет, поэтому спрашиваем строже: заметная
+// длина и явный отрыв от среднего темпа тренировки.
+function isSoloWorkBlock(block: Block, averagePace: number, slowestRepeatPace: number) {
+  return (
+    block.distance >= P.SOLO_MIN_METERS &&
+    block.moving >= P.SOLO_MIN_SECONDS &&
+    block.pace <= averagePace * P.SOLO_PACE_VS_AVERAGE &&
+    block.pace <= slowestRepeatPace * P.SOLO_PACE_VS_REPEATS
+  );
+}
+
 export function detectWorkoutIntervals(
   laps: WorkoutIntervalLap[],
   workout: { average_speed?: number | null } | null
@@ -303,7 +321,7 @@ export function detectWorkoutIntervals(
     }
   }
 
-  const sets = clusters
+  const repeatSets = clusters
     .map((cluster) => cluster.sort((a, b) => a.index - b.index))
     .filter((cluster) => {
       if (cluster.length < 2) {
@@ -327,21 +345,25 @@ export function detectWorkoutIntervals(
       return coefficientOfVariation(cluster.map((item) => item.pace)) <= P.SET_PACE_CV;
     });
 
-  if (!sets.length) {
+  if (!repeatSets.length) {
     return null;
   }
 
   // Доращиваем подтверждённую серию соседними похожими блоками: «4 из 7
   // одинаковых отрезков подсвечены» читается как ошибка.
-  for (const cluster of sets) {
+  for (const cluster of repeatSets) {
     let grew = true;
     while (grew) {
       grew = false;
       const clusterPace = median(cluster.map((item) => item.pace));
       const clusterDistance = median(cluster.map((item) => item.distance));
-      const indexes = cluster.map((item) => item.index);
-      const from = Math.min(...indexes) - 2;
-      const to = Math.max(...indexes) + 2;
+      const indexes = cluster.map((item) => item.index).sort((a, b) => a - b);
+      // Дотягиваемся на шаг самой серии: в связке «800 + рывок 200 + трусца»
+      // повторы идут через 3 блока, и фиксированное окно теряло первый из них.
+      const steps = indexes.slice(1).map((value, position) => value - indexes[position]);
+      const reach = Math.max(P.GROW_REACH_MIN, Math.min(median(steps) || 0, P.GROW_REACH_MAX));
+      const from = indexes[0] - reach;
+      const to = indexes[indexes.length - 1] + reach;
 
       for (const block of blocks) {
         if (cluster.includes(block) || block.index < from || block.index > to) {
@@ -369,6 +391,21 @@ export function detectWorkoutIntervals(
       cluster.sort((a, b) => a.index - b.index);
     }
   }
+
+  // Темповый отрезок рядом с интервалами (2 км в темпе до серии, километр после
+  // неё). Повторов у него нет, поэтому опираемся на сами повторы: работой он
+  // считается, только если бежался в темпе, сопоставимом с ними. Средний темп
+  // тренировки как единственный ориентир не годится — его занижают долгие
+  // прогулки между повторами, и тогда в работу попадает разминка.
+  const slowestRepeatPace = Math.max(
+    ...repeatSets.map((cluster) => median(cluster.map((item) => item.pace)))
+  );
+  const claimedByRepeats = new Set(repeatSets.flat().map((block) => block.index));
+  const soloSets = clusters
+    .filter((cluster) => cluster.length === 1 && !claimedByRepeats.has(cluster[0].index))
+    .filter((cluster) => isSoloWorkBlock(cluster[0], averagePace, slowestRepeatPace));
+
+  const sets = [...repeatSets, ...soloSets];
 
   // Соседние серии могут дорасти до одного и того же блока — тогда отрезок попал
   // бы в разметку дважды (двойная полоса на графике). Оставляем его той серии,
@@ -412,15 +449,28 @@ export function detectWorkoutIntervals(
     }
   }
 
-  const survivingSets = sets.filter((cluster) => cluster.length >= 2);
+  // Серия могла потерять блок при разрешении конфликта: оставшийся одиночкой
+  // блок сохраняем, только если он проходит как самостоятельный темповый отрезок.
+  const survivingSets = sets.filter(
+    (cluster) =>
+      cluster.length >= 2 ||
+      (cluster.length === 1 && isSoloWorkBlock(cluster[0], averagePace, slowestRepeatPace))
+  );
   if (!survivingSets.length) {
     return null;
   }
 
   const workBlocks = survivingSets.flat();
   const totalMoving = prepared.reduce((total, lap) => total + lap.moving, 0) || 1;
-  const workMoving = workBlocks.reduce((total, block) => total + block.moving, 0);
-  if (workMoving / totalMoving > P.MAX_WORK_TIME_SHARE) {
+  // Ограничение доли работы защищает от разметки обычного бега как серии повторов,
+  // поэтому считаем его по сериям. Темповые блоки в него не входят: у длинной
+  // темповой тренировки работа честно занимает большую часть времени, а от захвата
+  // всей пробежки такой блок удерживает требование быть быстрее её среднего темпа.
+  const repeatMoving = repeatSets
+    .flat()
+    .filter((block) => survivingSets.some((cluster) => cluster.includes(block)))
+    .reduce((total, block) => total + block.moving, 0);
+  if (repeatMoving / totalMoving > P.MAX_WORK_TIME_SHARE) {
     return null;
   }
 
@@ -469,7 +519,10 @@ export function detectWorkoutIntervals(
       pace_seconds_per_km: Math.round(setPace),
       moving_time_seconds: Math.round(median(cluster.map((item) => item.moving))),
       average_heartrate: setHeartRates.length ? Math.round(median(setHeartRates)) : null,
-      label: `${cluster.length}×${formatDistanceLabel(setDistance)}`
+      label:
+        cluster.length > 1
+          ? `${cluster.length}×${formatDistanceLabel(setDistance)}`
+          : formatDistanceLabel(setDistance)
     });
 
     for (const block of cluster) {
