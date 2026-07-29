@@ -263,7 +263,12 @@ export function detectWorkoutIntervals(
     return null;
   }
 
-  const blocks = buildBlocks(prepared).filter((block) => block.isValid && !block.isStub);
+  const allBlocks = buildBlocks(prepared);
+  // Огрызок записи по краям не может быть ни повтором, ни эталоном отдыха, но
+  // дорастить им подтверждённую серию можно: последнее ускорение часто обрывается
+  // вместе с записью — «4×100» вместо пяти читается как ошибка.
+  const blocks = allBlocks.filter((block) => block.isValid && !block.isStub);
+  const growable = allBlocks.filter((block) => block.isValid);
   if (blocks.length < P.MIN_BLOCKS) {
     return null;
   }
@@ -365,7 +370,7 @@ export function detectWorkoutIntervals(
       const from = indexes[0] - reach;
       const to = indexes[indexes.length - 1] + reach;
 
-      for (const block of blocks) {
+      for (const block of growable) {
         if (cluster.includes(block) || block.index < from || block.index > to) {
           continue;
         }
@@ -422,7 +427,7 @@ export function detectWorkoutIntervals(
       continue;
     }
 
-    const block = blocks.find((item) => item.index === blockIndex);
+    const block = allBlocks.find((item) => item.index === blockIndex);
     if (!block) {
       continue;
     }
