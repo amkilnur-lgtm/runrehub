@@ -91,11 +91,12 @@ export type IntervalBand = {
   left: string;
   width: string;
   setIndex: number;
+  from: number;
+  to: number;
 };
 
 export type IntervalBandLabel = {
-  left: string;
-  width: string;
+  center: string;
   label: string;
 };
 

@@ -1,5 +1,9 @@
+import { useLayoutEffect, useRef } from "react";
+
 import { CHART_HEIGHT, CHART_WIDTH } from "../chart/chart-utils";
 import { ChartModel, IntervalBand, IntervalBandLabel } from "../types/workout";
+
+const LABEL_MIN_GAP_PX = 8;
 
 export function StreamChart({
   title,
@@ -16,6 +20,54 @@ export function StreamChart({
   bands?: IntervalBand[];
   bandLabels?: IntervalBandLabel[];
 }) {
+  const labelsRef = useRef<HTMLDivElement | null>(null);
+
+  // Подписи серий стоят по центру своей группы полос и не обрезаются по её
+  // ширине, поэтому на узком экране соседние могут наехать друг на друга.
+  // Замеряем после отрисовки: крайние подтягиваем внутрь графика, наехавшие прячем.
+  useLayoutEffect(() => {
+    const row = labelsRef.current;
+    if (!row) {
+      return undefined;
+    }
+
+    const layout = () => {
+      const items = Array.from(row.querySelectorAll<HTMLElement>(".chart-band-label"));
+      for (const item of items) {
+        item.style.transform = "translateX(-50%)";
+        item.style.visibility = "";
+      }
+
+      const rowBox = row.getBoundingClientRect();
+      for (const item of items) {
+        const box = item.getBoundingClientRect();
+        const overflowLeft = rowBox.left - box.left;
+        const overflowRight = box.right - rowBox.right;
+        const shift = overflowLeft > 0 ? overflowLeft : overflowRight > 0 ? -overflowRight : 0;
+        if (shift) {
+          item.style.transform = `translateX(calc(-50% + ${Math.round(shift)}px))`;
+        }
+      }
+
+      let lastRight = Number.NEGATIVE_INFINITY;
+      for (const item of items) {
+        const box = item.getBoundingClientRect();
+        if (box.left < lastRight + LABEL_MIN_GAP_PX) {
+          item.style.visibility = "hidden";
+          continue;
+        }
+
+        lastRight = box.right;
+      }
+    };
+
+    layout();
+    const observer = new ResizeObserver(layout);
+    observer.observe(row);
+
+    return () => observer.disconnect();
+  }, [bandLabels]);
+
   if (!model) {
     return (
       <div className="chart-card">
@@ -46,12 +98,12 @@ export function StreamChart({
       {bandLabels.length ? (
         <div className="chart-x-wrap chart-band-label-row">
           <div />
-          <div className="chart-band-labels">
+          <div className="chart-band-labels" ref={labelsRef}>
             {bandLabels.map((item) => (
               <span
-                key={`${item.label}-${item.left}`}
+                key={`${item.label}-${item.center}`}
                 className="chart-band-label"
-                style={{ left: item.left, width: item.width }}
+                style={{ left: item.center }}
               >
                 {item.label}
               </span>
