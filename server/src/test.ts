@@ -422,4 +422,84 @@ await runTest("interval detector needs laps to work with", () => {
   );
 });
 
+// #58228, average_speed=3.571
+const LAPS_58228 = [
+  { id: 705352, distance_meters: 2000.5, elapsed_time_seconds: 659, average_speed: 3.0357, average_heartrate: 111, start_index: 0, end_index: 659 },
+  { id: 705353, distance_meters: 1001.5, elapsed_time_seconds: 248, average_speed: 4.0383, average_heartrate: 133, start_index: 659, end_index: 907 },
+  { id: 705354, distance_meters: 164, elapsed_time_seconds: 1458, average_speed: 2.5231, average_heartrate: 120, start_index: 907, end_index: 973 },
+  { id: 705355, distance_meters: 994, elapsed_time_seconds: 196, average_speed: 5.0714, average_heartrate: 147, start_index: 973, end_index: 1169 },
+  { id: 705356, distance_meters: 998, elapsed_time_seconds: 194, average_speed: 5.1443, average_heartrate: 168, start_index: 1169, end_index: 1363 },
+  { id: 705357, distance_meters: 14, elapsed_time_seconds: 188, average_speed: 2.8, average_heartrate: 136, start_index: 1363, end_index: 1369 },
+  { id: 705358, distance_meters: 391, elapsed_time_seconds: 70, average_speed: 5.5857, average_heartrate: 144, start_index: 1369, end_index: 1439 },
+  { id: 705359, distance_meters: 226.5, elapsed_time_seconds: 109, average_speed: 2.078, average_heartrate: 143, start_index: 1439, end_index: 1548 },
+  { id: 705360, distance_meters: 394.5, elapsed_time_seconds: 71, average_speed: 5.5563, average_heartrate: 148, start_index: 1548, end_index: 1619 },
+  { id: 705361, distance_meters: 213, elapsed_time_seconds: 88, average_speed: 2.4205, average_heartrate: 150, start_index: 1619, end_index: 1707 },
+  { id: 705362, distance_meters: 392, elapsed_time_seconds: 72, average_speed: 5.4444, average_heartrate: 153, start_index: 1707, end_index: 1779 },
+  { id: 705363, distance_meters: 217, elapsed_time_seconds: 94, average_speed: 2.3085, average_heartrate: 148, start_index: 1779, end_index: 1873 },
+  { id: 705364, distance_meters: 392, elapsed_time_seconds: 70, average_speed: 5.6, average_heartrate: 155, start_index: 1873, end_index: 1943 },
+  { id: 705365, distance_meters: 222, elapsed_time_seconds: 98, average_speed: 2.2653, average_heartrate: 148, start_index: 1943, end_index: 2041 },
+  { id: 705366, distance_meters: 397, elapsed_time_seconds: 72, average_speed: 5.5139, average_heartrate: 153, start_index: 2041, end_index: 2113 },
+  { id: 705367, distance_meters: 221, elapsed_time_seconds: 95, average_speed: 2.3263, average_heartrate: 149, start_index: 2113, end_index: 2208 },
+  { id: 705368, distance_meters: 401, elapsed_time_seconds: 73, average_speed: 5.4932, average_heartrate: 154, start_index: 2208, end_index: 2281 },
+  { id: 705369, distance_meters: 34, elapsed_time_seconds: 310, average_speed: 0.281, average_heartrate: 131, start_index: 2281, end_index: 2404 },
+  { id: 705370, distance_meters: 993, elapsed_time_seconds: 221, average_speed: 4.4932, average_heartrate: 148, start_index: 2404, end_index: 2625 },
+  { id: 705371, distance_meters: 1335.7, elapsed_time_seconds: 757, average_speed: 2.9356, average_heartrate: 122, start_index: 2625, end_index: 3082 }
+];
+
+// #58249, average_speed=3.015
+const LAPS_58249 = [
+  { id: 705422, distance_meters: 795.6, elapsed_time_seconds: 208, average_speed: 3.825, average_heartrate: 137, start_index: 0, end_index: 208 },
+  { id: 705423, distance_meters: 195.9, elapsed_time_seconds: 41, average_speed: 4.7783, average_heartrate: 155, start_index: 208, end_index: 249 },
+  { id: 705424, distance_meters: 221.8, elapsed_time_seconds: 169, average_speed: 1.4039, average_heartrate: 130, start_index: 249, end_index: 408 },
+  { id: 705425, distance_meters: 797.3, elapsed_time_seconds: 201, average_speed: 3.9665, average_heartrate: 145, start_index: 408, end_index: 609 },
+  { id: 705426, distance_meters: 202.5, elapsed_time_seconds: 43, average_speed: 4.7093, average_heartrate: 158, start_index: 609, end_index: 652 },
+  { id: 705427, distance_meters: 218.2, elapsed_time_seconds: 180, average_speed: 1.9307, average_heartrate: 127, start_index: 652, end_index: 766 },
+  { id: 705428, distance_meters: 799.7, elapsed_time_seconds: 202, average_speed: 3.9589, average_heartrate: 144, start_index: 766, end_index: 968 },
+  { id: 705429, distance_meters: 201.6, elapsed_time_seconds: 42, average_speed: 4.7988, average_heartrate: 159, start_index: 968, end_index: 1010 },
+  { id: 705430, distance_meters: 255.6, elapsed_time_seconds: 194, average_speed: 1.3173, average_heartrate: 125, start_index: 1010, end_index: 1204 },
+  { id: 705431, distance_meters: 802.6, elapsed_time_seconds: 202, average_speed: 3.9731, average_heartrate: 144, start_index: 1204, end_index: 1406 },
+  { id: 705432, distance_meters: 200.7, elapsed_time_seconds: 43, average_speed: 4.667, average_heartrate: 160, start_index: 1406, end_index: 1449 },
+  { id: 705433, distance_meters: 239.3, elapsed_time_seconds: 196, average_speed: 1.2209, average_heartrate: 126, start_index: 1449, end_index: 1645 },
+  { id: 705434, distance_meters: 804, elapsed_time_seconds: 201, average_speed: 4.0001, average_heartrate: 146, start_index: 1645, end_index: 1846 },
+  { id: 705435, distance_meters: 196.4, elapsed_time_seconds: 38, average_speed: 5.1684, average_heartrate: 163, start_index: 1846, end_index: 1884 },
+  { id: 705436, distance_meters: 26.9, elapsed_time_seconds: 330, average_speed: 2.0662, average_heartrate: 161, start_index: 1884, end_index: 1898 },
+  { id: 705437, distance_meters: 93.6, elapsed_time_seconds: 16, average_speed: 5.8519, average_heartrate: 115, start_index: 1898, end_index: 1914 },
+  { id: 705438, distance_meters: 99.8, elapsed_time_seconds: 61, average_speed: 1.6359, average_heartrate: 129, start_index: 1914, end_index: 1975 },
+  { id: 705439, distance_meters: 100.2, elapsed_time_seconds: 18, average_speed: 5.5678, average_heartrate: 126, start_index: 1975, end_index: 1993 },
+  { id: 705440, distance_meters: 115.5, elapsed_time_seconds: 79, average_speed: 1.4624, average_heartrate: 127, start_index: 1993, end_index: 2072 },
+  { id: 705441, distance_meters: 106.8, elapsed_time_seconds: 17, average_speed: 6.2806, average_heartrate: 124, start_index: 2072, end_index: 2089 },
+  { id: 705442, distance_meters: 131.3, elapsed_time_seconds: 95, average_speed: 1.3819, average_heartrate: 124, start_index: 2089, end_index: 2184 },
+  { id: 705443, distance_meters: 104.1, elapsed_time_seconds: 18, average_speed: 5.7817, average_heartrate: 121, start_index: 2184, end_index: 2202 },
+  { id: 705444, distance_meters: 129.5, elapsed_time_seconds: 82, average_speed: 1.5788, average_heartrate: 127, start_index: 2202, end_index: 2284 },
+  { id: 705445, distance_meters: 107.9, elapsed_time_seconds: 17, average_speed: 6.3471, average_heartrate: 124, start_index: 2284, end_index: 2301 }
+];
+
+await runTest("interval detector marks tempo blocks next to the repeats", () => {
+  // 2 км в темпе до серии и километр после неё — работа, хотя повторов у них нет
+  const structure = intervalsDetectorModule.detectWorkoutIntervals(LAPS_58228, {
+    average_speed: 3.571
+  });
+
+  assert.ok(structure);
+  assert.deepEqual(
+    structure.sets.map((set) => set.label),
+    ["2 км", "6×400 м", "1000 м"]
+  );
+  // разминочные 2 км по 5:29 работой не считаются
+  assert.equal(structure.work_lap_ids.includes(LAPS_58228[0].id), false);
+});
+
+await runTest("interval detector catches a repeat that opens the workout", () => {
+  // 5×(800 + рывок 200): первый повтор идёт самым первым кругом, слева от него
+  // нет восстановления, а справа рывок быстрее — контраста нет ни с одной стороны
+  const structure = intervalsDetectorModule.detectWorkoutIntervals(LAPS_58249, {
+    average_speed: 3.015
+  });
+
+  assert.ok(structure);
+  const eightHundreds = structure.sets.find((set) => set.label.startsWith("5×800"));
+  assert.ok(eightHundreds);
+  assert.equal(structure.work_lap_ids.includes(LAPS_58249[0].id), true);
+});
+
 console.log("All server tests passed.");
