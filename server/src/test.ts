@@ -500,6 +500,9 @@ await runTest("interval detector catches a repeat that opens the workout", () =>
   const eightHundreds = structure.sets.find((set) => set.label.startsWith("5×800"));
   assert.ok(eightHundreds);
   assert.equal(structure.work_lap_ids.includes(LAPS_58249[0].id), true);
+  // последнее ускорение обрывается вместе с записью — «4×100» вместо пяти
+  assert.ok(structure.sets.some((set) => set.label === "5×100 м"));
+  assert.equal(structure.work_lap_ids.includes(LAPS_58249[LAPS_58249.length - 1].id), true);
 });
 
 console.log("All server tests passed.");
