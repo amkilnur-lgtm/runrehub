@@ -505,4 +505,43 @@ await runTest("interval detector catches a repeat that opens the workout", () =>
   assert.equal(structure.work_lap_ids.includes(LAPS_58249[LAPS_58249.length - 1].id), true);
 });
 
+await runTest("intervals stream parser fills null holes instead of dropping the stream", () => {
+  // Suunto: первые секунды до захвата спутников + пауза внутри записи приходят как null,
+  // строгий парсер выбрасывал весь distance — тренировка оставалась без потока дистанции
+  const distance = intervalsModule.parseInterpolatedNumberStream([0, null, null, 300, 400, null, 600]);
+  assert.equal(distance.length, 7);
+  assert.deepEqual(distance, [0, 100, 200, 300, 400, 500, 600]);
+
+  // хвост и голова без значений — держим ближайшее известное, длина не меняется
+  assert.deepEqual(
+    intervalsModule.parseInterpolatedNumberStream([null, null, 170, 172, null]),
+    [170, 170, 170, 172, 172]
+  );
+
+  // поток без единого числа по-прежнему пустой, чужие типы не ломают разбор
+  assert.deepEqual(intervalsModule.parseInterpolatedNumberStream([null, null]), []);
+  assert.deepEqual(intervalsModule.parseInterpolatedNumberStream(undefined), []);
+  assert.deepEqual(intervalsModule.parseInterpolatedNumberStream(["12", null, 4]), [4, 4, 4]);
+});
+
+await runTest("latlng zip keeps index alignment when points are missing", () => {
+  const pairs = intervalsModule.zipLatLng({
+    type: "latlng",
+    data: [null, 54.72, 54.73, null, null, 54.75],
+    data2: [null, 55.94, 55.95, null, null, 55.97]
+  });
+
+  assert.equal(pairs.length, 6);
+  // до первой точки — первая известная, в дырке — последняя известная (стоянка на месте)
+  assert.deepEqual(pairs[0], [54.72, 55.94]);
+  assert.deepEqual(pairs[3], [54.73, 55.95]);
+  assert.deepEqual(pairs[4], [54.73, 55.95]);
+  assert.deepEqual(pairs[5], [54.75, 55.97]);
+
+  assert.deepEqual(
+    intervalsModule.zipLatLng({ type: "latlng", data: [null, null], data2: [null, null] }),
+    []
+  );
+});
+
 console.log("All server tests passed.");
