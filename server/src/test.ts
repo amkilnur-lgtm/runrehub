@@ -563,4 +563,40 @@ await runTest("activity name drops intervals.icu summaries built on broken GPS",
   );
 });
 
+await runTest("intervals credentials check retries a rate-limited request", async () => {
+  const calls: string[] = [];
+  const fetchMock = mock.method(globalThis, "fetch", async (url: string) => {
+    calls.push(String(url));
+    if (calls.length < 3) {
+      // Retry-After в секундах: ждём ровно столько, а не свою паузу
+      return new Response("", { status: 429, headers: { "retry-after": "0" } });
+    }
+    return new Response(JSON.stringify({ id: "i1", name: "Аня" }), { status: 200 });
+  });
+
+  try {
+    const result = await intervalsModule.verifyIntervalsCredentials("i1", "key");
+    assert.deepEqual(result, { ok: true, athleteName: "Аня" });
+    assert.equal(calls.length, 3);
+  } finally {
+    fetchMock.mock.restore();
+  }
+});
+
+await runTest("intervals fetch gives up after the retry budget and reports the failure", async () => {
+  const calls: string[] = [];
+  const fetchMock = mock.method(globalThis, "fetch", async (url: string) => {
+    calls.push(String(url));
+    return new Response("", { status: 429, headers: { "retry-after": "0" } });
+  });
+
+  try {
+    const result = await intervalsModule.verifyIntervalsCredentials("i1", "key");
+    assert.equal(result.ok, false);
+    assert.equal(calls.length, 4); // первый запрос + три повтора
+  } finally {
+    fetchMock.mock.restore();
+  }
+});
+
 console.log("All server tests passed.");

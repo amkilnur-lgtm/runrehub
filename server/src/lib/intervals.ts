@@ -225,10 +225,45 @@ export function normalizeIcuAthleteId(raw: string) {
   return /^\d+$/.test(trimmed) ? `i${trimmed}` : trimmed;
 }
 
+// intervals.icu режет частые запросы 429-м, а глубокий проход по атлету — это два
+// запроса на тренировку. Раньше упёршийся в лимит запрос потоков просто возвращал
+// null, и тренировка молча оставалась со старыми (или пустыми) стримами — так у Тайги
+// накопились 18 тренировок без высоты. Ждём и повторяем: Retry-After, если он есть.
+const RATE_LIMIT_RETRY_DELAYS_MS = [3000, 9000, 20000];
+const MAX_RETRY_AFTER_MS = 30000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(response: Response) {
+  const header = response.headers.get("retry-after");
+  if (!header) {
+    return null;
+  }
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+  }
+  const until = Date.parse(header);
+  return Number.isFinite(until) ? Math.min(Math.max(until - Date.now(), 0), MAX_RETRY_AFTER_MS) : null;
+}
+
 async function intervalsFetch(apiKey: string, path: string) {
-  const response = await fetch(`${INTERVALS_API_BASE}${path}`, {
+  let response = await fetch(`${INTERVALS_API_BASE}${path}`, {
     headers: { Authorization: buildAuthHeader(apiKey) }
   });
+
+  for (const fallbackDelayMs of RATE_LIMIT_RETRY_DELAYS_MS) {
+    if (response.status !== 429) {
+      return response;
+    }
+    await sleep(parseRetryAfterMs(response) ?? fallbackDelayMs);
+    response = await fetch(`${INTERVALS_API_BASE}${path}`, {
+      headers: { Authorization: buildAuthHeader(apiKey) }
+    });
+  }
+
   return response;
 }
 
@@ -524,6 +559,15 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
     if (streamsData) {
       await saveActivityStreams(workoutId, streamsData);
       await applyLapElevationChanges(workoutId, streamsData.altitude);
+    } else {
+      // повторы уже исчерпаны — тренировка осталась со старыми потоками, и молча
+      // такое не заметить: без стримов не считаются ни анализ, ни GPS-фикс
+      addStravaEvent({
+        source: "system",
+        level: "warn",
+        message: "intervals streams unavailable",
+        details: { workoutId, activityId: activity.id }
+      });
     }
     // Авто-фикс GPS при поступлении — только явно битые заезды, не блокируя импорт
     void maybeAutoFixWorkoutGps(userId, workoutId, activity.average_speed).catch((error) => {
@@ -778,7 +822,7 @@ export async function forceAndSyncAllAthletes(): Promise<{
     }
   }
   // даём intervals.icu время подтянуть из COROS
-  await new Promise((resolve) => setTimeout(resolve, 9000));
+  await sleep(9000);
 
   const connected = await pool.query(
     `select ic.user_id, u.full_name from intervals_connections ic join users u on u.id = ic.user_id order by u.full_name`
