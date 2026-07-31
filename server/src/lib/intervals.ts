@@ -9,7 +9,6 @@ import {
   getStoredActivityStreams,
   saveActivityStreams,
   applyLapElevationChanges,
-  parseNumberStream,
   parseLatLngStream,
   type ActivityStreams
 } from "./strava.js";
@@ -90,20 +89,94 @@ function parseLenientNumberStream(values: unknown[] | undefined) {
   return values.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : 0));
 }
 
-function zipLatLng(entry: StreamEntry | undefined) {
+// distance/time/altitude приходят с null по тем же причинам, но для них null — не 0:
+// это накопительные потоки и уровень высоты, ноль сделал бы обрыв и гигантский скачок
+// назад. Строгий parseNumberStream выбрасывал их целиком — у Suunto (150 null из 3200
+// точек: пауза + первые секунды до захвата спутников) так терялся ВЕСЬ distance_stream,
+// из-за чего анализ давал stream_too_short, а GPS-фикс не запускался вовсе (ему нужен
+// distance). Заполняем дырки линейной интерполяцией между соседними известными точками
+// (по краям — ближайшим известным значением), длина и выравнивание сохраняются.
+export function parseInterpolatedNumberStream(values: unknown[] | undefined) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const parsed = values.map((value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : null
+  );
+  const knownIndexes: number[] = [];
+  parsed.forEach((value, index) => {
+    if (value !== null) {
+      knownIndexes.push(index);
+    }
+  });
+  if (!knownIndexes.length) {
+    return [];
+  }
+
+  const filled: number[] = new Array(parsed.length);
+  let cursor = 0;
+  for (let index = 0; index < parsed.length; index += 1) {
+    const value = parsed[index];
+    if (value !== null) {
+      filled[index] = value;
+      continue;
+    }
+    while (cursor < knownIndexes.length && knownIndexes[cursor]! < index) {
+      cursor += 1;
+    }
+    const nextIndex = knownIndexes[cursor];
+    const previousIndex = cursor > 0 ? knownIndexes[cursor - 1] : undefined;
+    if (previousIndex === undefined) {
+      filled[index] = parsed[nextIndex!]!;
+      continue;
+    }
+    if (nextIndex === undefined) {
+      filled[index] = parsed[previousIndex]!;
+      continue;
+    }
+    const ratio = (index - previousIndex) / (nextIndex - previousIndex);
+    filled[index] = parsed[previousIndex]! + (parsed[nextIndex]! - parsed[previousIndex]!) * ratio;
+  }
+
+  return filled;
+}
+
+export function zipLatLng(entry: StreamEntry | undefined) {
   const lats = entry?.data;
   const lngs = entry?.data2;
   if (!Array.isArray(lats) || !Array.isArray(lngs) || lats.length !== lngs.length) {
     return [] as Array<[number, number]>;
   }
 
-  const pairs: Array<[number, number]> = [];
+  // Точки без координат (пауза, потеря спутников) раньше просто выбрасывались — поток
+  // становился короче остальных и СМЕЩАЛСЯ по индексам (у Suunto 695 дырок из 3206),
+  // а по индексам с ним сверяются и GPS-фикс, и подсветка кругов. Держим последнюю
+  // известную точку (в паузе спортсмен и правда стоит на месте), в начале — первую
+  // известную: длина совпадает с остальными потоками, ложного перемещения нет.
+  const pairs: Array<[number, number]> = new Array(lats.length);
+  let lastKnown: [number, number] | null = null;
+  let firstKnownIndex = -1;
   for (let i = 0; i < lats.length; i += 1) {
     const lat = lats[i];
     const lng = lngs[i];
-    if (typeof lat === "number" && typeof lng === "number") {
-      pairs.push([lat, lng]);
+    if (typeof lat === "number" && Number.isFinite(lat) && typeof lng === "number" && Number.isFinite(lng)) {
+      lastKnown = [lat, lng];
+      if (firstKnownIndex < 0) {
+        firstKnownIndex = i;
+      }
     }
+    if (!lastKnown) {
+      continue;
+    }
+    pairs[i] = lastKnown;
+  }
+
+  if (!lastKnown) {
+    return [] as Array<[number, number]>;
+  }
+  for (let i = 0; i < firstKnownIndex; i += 1) {
+    pairs[i] = pairs[firstKnownIndex]!;
   }
   return pairs;
 }
@@ -256,13 +329,13 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
   const latlngEntry = byType.get("latlng");
 
   return {
-    distance: parseNumberStream(numberData("distance")),
-    time: parseNumberStream(numberData("time")),
+    distance: parseInterpolatedNumberStream(numberData("distance")),
+    time: parseInterpolatedNumberStream(numberData("time")),
     // лояльные (null→0, длина сохранена): в этих потоках COROS часто есть null
     // на старте/в паузах, а строгий парсер выбрасывал весь массив
     heartrate: parseLenientNumberStream(numberData("heartrate")),
     cadence: parseLenientNumberStream(numberData("cadence")),
-    altitude: parseNumberStream(numberData("fixed_altitude") ?? numberData("altitude")),
+    altitude: parseInterpolatedNumberStream(numberData("fixed_altitude") ?? numberData("altitude")),
     velocity_smooth: parseLenientNumberStream(numberData("velocity_smooth")),
     latlng:
       latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined),
