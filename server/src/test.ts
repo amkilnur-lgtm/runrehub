@@ -544,4 +544,23 @@ await runTest("latlng zip keeps index alignment when points are missing", () => 
   );
 });
 
+await runTest("activity name drops intervals.icu summaries built on broken GPS", () => {
+  assert.equal(
+    intervalsModule.sanitizeActivityName(
+      "8 x  100м @ 241.9 км/ч   0'14 мин/км Ср. 140 (Макс. 142) уд/мин ;"
+    ),
+    "Тренировка"
+  );
+  // темп из того же сбоя, но без скорости в названии
+  assert.equal(intervalsModule.sanitizeActivityName("5 x 400м 1'02 мин/км"), "Тренировка");
+  assert.equal(intervalsModule.sanitizeActivityName(null), "Тренировка");
+
+  // живые названия не трогаем, включая честную сводку по кругам
+  assert.equal(intervalsModule.sanitizeActivityName("Morning Бег"), "Morning Бег");
+  assert.equal(
+    intervalsModule.sanitizeActivityName("8 x  100м @ 18.5 км/ч   3'14 мин/км ;"),
+    "8 x  100м @ 18.5 км/ч   3'14 мин/км ;"
+  );
+});
+
 console.log("All server tests passed.");

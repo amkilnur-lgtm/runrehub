@@ -142,6 +142,37 @@ export function parseInterpolatedNumberStream(values: unknown[] | undefined) {
   return filled;
 }
 
+// intervals.icu подставляет в название сводку по кругам, посчитанную из данных часов:
+// при GPS-сбое туда попадает мусор вида «8 x 100м @ 241.9 км/ч 0'14 мин/км». Тренировку
+// пересчитает GPS-фикс, а название так и осталось бы кричать про 242 км/ч, поэтому
+// проверяем зашитые в него скорость и темп на правдоподобие и выкидываем нереальные.
+const MAX_REALISTIC_RUN_SPEED_KMH = 32;
+const MIN_REALISTIC_RUN_PACE_SECONDS = 120;
+const FALLBACK_ACTIVITY_NAME = "Тренировка";
+
+export function sanitizeActivityName(rawName: string | null | undefined) {
+  const name = (rawName ?? "").trim();
+  if (!name) {
+    return FALLBACK_ACTIVITY_NAME;
+  }
+
+  for (const match of name.matchAll(/([\d]+[.,]?\d*)\s*(?:км\/ч|km\/h|kph)/gi)) {
+    const speed = Number(match[1]!.replace(",", "."));
+    if (Number.isFinite(speed) && speed > MAX_REALISTIC_RUN_SPEED_KMH) {
+      return FALLBACK_ACTIVITY_NAME;
+    }
+  }
+
+  for (const match of name.matchAll(/(\d+)['′:](\d{2})\s*(?:мин\/км|min\/km)/gi)) {
+    const paceSeconds = Number(match[1]) * 60 + Number(match[2]);
+    if (paceSeconds > 0 && paceSeconds < MIN_REALISTIC_RUN_PACE_SECONDS) {
+      return FALLBACK_ACTIVITY_NAME;
+    }
+  }
+
+  return name;
+}
+
 export function zipLatLng(entry: StreamEntry | undefined) {
   const lats = entry?.data;
   const lngs = entry?.data2;
@@ -426,7 +457,7 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
       [
         userId,
         activity.id,
-        activity.name ?? "Тренировка",
+        sanitizeActivityName(activity.name),
         activity.type ?? "Run",
         activity.start_date,
         activity.distance ?? 0,
