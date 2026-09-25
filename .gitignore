@@ -21,3 +21,6 @@ runrehab-repomix.xml
 # runtime upload artifacts (dev cwd quirk)
 server/server/
 server/uploads/
+
+# deploy credentials (never commit)
+deploy.json
