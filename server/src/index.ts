@@ -8,6 +8,7 @@ import jwt from "@fastify/jwt";
 import fastifyStatic from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
+import { ZodError } from "zod";
 
 import { authRoutes } from "./routes/auth.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -68,9 +69,16 @@ await app.register(rateLimit, {
 
 // --- Глобальный error handler ---
 app.setErrorHandler((error: any, request, reply) => {
-  // Ошибки Zod-валидации
+  // Ошибки валидации: схемы Fastify (error.validation) и .parse() Zod в хендлерах
   if (error.validation) {
     return reply.code(400).send({ message: "Ошибка валидации", details: error.validation });
+  }
+  if (error instanceof ZodError) {
+    return reply.code(400).send({ message: "Ошибка валидации", details: error.issues });
+  }
+  // Postgres не смог привести параметр к типу колонки: /workouts/abc → Number("abc") = NaN
+  if (error.code === "22P02" || error.code === "22003") {
+    return reply.code(400).send({ message: "Некорректный параметр запроса" });
   }
   // JWT-ошибки (неверный / истёкший токен)
   const jwtErrorCodes = new Set([

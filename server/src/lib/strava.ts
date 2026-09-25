@@ -45,6 +45,28 @@ export async function markStravaActivityDeleted(userId: number, stravaActivityId
   );
 }
 
+// Отметка «удалена вручную»: синк не должен импортировать тренировку обратно
+export async function markWorkoutDeleted(workout: {
+  user_id: number;
+  source: string;
+  source_activity_id: string;
+  strava_activity_id: number | string | null;
+}) {
+  const userId = Number(workout.user_id);
+  if (workout.strava_activity_id) {
+    await markStravaActivityDeleted(userId, Number(workout.strava_activity_id));
+  }
+  await pool.query(
+    `
+      insert into deleted_source_activities (source, source_activity_id, user_id)
+      values ($1, $2, $3)
+      on conflict (source, source_activity_id) do update
+      set deleted_at = now()
+    `,
+    [workout.source, workout.source_activity_id, userId]
+  );
+}
+
 export function getTokenEncryptionKey() {
   if (!config.STRAVA_TOKEN_ENCRYPTION_KEY) {
     return null;

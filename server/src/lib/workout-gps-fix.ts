@@ -191,7 +191,7 @@ type StoredCorrectionRow = {
   removed_segments: RemovedSegment[] | null;
   corrected_streams: CorrectedStreamsPayload | null;
   corrected_laps: CorrectedLapPayload[] | null;
-  created_by_user_id: number;
+  created_by_user_id: number | null;
   created_at: string;
   updated_at: string;
 };

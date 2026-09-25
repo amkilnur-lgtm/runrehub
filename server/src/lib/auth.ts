@@ -3,6 +3,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 
 import { AuthUser, AppRole } from "../types.js";
 import { config } from "../config.js";
+import { pool } from "./db.js";
 
 const AUTH_COOKIE = "runrehab_token";
 const AUTH_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -45,8 +46,34 @@ export function clearAuthCookie(reply: FastifyReply) {
   reply.clearCookie(AUTH_COOKIE, insecureAuthCookieOptions);
 }
 
+// Токен живёт 30 дней, а роль, тренер и сам пользователь могут поменяться:
+// подпись проверяем по JWT, но актуальные данные берём из базы
+export async function loadCurrentUser(userId: number): Promise<AuthUser | null> {
+  const { rows } = await pool.query(
+    `select id, username, full_name, avatar_url, role, coach_id from users where id = $1`,
+    [userId]
+  );
+  const user = rows[0];
+  if (!user) {
+    return null;
+  }
+  return {
+    id: user.id,
+    username: user.username,
+    fullName: user.full_name,
+    avatarUrl: user.avatar_url,
+    role: user.role,
+    coachId: user.coach_id
+  };
+}
+
 export async function requireAuth(request: FastifyRequest) {
   await request.jwtVerify();
+  const user = await loadCurrentUser(request.user.id);
+  if (!user) {
+    throw Object.assign(new Error("Не авторизован"), { statusCode: 401 });
+  }
+  request.user = user;
 }
 
 export function requireRole(request: FastifyRequest, roles: AppRole[]) {

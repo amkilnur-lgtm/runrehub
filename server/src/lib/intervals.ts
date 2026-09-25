@@ -1,4 +1,5 @@
 import { FastifyBaseLogger } from "fastify";
+import type pg from "pg";
 
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
@@ -427,7 +428,27 @@ async function fetchActivityLaps(apiKey: string, activityId: string) {
   return (payload.icu_intervals ?? []).filter((lap) => !isRemainderLap(lap));
 }
 
+async function isDeletedActivity(userId: number, activity: IntervalsActivity) {
+  const { rows } = await pool.query(
+    `
+      select 1 from deleted_source_activities
+      where source = 'intervals' and source_activity_id = $1
+      union all
+      select 1 from deleted_strava_activities
+      where user_id = $2 and strava_activity_id::text = $3
+      limit 1
+    `,
+    [activity.id, userId, activity.strava_id ?? ""]
+  );
+  return rows.length > 0;
+}
+
 async function syncSingleIntervalsActivity(userId: number, apiKey: string, activity: IntervalsActivity) {
+  // Удалена тренером или атлетом — обратно не импортируем
+  if (await isDeletedActivity(userId, activity)) {
+    return { workoutId: null, isNewWorkout: false, deduped: true };
+  }
+
   // Тренировка могла уже приехать из Strava раньше — не создаем дубль
   if (activity.strava_id) {
     const { rows } = await pool.query(
@@ -645,16 +666,34 @@ async function maybeAutoFixWorkoutGps(userId: number, workoutId: number, recorde
   });
 }
 
+// Advisory lock живёт в сессии Postgres: берём и снимаем его на одном и том же
+// соединении, иначе unlock уходит в чужое соединение пула и лок остаётся висеть
 async function tryAcquireSyncLock(userId: number) {
-  const { rows } = await pool.query(`select pg_try_advisory_lock($1, $2) as locked`, [
-    INTERVALS_SYNC_LOCK_NAMESPACE,
-    userId
-  ]);
-  return rows[0]?.locked === true;
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(`select pg_try_advisory_lock($1, $2) as locked`, [
+      INTERVALS_SYNC_LOCK_NAMESPACE,
+      userId
+    ]);
+    if (rows[0]?.locked === true) {
+      return client;
+    }
+  } catch (error) {
+    client.release();
+    throw error;
+  }
+  client.release();
+  return null;
 }
 
-async function releaseSyncLock(userId: number) {
-  await pool.query(`select pg_advisory_unlock($1, $2)`, [INTERVALS_SYNC_LOCK_NAMESPACE, userId]);
+async function releaseSyncLock(lockClient: pg.PoolClient, userId: number) {
+  try {
+    await lockClient.query(`select pg_advisory_unlock($1, $2)`, [INTERVALS_SYNC_LOCK_NAMESPACE, userId]);
+    lockClient.release();
+  } catch (error) {
+    // соединение в неизвестном состоянии — выбрасываем его из пула вместе с локом
+    lockClient.release(error instanceof Error ? error : true);
+  }
 }
 
 async function markSyncStarted(userId: number, startedAt: Date) {
@@ -693,8 +732,8 @@ export async function syncIntervalsLatestActivities(
   userId: number,
   options?: { forceDeep?: boolean }
 ): Promise<IntervalsSyncResult> {
-  const lockAcquired = await tryAcquireSyncLock(userId);
-  if (!lockAcquired) {
+  const lockClient = await tryAcquireSyncLock(userId);
+  if (!lockClient) {
     return { synced: false, reason: "already_running" };
   }
 
@@ -742,7 +781,8 @@ export async function syncIntervalsLatestActivities(
     let imported = 0;
     for (const activity of runningActivities) {
       const result = await syncSingleIntervalsActivity(userId, apiKey, activity);
-      if (!result.deduped) {
+      // повторный проход по уже импортированной тренировке — обновление, не импорт
+      if (result.isNewWorkout) {
         imported += 1;
       }
     }
@@ -760,7 +800,7 @@ export async function syncIntervalsLatestActivities(
     await markSyncFailed(userId, error);
     throw error;
   } finally {
-    await releaseSyncLock(userId);
+    await releaseSyncLock(lockClient, userId);
   }
 }
 

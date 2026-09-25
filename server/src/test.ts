@@ -15,6 +15,7 @@ const analysisModule = await import("./lib/workout-analysis.js");
 const gpsFixModule = await import("./lib/workout-gps-fix.js");
 const intervalsDetectorModule = await import("./lib/workout-intervals.js");
 const dbModule = await import("./lib/db.js");
+const authModule = await import("./lib/auth.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 
@@ -71,19 +72,26 @@ await runTest("decryptToken keeps legacy plaintext tokens readable", () => {
 });
 
 await runTest("syncIntervalsLatestActivities returns already_running when advisory lock is busy", async () => {
-  const queryMock = mock.method(dbModule.pool, "query", async (sql: string) => {
-    if (sql.includes("pg_try_advisory_lock")) {
-      return { rows: [{ locked: false }] };
+  let released = 0;
+  const lockClient = {
+    query: async (sql: string) => {
+      if (sql.includes("pg_try_advisory_lock")) {
+        return { rows: [{ locked: false }] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release: () => {
+      released += 1;
     }
-
-    throw new Error(`Unexpected query: ${sql}`);
-  });
+  };
+  const connectMock = mock.method(dbModule.pool, "connect", async () => lockClient);
 
   try {
     const result = await intervalsModule.syncIntervalsLatestActivities(77);
     assert.deepEqual(result, { synced: false, reason: "already_running" });
+    assert.equal(released, 1);
   } finally {
-    queryMock.mock.restore();
+    connectMock.mock.restore();
   }
 });
 
@@ -596,6 +604,39 @@ await runTest("intervals fetch gives up after the retry budget and reports the f
     assert.equal(calls.length, 4); // первый запрос + три повтора
   } finally {
     fetchMock.mock.restore();
+  }
+});
+
+await runTest("requireAuth takes role and coach from the database, not the 30-day token", async () => {
+  const queryMock = mock.method(dbModule.pool, "query", async () => ({
+    rows: [{ id: 5, username: "ivan", full_name: "Иван", avatar_url: null, role: "trainer", coach_id: null }]
+  }));
+  const request = {
+    user: { id: 5, username: "ivan", fullName: "Иван", avatarUrl: null, role: "athlete", coachId: 2 },
+    jwtVerify: async () => {}
+  };
+  try {
+    await authModule.requireAuth(request as never);
+    assert.equal(request.user.role, "trainer");
+    assert.equal(request.user.coachId, null);
+  } finally {
+    queryMock.mock.restore();
+  }
+});
+
+await runTest("requireAuth rejects a valid token of a deleted user with 401", async () => {
+  const queryMock = mock.method(dbModule.pool, "query", async () => ({ rows: [] }));
+  const request = {
+    user: { id: 9, username: "gone", fullName: "Gone", avatarUrl: null, role: "athlete", coachId: 2 },
+    jwtVerify: async () => {}
+  };
+  try {
+    await assert.rejects(authModule.requireAuth(request as never), (error: { statusCode?: number }) => {
+      assert.equal(error.statusCode, 401);
+      return true;
+    });
+  } finally {
+    queryMock.mock.restore();
   }
 });
 

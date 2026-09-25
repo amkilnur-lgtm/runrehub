@@ -12,7 +12,7 @@ import {
   listWorkoutComments
 } from "../lib/social.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
-import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
+import { getStoredActivityStreams, markWorkoutDeleted } from "../lib/strava.js";
 import { analyzeWorkout } from "../lib/workout-analysis.js";
 import {
   applyWorkoutCorrectionToView,
@@ -446,7 +446,7 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     const existingWorkoutResult = await pool.query(
       `
-        select w.user_id, w.strava_activity_id
+        select w.user_id, w.source, w.source_activity_id, w.strava_activity_id
         from workouts w
         join users u on u.id = w.user_id
         where w.id = $1
@@ -454,20 +454,13 @@ export async function trainerRoutes(app: FastifyInstance) {
       `,
       [workoutId, request.user.id]
     );
-    const existingWorkout = existingWorkoutResult.rows[0] as
-      | { user_id: number; strava_activity_id: number | null }
-      | undefined;
+    const existingWorkout = existingWorkoutResult.rows[0];
 
     if (!existingWorkout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
-    if (existingWorkout.strava_activity_id) {
-      await markStravaActivityDeleted(
-        Number(existingWorkout.user_id),
-        Number(existingWorkout.strava_activity_id)
-      );
-    }
+    await markWorkoutDeleted(existingWorkout);
 
     const { rowCount } = await pool.query(
       `
@@ -536,7 +529,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     );
 
     if (!result.rows[0]) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
     return { ok: true, coachComment: result.rows[0].coach_comment ?? null };
@@ -677,7 +670,7 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     const workout = workoutResult.rows[0];
     if (!workout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
     const lapsResult = await pool.query(
@@ -703,7 +696,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       Math.round(body.distanceKm * 1000)
     );
     if (!preview) {
-      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕСЃС‚СЂРѕРёС‚СЊ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂ РґР»СЏ РЅРѕРІРѕР№ РґРёСЃС‚Р°РЅС†РёРё" });
+      return reply.code(400).send({ message: "Не удалось построить предпросмотр для новой дистанции" });
     }
 
     return {
@@ -739,7 +732,7 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     const workout = workoutResult.rows[0];
     if (!workout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
     const lapsResult = await pool.query(
@@ -765,7 +758,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       Math.round(body.distanceKm * 1000)
     );
     if (!preview) {
-      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРјРµРЅРёС‚СЊ РЅРѕРІСѓСЋ РґРёСЃС‚Р°РЅС†РёСЋ" });
+      return reply.code(400).send({ message: "Не удалось применить новую дистанцию" });
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_distance", preview);
@@ -799,7 +792,7 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     const workout = workoutResult.rows[0];
     if (!workout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
     const lapsResult = await pool.query(
@@ -825,7 +818,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       body.movingTimeSeconds
     );
     if (!preview) {
-      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕСЃС‚СЂРѕРёС‚СЊ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂ РґР»СЏ РЅРѕРІРѕРіРѕ РІСЂРµРјРµРЅРё" });
+      return reply.code(400).send({ message: "Не удалось построить предпросмотр для нового времени" });
     }
 
     return {
@@ -861,7 +854,7 @@ export async function trainerRoutes(app: FastifyInstance) {
 
     const workout = workoutResult.rows[0];
     if (!workout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
     const lapsResult = await pool.query(
@@ -887,7 +880,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       body.movingTimeSeconds
     );
     if (!preview) {
-      return reply.code(400).send({ message: "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРјРµРЅРёС‚СЊ РЅРѕРІРѕРµ РІСЂРµРјСЏ" });
+      return reply.code(400).send({ message: "Не удалось применить новое время" });
     }
 
     await upsertWorkoutCorrection(workoutId, request.user.id, "manual_time", preview);

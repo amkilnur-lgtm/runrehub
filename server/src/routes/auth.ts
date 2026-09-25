@@ -63,11 +63,18 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get("/api/auth/me", async (request, reply) => {
     try {
-      await request.jwtVerify();
-      return { user: request.user };
-    } catch {
+      await requireAuth(request);
+    } catch (error) {
+      // сбой базы — не повод разлогинивать: пусть уйдёт 500 через общий обработчик
+      const code = (error as { code?: string; statusCode?: number }).code ?? "";
+      const isAuthError = code.startsWith("FST_JWT_") || (error as { statusCode?: number }).statusCode === 401;
+      if (!isAuthError) {
+        throw error;
+      }
+      clearAuthCookie(reply);
       return reply.code(401).send({ message: "Не авторизован" });
     }
+    return { user: request.user };
   });
 
   app.put("/api/auth/avatar", { preHandler: requireAuth }, async (request, reply) => {

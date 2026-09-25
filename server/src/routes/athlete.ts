@@ -17,7 +17,7 @@ import {
   isWorkoutInGroup,
   listWorkoutComments
 } from "../lib/social.js";
-import { getStoredActivityStreams, markStravaActivityDeleted } from "../lib/strava.js";
+import { getStoredActivityStreams, markWorkoutDeleted } from "../lib/strava.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
@@ -374,20 +374,16 @@ export async function athleteRoutes(app: FastifyInstance) {
     const workoutId = Number(params.id);
 
     const existingWorkoutResult = await pool.query(
-      `select strava_activity_id from workouts where id = $1 and user_id = $2`,
+      `select user_id, source, source_activity_id, strava_activity_id from workouts where id = $1 and user_id = $2`,
       [workoutId, request.user.id]
     );
-    const existingWorkout = existingWorkoutResult.rows[0] as
-      | { strava_activity_id: number | null }
-      | undefined;
+    const existingWorkout = existingWorkoutResult.rows[0];
 
     if (!existingWorkout) {
-      return reply.code(404).send({ message: "РўСЂРµРЅРёСЂРѕРІРєР° РЅРµ РЅР°Р№РґРµРЅР°" });
+      return reply.code(404).send({ message: "Тренировка не найдена" });
     }
 
-    if (existingWorkout.strava_activity_id) {
-      await markStravaActivityDeleted(request.user.id, Number(existingWorkout.strava_activity_id));
-    }
+    await markWorkoutDeleted(existingWorkout);
 
     const { rowCount } = await pool.query(
       `delete from workouts where id = $1 and user_id = $2`,

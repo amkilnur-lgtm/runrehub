@@ -12,24 +12,29 @@ const uploadsRoot = path.join(process.cwd(), "server", "uploads");
 const avatarsDir = path.join(uploadsRoot, "avatars");
 const avatarUrlPrefix = "/uploads/avatars/";
 
+// statusCode 400: глобальный error handler отдаст текст клиенту, а не «Внутренняя ошибка»
+function invalidAvatar(message: string) {
+  return Object.assign(new Error(message), { statusCode: 400 });
+}
+
 function parseAvatarDataUrl(dataUrl: string) {
   const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!match) {
-    throw new Error("Поддерживаются только JPG, PNG или WEBP");
+    throw invalidAvatar("Поддерживаются только JPG, PNG или WEBP");
   }
 
   const [, mimeType, base64Payload] = match;
   const extension = ALLOWED_MIME_TYPES.get(mimeType);
   if (!extension) {
-    throw new Error("Неподдерживаемый формат изображения");
+    throw invalidAvatar("Неподдерживаемый формат изображения");
   }
 
   const buffer = Buffer.from(base64Payload, "base64");
   if (buffer.length === 0) {
-    throw new Error("Файл пустой");
+    throw invalidAvatar("Файл пустой");
   }
   if (buffer.length > MAX_AVATAR_BYTES) {
-    throw new Error("Файл слишком большой. Максимум 2 МБ");
+    throw invalidAvatar("Файл слишком большой. Максимум 2 МБ");
   }
 
   return { buffer, extension };
