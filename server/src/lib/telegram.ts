@@ -231,8 +231,9 @@ export function formatTelegramWorkoutMessage(input: {
 
   const workoutUrl = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${input.workoutId}`;
 
+  // Пол спортсмена неизвестен — без «пробежал(а)»
   return [
-    `<b>${athleteName} пробежала</b>`,
+    `<b>${athleteName}</b> · новая пробежка`,
     "",
     `Дистанция: <b>${distanceKm} км</b>`,
     `Средний темп: <b>${escapeTelegramHtml(paceText)}</b>`,
@@ -240,6 +241,12 @@ export function formatTelegramWorkoutMessage(input: {
     "",
     `<a href="${escapeTelegramHtml(workoutUrl)}">Посмотреть тренировку</a>`
   ].join("\n");
+}
+
+// Подпись под карточкой пробежки: цифры уже на картинке, остаются имя и ссылка
+export function formatTelegramWorkoutCaption(input: { athleteName: string; workoutId: number }) {
+  const workoutUrl = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${input.workoutId}`;
+  return `<b>${escapeTelegramHtml(input.athleteName)}</b> · новая пробежка\n<a href="${escapeTelegramHtml(workoutUrl)}">Посмотреть тренировку</a>`;
 }
 
 export function formatTelegramWeeklyReportMessage(input: {

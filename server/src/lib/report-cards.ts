@@ -7,6 +7,8 @@ import satori from "satori";
 // Карточки-картинки для Telegram: итоги недели/месяца и пробежка.
 // satori верстает флексбокс-разметку в SVG, resvg растеризует в PNG —
 // без браузера, работает и в alpine-контейнере.
+// Пропорции держим не выше ~4:5: более вытянутое фото Telegram показывает
+// узкой полосой с размытыми полями по бокам.
 
 const require = createRequire(import.meta.url);
 
@@ -41,8 +43,8 @@ const TEXT_FONT = "Manrope, Manrope Cyr";
 
 const WIDTH = 1080;
 const PAD = 56;
-const GAP = 28;
-const TILE_WIDTH = (WIDTH - PAD * 2 - GAP) / 2;
+const GAP = 24;
+const CONTENT_WIDTH = WIDTH - PAD * 2;
 
 const COLOR = {
   bg: "#000000",
@@ -104,12 +106,12 @@ const ICONS: Record<string, Child[]> = {
   elevation: [h("path", { d: "m8 3 4 8 5-5 5 15H2L8 3z" })]
 };
 
-function icon(name: keyof typeof ICONS) {
+function icon(name: keyof typeof ICONS, size: number) {
   return h(
     "svg",
     {
-      width: 52,
-      height: 52,
+      width: size,
+      height: size,
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: COLOR.icon,
@@ -123,103 +125,156 @@ function icon(name: keyof typeof ICONS) {
 
 export type StatTile = { value: string; unit: string | null; label: string; icon: keyof typeof ICONS };
 
-function tile(stat: StatTile) {
-  // длинные значения (2:00:39) ужимаем, чтобы не наезжали на иконку:
-  // до иконки ~312px; замер: цифра Unbounded 800 ~0.84em, двоеточие/точка ~0.4em
-  const narrow = (stat.value.match(/[:.]/g) ?? []).length;
-  const emWidth = (stat.value.length - narrow) * 0.84 + narrow * 0.4;
-  const fontSize = Math.min(88, Math.floor(312 / Math.max(emWidth, 1)));
+// Замер Unbounded 800: цифра ~0.84em, двоеточие/точка ~0.4em, прочее ~0.9em
+function displayTextEm(text: string) {
+  let em = 0;
+  for (const char of text) {
+    em += /[0-9]/.test(char) ? 0.84 : /[:.]/.test(char) ? 0.4 : 0.9;
+  }
+  return Math.max(em, 1);
+}
+
+// Manrope 500: в среднем ~0.56em на символ
+function textWidth(text: string, fontSize: number) {
+  return text.length * fontSize * 0.56;
+}
+
+function fitFont(text: string, maxWidth: number, maxSize: number) {
+  return Math.min(maxSize, Math.floor(maxWidth / displayTextEm(text)));
+}
+
+// Крупная плитка (итоги, 2 колонки): число, под ним «единица · подпись», иконка справа
+function wideTile(stat: StatTile, width: number) {
+  const valueBox = width - 40 - 36 - 44 - 16;
+  const fontSize = fitFont(stat.value, valueBox, 84);
   return h(
     "div",
     {
       style: {
-        display: "flex",
         flexDirection: "column",
-        width: TILE_WIDTH,
-        height: 236,
-        padding: "44px 40px 0 46px",
-        borderRadius: 48,
+        justifyContent: "space-between",
+        width,
+        height: 200,
+        padding: "36px 36px 34px 40px",
+        borderRadius: 44,
         backgroundColor: COLOR.tile,
         position: "relative"
       }
     },
-    h("div", { style: { display: "flex", position: "absolute", top: 50, right: 40 } }, icon(stat.icon)),
+    h("div", { style: { position: "absolute", top: 38, right: 36 } }, icon(stat.icon, 44)),
     h(
       "div",
-      {
-        style: {
-          fontFamily: DISPLAY_FONT,
-          fontSize,
-          lineHeight: 1,
-          letterSpacing: -2,
-          color: COLOR.text,
-          marginTop: (88 - fontSize) / 2
-        }
-      },
-      stat.value
+      { style: { height: 84, alignItems: "center" } },
+      h(
+        "div",
+        { style: { fontFamily: DISPLAY_FONT, fontSize, lineHeight: 1, letterSpacing: -2, color: COLOR.text } },
+        stat.value
+      )
     ),
     h(
       "div",
-      {
-        style: {
-          display: "flex",
-          fontFamily: TEXT_FONT,
-          fontWeight: 500,
-          fontSize: 34,
-          color: COLOR.muted,
-          marginTop: 30 + (88 - fontSize) / 2
-        }
-      },
+      { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 30, color: COLOR.muted } },
       stat.unit ? `${stat.unit} · ${stat.label}` : stat.label
     )
   );
 }
 
-function tileGrid(stats: StatTile[]) {
+// Компактная плитка (пробежка, 3 колонки): сверху иконка и подпись, ниже число с единицей
+function compactTile(stat: StatTile, width: number) {
+  const inner = width - 32 - 28;
+  const unitSize = 24;
+  const unitWidth = stat.unit ? textWidth(stat.unit, unitSize) + 10 : 0;
+  const fontSize = fitFont(stat.value, inner - unitWidth, 66);
   return h(
     "div",
-    { style: { display: "flex", flexWrap: "wrap", gap: GAP, width: WIDTH - PAD * 2 } },
-    ...stats.map(tile)
+    {
+      style: {
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width,
+        height: 178,
+        padding: "28px 28px 30px 32px",
+        borderRadius: 40,
+        backgroundColor: COLOR.tile
+      }
+    },
+    h(
+      "div",
+      { style: { alignItems: "center" } },
+      icon(stat.icon, 30),
+      h(
+        "div",
+        { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 26, color: COLOR.muted, marginLeft: 10 } },
+        stat.label
+      )
+    ),
+    h(
+      "div",
+      { style: { alignItems: "flex-end", height: 66 } },
+      h(
+        "div",
+        { style: { fontFamily: DISPLAY_FONT, fontSize, lineHeight: 1, letterSpacing: -1.5, color: COLOR.text } },
+        stat.value
+      ),
+      stat.unit
+        ? h(
+            "div",
+            {
+              style: {
+                fontFamily: TEXT_FONT,
+                fontWeight: 700,
+                fontSize: unitSize,
+                color: COLOR.muted,
+                marginLeft: 10,
+                marginBottom: 2
+              }
+            },
+            stat.unit
+          )
+        : null
+    )
   );
 }
 
-function header(kicker: string, title: string, subtitle: string | null) {
+function tileGrid(stats: StatTile[], columns: 2 | 3) {
+  const width = Math.floor((CONTENT_WIDTH - GAP * (columns - 1)) / columns);
   return h(
     "div",
-    { style: { display: "flex", flexDirection: "column", marginBottom: 48 } },
-    subtitle
-      ? h(
-          "div",
-          {
-            style: {
-              fontFamily: TEXT_FONT,
-              fontWeight: 700,
-              fontSize: 32,
-              color: COLOR.muted,
-              marginBottom: 18,
-              letterSpacing: 0.5
-            }
-          },
-          subtitle
-        )
-      : null,
+    { style: { flexWrap: "wrap", gap: GAP, width: CONTENT_WIDTH } },
+    ...stats.map((stat) => (columns === 2 ? wideTile(stat, width) : compactTile(stat, width)))
+  );
+}
+
+// Имя спортсмена — крупно (его ищут глазами в общем чате), ниже «Итоги · Сентябрь»
+function header(kicker: string, title: string, athleteName: string) {
+  const titleText = `${kicker} · ${title}`;
+  const titleSize = fitFont(titleText, CONTENT_WIDTH, 50);
+  const nameSize = Math.min(56, Math.floor(CONTENT_WIDTH / Math.max(athleteName.length * 0.62, 1)));
+  return h(
+    "div",
+    { style: { flexDirection: "column", marginBottom: 36 } },
+    h(
+      "div",
+      { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: nameSize, lineHeight: 1.1, color: COLOR.text } },
+      athleteName
+    ),
     h(
       "div",
       {
         style: {
-          display: "flex",
           alignItems: "center",
           fontFamily: DISPLAY_FONT,
-          fontSize: 62,
+          fontSize: titleSize,
           lineHeight: 1.1,
-          color: COLOR.text
+          color: COLOR.muted,
+          marginTop: 14
         }
       },
       kicker,
       h("div", {
-        style: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLOR.muted, margin: "8px 22px 0" }
+        style: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLOR.accent, margin: "6px 18px 0" }
       }),
-      title
+      h("div", { style: { color: COLOR.text } }, title)
     )
   );
 }
@@ -242,49 +297,43 @@ function zonesBlock(zones: ZonePercentages) {
     "div",
     {
       style: {
-        display: "flex",
         flexDirection: "column",
         marginTop: GAP,
-        padding: "40px 46px",
-        borderRadius: 48,
+        padding: "30px 40px 32px",
+        borderRadius: 40,
         backgroundColor: COLOR.tile
       }
     },
     h(
       "div",
-      { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 34, color: COLOR.muted, marginBottom: 28 } },
-      "зоны пульса"
+      { style: { justifyContent: "space-between", alignItems: "center", marginBottom: 22 } },
+      h("div", { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 28, color: COLOR.muted } }, "зоны пульса")
     ),
     h(
       "div",
-      { style: { display: "flex", height: 22, borderRadius: 11, overflow: "hidden", backgroundColor: "#2c2c2e" } },
-      ...items
-        .map((item, index) =>
-          item.value > 0
-            ? h("div", { style: { width: `${item.value}%`, height: 22, backgroundColor: COLOR.zones[index] } })
-            : null
-        )
+      { style: { height: 18, borderRadius: 9, overflow: "hidden", backgroundColor: "#2c2c2e" } },
+      ...items.map((item, index) =>
+        item.value > 0
+          ? h("div", { style: { width: `${item.value}%`, height: 18, backgroundColor: COLOR.zones[index] } })
+          : null
+      )
     ),
     h(
       "div",
-      { style: { display: "flex", justifyContent: "space-between", marginTop: 30 } },
+      { style: { justifyContent: "space-between", marginTop: 22 } },
       ...items.map((item, index) =>
         h(
           "div",
-          { style: { display: "flex", flexDirection: "column" } },
+          { style: { alignItems: "center" } },
+          h("div", {
+            style: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLOR.zones[index], marginRight: 10 }
+          }),
           h(
             "div",
-            { style: { display: "flex", alignItems: "center", fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 28, color: COLOR.muted } },
-            h("div", {
-              style: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLOR.zones[index], marginRight: 12 }
-            }),
+            { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 24, color: COLOR.muted, marginRight: 10 } },
             item.label
           ),
-          h(
-            "div",
-            { style: { fontFamily: DISPLAY_FONT, fontSize: 40, color: COLOR.text, marginTop: 12 } },
-            `${item.value}%`
-          )
+          h("div", { style: { fontFamily: DISPLAY_FONT, fontSize: 30, color: COLOR.text } }, `${item.value}%`)
         )
       )
     )
@@ -297,82 +346,203 @@ function footer() {
     "div",
     {
       style: {
-        display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginTop: 44,
-        paddingTop: 36,
+        marginTop: 32,
+        paddingTop: 28,
         borderTop: "2px solid #1c1c1e"
       }
     },
     h(
       "div",
-      { style: { display: "flex", alignItems: "center", fontFamily: DISPLAY_FONT, fontSize: 30, letterSpacing: 5 } },
-      h("div", { style: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLOR.accent, marginRight: 18 } }),
+      { style: { alignItems: "center", fontFamily: DISPLAY_FONT, fontSize: 28, letterSpacing: 5 } },
+      h("div", { style: { width: 13, height: 13, borderRadius: 7, backgroundColor: COLOR.accent, marginRight: 16 } }),
       h("div", { style: { color: COLOR.text } }, "RUNNING"),
-      h("div", { style: { color: COLOR.accent, marginLeft: 16 } }, "REHAB")
+      h("div", { style: { color: COLOR.accent, marginLeft: 14 } }, "REHAB")
     ),
     h(
       "div",
-      { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 26, color: "#636366", letterSpacing: 1 } },
+      { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 24, color: "#636366", letterSpacing: 1 } },
       "runrehab.ru"
     )
   );
 }
 
-// Трек: проекция «плоская Земля» с поправкой на широту — для пробежки хватает
-function routeSvgPath(points: Array<[number, number]>, width: number, height: number, inset: number) {
-  const step = Math.max(1, Math.floor(points.length / 600));
-  const sampled = points.filter((_, index) => index % step === 0 || index === points.length - 1);
-  const midLat = sampled.reduce((sum, [lat]) => sum + lat, 0) / sampled.length;
-  const kx = Math.cos((midLat * Math.PI) / 180);
-  const xs = sampled.map(([, lng]) => lng * kx);
-  const ys = sampled.map(([lat]) => -lat);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const spanX = maxX - minX || 1e-9;
-  const spanY = maxY - minY || 1e-9;
-  const scale = Math.min((width - inset * 2) / spanX, (height - inset * 2) / spanY);
-  const offsetX = (width - spanX * scale) / 2;
-  const offsetY = (height - spanY * scale) / 2;
-  const coords = xs.map((x, index) => [
-    Number((offsetX + (x - minX) * scale).toFixed(1)),
-    Number((offsetY + (ys[index]! - minY) * scale).toFixed(1))
-  ]);
-  const d = coords.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
-  return { d, start: coords[0]!, finish: coords[coords.length - 1]! };
+// --- Карта под треком ---
+// Тот же подход, что у RouteStaticMap на сайте: мозаика растровых тайлов в
+// проекции Web Mercator, трек в тех же координатах поверх. Тайл 512 px на
+// масштабе карточки — крупные подписи, читаются на телефоне.
+
+const MAP_TILE = 512;
+const ROUTE_CASING = "#181b26";
+const MAP_MAX_ZOOM = 17;
+const MAP_FETCH_TIMEOUT_MS = 6000;
+
+function mercator(lat: number, lng: number) {
+  const rad = (Math.max(-85, Math.min(85, lat)) * Math.PI) / 180;
+  return {
+    x: (lng + 180) / 360,
+    y: (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2
+  };
 }
 
-function routeBlock(points: Array<[number, number]>) {
-  const width = WIDTH - PAD * 2;
-  const height = 520;
-  const { d, start, finish } = routeSvgPath(points, width, height, 64);
+// Только MapTiler (ключ тот же, что у карты на сайте). Без ключа карты нет:
+// CARTO больше не отдаёт тайлы без ключа — вместо карты приходит заглушка
+function mapTileUrl(z: number, x: number, y: number) {
+  const apiKey = process.env.VITE_MAP_API_KEY?.trim();
+  return apiKey ? `https://api.maptiler.com/maps/streets-v2-dark/256/${z}/${x}/${y}@2x.png?key=${apiKey}` : null;
+}
+
+async function fetchTile(url: string) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(MAP_FETCH_TIMEOUT_MS),
+    headers: { "User-Agent": "RunRehab report cards (runrehab.ru)" }
+  });
+  if (!response.ok) {
+    throw new Error(`MAP_TILE_FAILED ${response.status}`);
+  }
+  return `data:image/png;base64,${Buffer.from(await response.arrayBuffer()).toString("base64")}`;
+}
+
+type RouteLayout = {
+  d: string;
+  start: [number, number];
+  finish: [number, number];
+  tiles: Array<{ src: string; left: number; top: number; size: number }>;
+};
+
+async function layoutRoute(
+  points: Array<[number, number]>,
+  width: number,
+  height: number,
+  inset: number,
+  withMap: boolean
+): Promise<RouteLayout> {
+  const step = Math.max(1, Math.floor(points.length / 700));
+  const sampled = points.filter((_, index) => index % step === 0 || index === points.length - 1);
+  const projected = sampled.map(([lat, lng]) => mercator(lat, lng));
+  const minX = Math.min(...projected.map((p) => p.x));
+  const maxX = Math.max(...projected.map((p) => p.x));
+  const minY = Math.min(...projected.map((p) => p.y));
+  const maxY = Math.max(...projected.map((p) => p.y));
+
+  // масштаб, при котором трек целиком влезает с отступом; зум дробный:
+  // тайлы ближайшего меньшего зума растягиваем (до 2×), трек занимает весь блок
+  const spanX = Math.max(maxX - minX, 1e-9);
+  const spanY = Math.max(maxY - minY, 1e-9);
+  const fitScale = Math.min((width - inset * 2) / spanX, (height - inset * 2) / spanY);
+  const worldSize = Math.min(fitScale, MAP_TILE * 2 ** MAP_MAX_ZOOM);
+  const zoom = Math.max(1, Math.min(MAP_MAX_ZOOM, Math.floor(Math.log2(worldSize / MAP_TILE))));
+  const tileSize = worldSize / 2 ** zoom;
+
+  const centerX = ((minX + maxX) / 2) * worldSize;
+  const centerY = ((minY + maxY) / 2) * worldSize;
+  const originX = centerX - width / 2;
+  const originY = centerY - height / 2;
+
+  const coords = projected.map(
+    (p) =>
+      [Number((p.x * worldSize - originX).toFixed(1)), Number((p.y * worldSize - originY).toFixed(1))] as [
+        number,
+        number
+      ]
+  );
+  const d = coords.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
+
+  const tiles: RouteLayout["tiles"] = [];
+  if (withMap && mapTileUrl(0, 0, 0)) {
+    const maxIndex = 2 ** zoom - 1;
+    const firstX = Math.floor(originX / tileSize);
+    const lastX = Math.floor((originX + width) / tileSize);
+    const firstY = Math.floor(originY / tileSize);
+    const lastY = Math.floor((originY + height) / tileSize);
+    const jobs: Array<Promise<void>> = [];
+    for (let tx = firstX; tx <= lastX; tx += 1) {
+      for (let ty = firstY; ty <= lastY; ty += 1) {
+        if (ty < 0 || ty > maxIndex) {
+          continue;
+        }
+        const wrappedX = ((tx % (maxIndex + 1)) + maxIndex + 1) % (maxIndex + 1);
+        // +1px перекрытия, чтобы между растянутыми тайлами не просвечивали швы
+        const left = Math.floor(tx * tileSize - originX);
+        const top = Math.floor(ty * tileSize - originY);
+        const size = Math.ceil(tileSize) + 1;
+        jobs.push(
+          fetchTile(mapTileUrl(zoom, wrappedX, ty)!).then((src) => {
+            tiles.push({ src, left, top, size });
+          })
+        );
+      }
+    }
+    await Promise.all(jobs);
+  }
+
+  return { d, start: coords[0]!, finish: coords[coords.length - 1]!, tiles };
+}
+
+async function routeBlock(points: Array<[number, number]>) {
+  const width = CONTENT_WIDTH;
+  const height = 380;
+  let layout: RouteLayout;
+  try {
+    layout = await layoutRoute(points, width, height, 56, true);
+  } catch {
+    // тайлы не скачались — рисуем трек на однотонном фоне, карточка важнее карты
+    layout = await layoutRoute(points, width, height, 56, false);
+  }
+  const hasMap = layout.tiles.length > 0;
   return h(
     "div",
     {
       style: {
-        display: "flex",
         width,
         height,
         marginBottom: GAP,
-        borderRadius: 48,
+        borderRadius: 40,
         backgroundColor: COLOR.tile,
-        overflow: "hidden"
+        overflow: "hidden",
+        position: "relative"
       }
     },
+    ...layout.tiles.map((tile) =>
+      h("img", {
+        src: tile.src,
+        width: tile.size,
+        height: tile.size,
+        style: { position: "absolute", left: tile.left, top: tile.top, width: tile.size, height: tile.size }
+      })
+    ),
     h(
       "svg",
-      { width, height, viewBox: `0 0 ${width} ${height}` },
-      // мягкое свечение под линией
-      h("path", { d, fill: "none", stroke: COLOR.accent, strokeOpacity: 0.22, strokeWidth: 26, strokeLinecap: "round", strokeLinejoin: "round" }),
-      h("path", { d, fill: "none", stroke: COLOR.accent, strokeWidth: 9, strokeLinecap: "round", strokeLinejoin: "round" }),
-      h("circle", { cx: start[0], cy: start[1], r: 15, fill: "#ffffff" }),
-      h("circle", { cx: start[0], cy: start[1], r: 8, fill: "#34c77b" }),
-      h("circle", { cx: finish[0], cy: finish[1], r: 15, fill: "#ffffff" }),
-      h("circle", { cx: finish[0], cy: finish[1], r: 8, fill: COLOR.accent })
-    )
+      { width, height, viewBox: `0 0 ${width} ${height}`, style: { position: "absolute", left: 0, top: 0 } },
+      // сплошная тёмная обводка, как у карты на сайте в тёмной теме (WorkoutRouteMap);
+      // без карты — мягкое свечение, чтобы линия не терялась на однотонном фоне
+      hasMap
+        ? h("path", { d: layout.d, fill: "none", stroke: ROUTE_CASING, strokeWidth: 12, strokeLinecap: "round", strokeLinejoin: "round" })
+        : h("path", { d: layout.d, fill: "none", stroke: COLOR.accent, strokeOpacity: 0.22, strokeWidth: 20, strokeLinecap: "round", strokeLinejoin: "round" }),
+      h("path", { d: layout.d, fill: "none", stroke: COLOR.accent, strokeWidth: 6, strokeLinecap: "round", strokeLinejoin: "round" }),
+      h("circle", { cx: layout.start[0], cy: layout.start[1], r: 14, fill: "#ffffff" }),
+      h("circle", { cx: layout.start[0], cy: layout.start[1], r: 8, fill: "#34c77b" }),
+      h("circle", { cx: layout.finish[0], cy: layout.finish[1], r: 14, fill: "#ffffff" }),
+      h("circle", { cx: layout.finish[0], cy: layout.finish[1], r: 8, fill: COLOR.accent })
+    ),
+    hasMap
+      ? h(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              right: 18,
+              bottom: 12,
+              fontFamily: TEXT_FONT,
+              fontWeight: 500,
+              fontSize: 16,
+              color: "rgba(255,255,255,0.45)"
+            }
+          },
+          "© MapTiler © OpenStreetMap"
+        )
+      : null
   );
 }
 
@@ -381,10 +551,9 @@ async function render(children: Child[]) {
     "div",
     {
       style: {
-        display: "flex",
         flexDirection: "column",
         width: WIDTH,
-        padding: `${PAD + 8}px ${PAD}px ${PAD - 8}px`,
+        padding: `${PAD}px ${PAD}px ${PAD - 16}px`,
         backgroundColor: COLOR.bg
       }
     },
@@ -459,9 +628,12 @@ export async function renderPeriodCard(input: PeriodCardInput) {
     { value: String(input.workoutCount), unit: null, label: pluralWorkouts(input.workoutCount), icon: "workouts" }
   ];
   const zones = hasZones(input.zonePercentages) ? input.zonePercentages : null;
-  return render(
-    [header("Итоги", input.title, input.athleteName), tileGrid(stats), zones ? zonesBlock(zones) : null, footer()]
-  );
+  return render([
+    header("Итоги", input.title, input.athleteName),
+    tileGrid(stats, 2),
+    zones ? zonesBlock(zones) : null,
+    footer()
+  ]);
 }
 
 function pluralWorkouts(count: number) {
@@ -497,21 +669,19 @@ export async function renderWorkoutCard(input: WorkoutCardInput) {
         ? { value: String(Math.round(input.averageCadence)), unit: "шаг/мин", label: "каденс", icon: "workouts" }
         : { value: formatHeartRate(input.maxHeartrate), unit: "уд/мин", label: "макс. пульс", icon: "heart" };
   const stats: StatTile[] = [
-    { value: formatKm(input.distanceMeters), unit: "км", label: "расстояние", icon: "distance" },
+    { value: formatKm(input.distanceMeters), unit: "км", label: "дистанция", icon: "distance" },
     { value: formatClock(input.movingTimeSeconds), unit: null, label: "время", icon: "time" },
-    { value: formatPaceValue(input.averageSpeed), unit: "мин/км", label: "темп", icon: "pace" },
+    { value: formatPaceValue(input.averageSpeed), unit: "/км", label: "темп", icon: "pace" },
     { value: formatHeartRate(input.averageHeartrate), unit: "уд/мин", label: "пульс", icon: "heart" },
     energyOrElevationTile(input.calories, input.elevationGain),
     lastTile
   ];
   const zones = hasZones(input.zonePercentages) ? input.zonePercentages : null;
-  return render(
-    [
-      header("Пробежка", input.dateLabel, input.athleteName),
-      route ? routeBlock(route) : null,
-      tileGrid(stats),
-      zones ? zonesBlock(zones) : null,
-      footer()
-    ]
-  );
+  return render([
+    header("Пробежка", input.dateLabel, input.athleteName),
+    route ? await routeBlock(route) : null,
+    tileGrid(stats, 3),
+    zones ? zonesBlock(zones) : null,
+    footer()
+  ]);
 }

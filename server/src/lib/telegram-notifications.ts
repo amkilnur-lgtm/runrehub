@@ -12,6 +12,7 @@ import {
   formatTelegramMonthlyReportMessage,
   formatTelegramPeriodCaption,
   formatTelegramWeeklyReportMessage,
+  formatTelegramWorkoutCaption,
   formatTelegramWorkoutMessage,
   isTelegramConfigured,
   sendTelegramMessage,
@@ -959,7 +960,11 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
         const workoutId = job.workout_id;
         const png = await renderOrNull("new_workout", () => buildWorkoutCardPng(workoutId, job.athlete_name));
         if (png) {
-          await sendTelegramPhoto(job.chat_id, png, message);
+          await sendTelegramPhoto(
+            job.chat_id,
+            png,
+            formatTelegramWorkoutCaption({ athleteName: job.athlete_name, workoutId })
+          );
         } else {
           await sendTelegramMessage(job.chat_id, message);
         }
