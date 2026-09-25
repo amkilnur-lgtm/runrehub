@@ -304,10 +304,16 @@ export function WorkoutRouteMap({ points }: { points: [number, number][] }) {
     let activeMap: MapLibreMap | null = null;
 
     const initializeMap = async () => {
-      const { default: maplibregl } = await import("maplibre-gl");
+      const [maplibregl, { default: workerUrl }] = await Promise.all([
+        import("maplibre-gl"),
+        // maplibre v6 ищет воркер рядом со своим модулем, а после бандлинга его там
+        // нет — отдаём Vite собрать воркер (с общим чанком) и передаём его адрес
+        import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url")
+      ]);
       if (cancelled) {
         return;
       }
+      maplibregl.setWorkerUrl(workerUrl);
 
       const style = resolveMapStyle(themeRef.current);
       const routeData = buildRouteFeatureCollection(points);
