@@ -482,7 +482,7 @@ async function layoutRoute(
 
 async function routeBlock(points: Array<[number, number]>) {
   const width = CONTENT_WIDTH;
-  const height = 243;
+  const height = 290;
   let layout: RouteLayout;
   try {
     layout = await layoutRoute(points, width, height, 56, true);
