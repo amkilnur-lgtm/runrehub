@@ -252,7 +252,7 @@ function header(kicker: string, title: string, athleteName: string) {
   const nameSize = Math.min(56, Math.floor(CONTENT_WIDTH / Math.max(athleteName.length * 0.62, 1)));
   return h(
     "div",
-    { style: { flexDirection: "column", marginBottom: 36 } },
+    { style: { flexDirection: "column", marginBottom: 28 } },
     h(
       "div",
       { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: nameSize, lineHeight: 1.1, color: COLOR.text } },
@@ -299,14 +299,14 @@ function zonesBlock(zones: ZonePercentages) {
       style: {
         flexDirection: "column",
         marginTop: GAP,
-        padding: "30px 40px 32px",
+        padding: "24px 40px 26px",
         borderRadius: 40,
         backgroundColor: COLOR.tile
       }
     },
     h(
       "div",
-      { style: { justifyContent: "space-between", alignItems: "center", marginBottom: 22 } },
+      { style: { justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
       h("div", { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 28, color: COLOR.muted } }, "зоны пульса")
     ),
     h(
@@ -320,7 +320,7 @@ function zonesBlock(zones: ZonePercentages) {
     ),
     h(
       "div",
-      { style: { justifyContent: "space-between", marginTop: 22 } },
+      { style: { justifyContent: "space-between", marginTop: 16 } },
       ...items.map((item, index) =>
         h(
           "div",
@@ -348,8 +348,8 @@ function footer() {
       style: {
         alignItems: "center",
         justifyContent: "space-between",
-        marginTop: 32,
-        paddingTop: 28,
+        marginTop: 24,
+        paddingTop: 22,
         borderTop: "2px solid #1c1c1e"
       }
     },
@@ -482,7 +482,7 @@ async function layoutRoute(
 
 async function routeBlock(points: Array<[number, number]>) {
   const width = CONTENT_WIDTH;
-  const height = 380;
+  const height = 290;
   let layout: RouteLayout;
   try {
     layout = await layoutRoute(points, width, height, 56, true);
