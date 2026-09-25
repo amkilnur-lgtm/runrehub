@@ -48,7 +48,7 @@ export type WorkoutData = {
         source_moving_time_seconds: number;
         split_strategy: "stream" | "synthetic_even";
       };
-      created_by_user_id: number;
+      created_by_user_id: number | null;
       created_at: string;
       updated_at: string;
     } | null;

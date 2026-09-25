@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api";
 
 export function useApi<T>(url: string | null) {
@@ -6,6 +6,7 @@ export function useApi<T>(url: string | null) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const loadedUrl = useRef<string | null>(null);
 
   const refresh = useCallback(() => {
     setTick((t) => t + 1);
@@ -15,6 +16,12 @@ export function useApi<T>(url: string | null) {
     if (!url) return;
     
     let isMounted = true;
+    // другой адрес (перешли к другому спортсмену) — не показываем чужие данные,
+    // пока грузятся новые; refresh() того же адреса данные оставляет
+    if (loadedUrl.current !== url) {
+      loadedUrl.current = url;
+      setData(null);
+    }
     setLoading(true);
     setError(null);
     

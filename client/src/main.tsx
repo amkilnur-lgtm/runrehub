@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 
 import { AppLayout } from "./components/AppLayout";
-import { RequireAuth } from "./components/RequireAuth";
+import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import { AuthProvider } from "./components/AuthProvider";
 import { ToastProvider } from "./components/ToastProvider";
 import { LoginPage } from "./pages/LoginPage";
@@ -28,13 +28,26 @@ const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: "/admin", element: <AdminPage /> },
-          { path: "/trainer", element: <TrainerDashboardPage /> },
-          { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
-          { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> },
-          { path: "/athlete", element: <AthleteDashboardPage /> },
-          { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
-          { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> },
+          {
+            element: <RequireRole roles={["admin"]} />,
+            children: [{ path: "/admin", element: <AdminPage /> }]
+          },
+          {
+            element: <RequireRole roles={["trainer"]} />,
+            children: [
+              { path: "/trainer", element: <TrainerDashboardPage /> },
+              { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
+              { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> }
+            ]
+          },
+          {
+            element: <RequireRole roles={["athlete"]} />,
+            children: [
+              { path: "/athlete", element: <AthleteDashboardPage /> },
+              { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
+              { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> }
+            ]
+          },
           { path: "*", element: <Navigate to="/" replace /> }
         ]
       }
