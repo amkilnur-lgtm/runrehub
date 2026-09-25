@@ -58,6 +58,7 @@ export type IntervalsActivity = {
   average_stride: number | null;
   icu_training_load: number | null;
   device_name: string | null;
+  calories?: number | null;
 };
 
 type IntervalsLap = {
@@ -488,9 +489,10 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
           average_cadence,
           average_stride,
           training_load,
-          device_name
+          device_name,
+          calories
         )
-        values ($1,'intervals',$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        values ($1,'intervals',$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
         on conflict (source, source_activity_id) do update
         set name = coalesce(workouts.custom_name, excluded.strava_name),
             strava_name = excluded.strava_name,
@@ -507,7 +509,8 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
             average_cadence = excluded.average_cadence,
             average_stride = excluded.average_stride,
             training_load = excluded.training_load,
-            device_name = excluded.device_name
+            device_name = excluded.device_name,
+            calories = excluded.calories
         returning id, (xmax = 0) as inserted
       `,
       [
@@ -527,7 +530,8 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
         activity.average_cadence ?? null,
         activity.average_stride ?? null,
         activity.icu_training_load ?? null,
-        activity.device_name ?? null
+        activity.device_name ?? null,
+        typeof activity.calories === "number" && activity.calories > 0 ? Math.round(activity.calories) : null
       ]
     );
 

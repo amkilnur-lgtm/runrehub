@@ -3,13 +3,21 @@ import { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
+import { renderPeriodCard, renderWorkoutCard } from "./report-cards.js";
+import { getStoredActivityStreams } from "./strava.js";
 import {
+  formatCardMonthTitle,
+  formatCardWeekTitle,
+  formatCardWorkoutDate,
   formatTelegramMonthlyReportMessage,
+  formatTelegramPeriodCaption,
   formatTelegramWeeklyReportMessage,
   formatTelegramWorkoutMessage,
   isTelegramConfigured,
-  sendTelegramMessage
+  sendTelegramMessage,
+  sendTelegramPhoto
 } from "./telegram.js";
+import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "./workout-gps-fix.js";
 
 type PendingTelegramJob = {
   id: number;
@@ -34,6 +42,8 @@ type PeriodReportData = {
   totalElevationGain: number;
   averageSpeed: number | null;
   averageHeartrate: number | null;
+  // null, если хоть у одной тренировки периода калорий нет (частичная сумма врёт)
+  totalCalories: number | null;
   zonePercentages: {
     under130: number;
     from130To150: number;
@@ -370,6 +380,124 @@ function computeZonePercentages(zoneSeconds: number[]) {
   };
 }
 
+// --- Карточки-картинки ---
+// Рисуем PNG; если отрисовка упала (шрифты, данные) — шлём прежний текст, чтобы
+// тренер всё равно получил отчёт. Ошибку отправки не глушим: её повторит воркер.
+
+async function renderOrNull(what: string, render: () => Promise<Buffer>) {
+  try {
+    return await render();
+  } catch (error) {
+    logTelegramEvent("warn", "telegram card render failed", {
+      what,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+    return null;
+  }
+}
+
+async function sendPeriodReport(
+  chatId: string,
+  kind: "weekly" | "monthly",
+  report: PeriodReportData,
+  periodStart: string | Date
+) {
+  const title = kind === "weekly" ? formatCardWeekTitle(periodStart) : formatCardMonthTitle(periodStart);
+  const png = await renderOrNull(`${kind}_report`, () =>
+    renderPeriodCard({
+      athleteName: report.athleteName,
+      title,
+      totalDistanceMeters: report.totalDistanceMeters,
+      totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+      averageSpeed: report.averageSpeed,
+      averageHeartrate: report.averageHeartrate,
+      totalCalories: report.totalCalories,
+      totalElevationGain: report.totalElevationGain,
+      workoutCount: report.workoutCount,
+      zonePercentages: report.zonePercentages
+    })
+  );
+
+  if (png) {
+    const periodLabel = kind === "weekly" ? `итоги недели, ${title}` : `итоги месяца, ${title.toLowerCase()}`;
+    await sendTelegramPhoto(chatId, png, formatTelegramPeriodCaption(report.athleteName, periodLabel));
+    return;
+  }
+
+  const input = {
+    athleteName: report.athleteName,
+    totalDistanceMeters: report.totalDistanceMeters,
+    totalMovingTimeSeconds: report.totalMovingTimeSeconds,
+    totalElevationGain: report.totalElevationGain,
+    averageSpeed: report.averageSpeed,
+    averageHeartrate: report.averageHeartrate,
+    workoutCount: report.workoutCount,
+    zonePercentages: report.zonePercentages
+  };
+  await sendTelegramMessage(
+    chatId,
+    kind === "weekly"
+      ? formatTelegramWeeklyReportMessage({ ...input, weekStart: periodStart })
+      : formatTelegramMonthlyReportMessage({ ...input, monthStart: periodStart })
+  );
+}
+
+// Беговой каденс: часть часов пишет «на одну ногу» (~85), приводим к шагам в минуту
+function stepsPerMinute(cadence: number | null) {
+  if (!cadence || !Number.isFinite(cadence) || cadence <= 0) {
+    return null;
+  }
+  return cadence < 120 ? cadence * 2 : cadence;
+}
+
+export async function buildWorkoutCardPng(workoutId: number, athleteName: string) {
+  const { rows } = await pool.query(`select * from workouts where id = $1`, [workoutId]);
+  const row = rows[0];
+  if (!row) {
+    throw new Error("WORKOUT_NOT_FOUND");
+  }
+
+  // с учётом правок тренера (обрезка, GPS-фикс): карточка = то, что видно на сайте
+  const streams = await getStoredActivityStreams(workoutId);
+  const correction = await getActiveWorkoutCorrection(workoutId);
+  const view = applyWorkoutCorrectionToView(row, [], streams, correction);
+  const workout = view.workout as Record<string, unknown>;
+  const viewStreams = view.streams;
+
+  const zoneSeconds = [0, 0, 0, 0];
+  const time = viewStreams?.time ?? [];
+  const heartrate = viewStreams?.heartrate ?? [];
+  const size = Math.min(time.length, heartrate.length);
+  for (let index = 1; index < size; index += 1) {
+    const dt = time[index]! - time[index - 1]!;
+    const zoneIndex = getHeartRateZoneIndex(heartrate[index]!);
+    if (Number.isFinite(dt) && dt > 0 && dt < 60 && zoneIndex >= 0) {
+      zoneSeconds[zoneIndex] += dt;
+    }
+  }
+
+  const route = (viewStreams?.latlng ?? []).filter(
+    (point): point is [number, number] =>
+      Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]) && (point[0] !== 0 || point[1] !== 0)
+  );
+  const toNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+
+  return renderWorkoutCard({
+    athleteName,
+    dateLabel: formatCardWorkoutDate(workout.start_date as string | Date),
+    distanceMeters: Number(workout.distance_meters ?? 0),
+    movingTimeSeconds: Number(workout.moving_time_seconds ?? 0),
+    averageSpeed: toNumber(workout.average_speed),
+    averageHeartrate: toNumber(workout.average_heartrate),
+    elevationGain: Number(workout.elevation_gain ?? 0),
+    calories: toNumber(row.calories),
+    averageCadence: stepsPerMinute(toNumber(row.average_cadence)),
+    maxHeartrate: toNumber(workout.max_heartrate),
+    route: route.length >= 2 ? route : null,
+    zonePercentages: computeZonePercentages(zoneSeconds)
+  });
+}
+
 export async function enqueueNewWorkoutTelegramNotification(workoutId: number) {
   const { rows } = await pool.query(
     `
@@ -625,6 +753,7 @@ async function buildPeriodReportData(
     total_elevation_gain: number | string | null;
     weighted_heartrate_sum: number | string | null;
     heartrate_time_seconds: number | string | null;
+    total_calories: number | string | null;
   }>(
     `
       select
@@ -639,7 +768,8 @@ async function buildPeriodReportData(
         ) filter (where coalesce(wc.corrected_average_heartrate, w.average_heartrate) is not null), 0) as weighted_heartrate_sum,
         coalesce(sum(
           coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds)
-        ) filter (where coalesce(wc.corrected_average_heartrate, w.average_heartrate) is not null), 0) as heartrate_time_seconds
+        ) filter (where coalesce(wc.corrected_average_heartrate, w.average_heartrate) is not null), 0) as heartrate_time_seconds,
+        case when count(w.calories) = count(w.id) then sum(w.calories) end as total_calories
       from workouts w
       join users athlete on athlete.id = w.user_id
       left join workout_corrections wc on wc.workout_id = w.id
@@ -736,6 +866,7 @@ async function buildPeriodReportData(
       totalMovingTimeSeconds > 0 ? totalDistanceMeters / totalMovingTimeSeconds : null,
     averageHeartrate:
       heartrateTimeSeconds > 0 ? weightedHeartrateSum / heartrateTimeSeconds : null,
+    totalCalories: summary.total_calories === null ? null : Number(summary.total_calories),
     zonePercentages: computeZonePercentages(zoneSeconds)
   };
 }
@@ -757,7 +888,6 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
     processed += 1;
 
     try {
-      let message: string;
       if (job.kind === "weekly_report") {
         if (!job.athlete_user_id || !job.report_week_start) {
           throw new Error("TELEGRAM_WEEKLY_REPORT_CONTEXT_MISSING");
@@ -783,17 +913,7 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           continue;
         }
 
-        message = formatTelegramWeeklyReportMessage({
-          athleteName: report.athleteName,
-          weekStart: job.report_week_start,
-          totalDistanceMeters: report.totalDistanceMeters,
-          totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-          totalElevationGain: report.totalElevationGain,
-          averageSpeed: report.averageSpeed,
-          averageHeartrate: report.averageHeartrate,
-          workoutCount: report.workoutCount,
-          zonePercentages: report.zonePercentages
-        });
+        await sendPeriodReport(job.chat_id, "weekly", report, job.report_week_start);
       } else if (job.kind === "monthly_report") {
         if (!job.athlete_user_id || !job.report_month_start) {
           throw new Error("TELEGRAM_MONTHLY_REPORT_CONTEXT_MISSING");
@@ -819,23 +939,13 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           continue;
         }
 
-        message = formatTelegramMonthlyReportMessage({
-          athleteName: report.athleteName,
-          monthStart: job.report_month_start,
-          totalDistanceMeters: report.totalDistanceMeters,
-          totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-          totalElevationGain: report.totalElevationGain,
-          averageSpeed: report.averageSpeed,
-          averageHeartrate: report.averageHeartrate,
-          workoutCount: report.workoutCount,
-          zonePercentages: report.zonePercentages
-        });
+        await sendPeriodReport(job.chat_id, "monthly", report, job.report_month_start);
       } else {
         if (!job.workout_id) {
           throw new Error("TELEGRAM_WORKOUT_CONTEXT_MISSING");
         }
 
-        message = formatTelegramWorkoutMessage({
+        const message = formatTelegramWorkoutMessage({
           athleteName: job.athlete_name,
           distanceMeters: Number(job.distance_meters ?? 0),
           averageSpeed:
@@ -846,9 +956,14 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
               : job.average_heartrate ?? null,
           workoutId: job.workout_id
         });
+        const workoutId = job.workout_id;
+        const png = await renderOrNull("new_workout", () => buildWorkoutCardPng(workoutId, job.athlete_name));
+        if (png) {
+          await sendTelegramPhoto(job.chat_id, png, message);
+        } else {
+          await sendTelegramMessage(job.chat_id, message);
+        }
       }
-
-      await sendTelegramMessage(job.chat_id, message);
 
       await pool.query(
         `
@@ -939,20 +1054,7 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
   let sent = 0;
 
   for (const report of preview.reports) {
-    await sendTelegramMessage(
-      chatId,
-      formatTelegramWeeklyReportMessage({
-        athleteName: report.athleteName,
-        weekStart: preview.reportWeekStart,
-        totalDistanceMeters: report.totalDistanceMeters,
-        totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-        totalElevationGain: report.totalElevationGain,
-        averageSpeed: report.averageSpeed,
-        averageHeartrate: report.averageHeartrate,
-        workoutCount: report.workoutCount,
-        zonePercentages: report.zonePercentages
-      })
-    );
+    await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart);
     sent += 1;
   }
 
@@ -984,20 +1086,7 @@ export async function sendMonthlyTelegramTestMessages(trainerId: number, monthDa
   let sent = 0;
 
   for (const report of preview.reports) {
-    await sendTelegramMessage(
-      chatId,
-      formatTelegramMonthlyReportMessage({
-        athleteName: report.athleteName,
-        monthStart: preview.reportMonthStart,
-        totalDistanceMeters: report.totalDistanceMeters,
-        totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-        totalElevationGain: report.totalElevationGain,
-        averageSpeed: report.averageSpeed,
-        averageHeartrate: report.averageHeartrate,
-        workoutCount: report.workoutCount,
-        zonePercentages: report.zonePercentages
-      })
-    );
+    await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart);
     sent += 1;
   }
 
@@ -1061,20 +1150,7 @@ export async function sendAthleteWeeklyTelegramReport(
     throw new Error("WEEKLY_REPORT_NOT_FOUND");
   }
 
-  await sendTelegramMessage(
-    chatId,
-    formatTelegramWeeklyReportMessage({
-      athleteName: report.athleteName,
-      weekStart: preview.reportWeekStart,
-      totalDistanceMeters: report.totalDistanceMeters,
-      totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-      totalElevationGain: report.totalElevationGain,
-      averageSpeed: report.averageSpeed,
-      averageHeartrate: report.averageHeartrate,
-      workoutCount: report.workoutCount,
-      zonePercentages: report.zonePercentages
-    })
-  );
+  await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart);
 
   return {
     athleteName: athlete.athlete_name,
@@ -1136,20 +1212,7 @@ export async function sendAthleteMonthlyTelegramReport(
     throw new Error("MONTHLY_REPORT_NOT_FOUND");
   }
 
-  await sendTelegramMessage(
-    chatId,
-    formatTelegramMonthlyReportMessage({
-      athleteName: report.athleteName,
-      monthStart: preview.reportMonthStart,
-      totalDistanceMeters: report.totalDistanceMeters,
-      totalMovingTimeSeconds: report.totalMovingTimeSeconds,
-      totalElevationGain: report.totalElevationGain,
-      averageSpeed: report.averageSpeed,
-      averageHeartrate: report.averageHeartrate,
-      workoutCount: report.workoutCount,
-      zonePercentages: report.zonePercentages
-    })
-  );
+  await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart);
 
   return {
     athleteName: athlete.athlete_name,

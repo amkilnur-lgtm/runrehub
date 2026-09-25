@@ -117,6 +117,29 @@ export async function sendTelegramMessage(chatId: string, text: string) {
   }
 }
 
+// Картинка-карточка с подписью (HTML, до 1024 символов)
+export async function sendTelegramPhoto(chatId: string, png: Buffer, caption: string) {
+  if (!config.TELEGRAM_BOT_TOKEN) {
+    throw new Error("TELEGRAM_NOT_CONFIGURED");
+  }
+
+  const form = new FormData();
+  form.append("chat_id", chatId);
+  form.append("caption", caption);
+  form.append("parse_mode", "HTML");
+  form.append("photo", new Blob([new Uint8Array(png)], { type: "image/png" }), "card.png");
+
+  const response = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+    method: "POST",
+    body: form
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`TELEGRAM_SEND_FAILED: ${body.slice(0, 500)}`);
+  }
+}
+
 function formatDistanceKm(distanceMeters: number) {
   return Number.isFinite(distanceMeters) ? (distanceMeters / 1000).toFixed(2) : "0.00";
 }
@@ -306,4 +329,48 @@ export function formatTelegramMonthlyReportMessage(input: {
     `150-162: <b>${input.zonePercentages.from150To162}%</b>`,
     `162+: <b>${input.zonePercentages.from162Plus}%</b>`
   ].join("\n");
+}
+
+// --- Заголовки карточек ---
+
+const CARD_TIME_ZONE = "Asia/Yekaterinburg";
+
+// «Сентябрь»
+export function formatCardMonthTitle(monthStart: string | Date) {
+  const [year, month] = toDateOnlyString(monthStart).split("-").map(Number);
+  const label = new Intl.DateTimeFormat("ru-RU", { timeZone: CARD_TIME_ZONE, month: "long" }).format(
+    new Date(Date.UTC(year, month - 1, 1, 5, 0, 0))
+  );
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+const SHORT_MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+// «15–21 сентября», через границу месяцев — «29 сен – 5 окт»
+export function formatCardWeekTitle(weekStart: string | Date) {
+  const start = new Date(`${toDateOnlyString(weekStart)}T05:00:00Z`);
+  const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+  const day = (date: Date) =>
+    new Intl.DateTimeFormat("ru-RU", { timeZone: CARD_TIME_ZONE, day: "numeric" }).format(date);
+  const monthLong = (date: Date) =>
+    new Intl.DateTimeFormat("ru-RU", { timeZone: CARD_TIME_ZONE, day: "numeric", month: "long" })
+      .format(date)
+      .replace(/^\d+\s/, "");
+  const monthShort = (date: Date) => SHORT_MONTHS[date.getUTCMonth()]!;
+  if (start.getUTCMonth() === end.getUTCMonth()) {
+    return `${day(start)}–${day(end)} ${monthLong(end)}`;
+  }
+  return `${day(start)} ${monthShort(start)} – ${day(end)} ${monthShort(end)}`;
+}
+
+// «25 сентября» — дата пробежки по местному времени
+export function formatCardWorkoutDate(startDate: string | Date) {
+  return new Intl.DateTimeFormat("ru-RU", { timeZone: CARD_TIME_ZONE, day: "numeric", month: "long" }).format(
+    new Date(startDate)
+  );
+}
+
+// Короткая подпись под карточкой итогов: сами цифры уже на картинке
+export function formatTelegramPeriodCaption(athleteName: string, periodLabel: string) {
+  return `<b>${escapeTelegramHtml(athleteName)}</b> · ${escapeTelegramHtml(periodLabel)}`;
 }

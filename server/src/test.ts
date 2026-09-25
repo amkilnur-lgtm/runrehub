@@ -16,6 +16,7 @@ const gpsFixModule = await import("./lib/workout-gps-fix.js");
 const intervalsDetectorModule = await import("./lib/workout-intervals.js");
 const dbModule = await import("./lib/db.js");
 const authModule = await import("./lib/auth.js");
+const cardsModule = await import("./lib/report-cards.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 
@@ -638,6 +639,52 @@ await runTest("requireAuth rejects a valid token of a deleted user with 401", as
   } finally {
     queryMock.mock.restore();
   }
+});
+
+const PNG_SIGNATURE = "89504e470d0a1a0a";
+
+await runTest("period card renders a PNG with the bundled fonts", async () => {
+  const png = await cardsModule.renderPeriodCard({
+    athleteName: "Анна Бегунова",
+    title: "Сентябрь",
+    totalDistanceMeters: 26090,
+    totalMovingTimeSeconds: 7239,
+    averageSpeed: 3.6,
+    averageHeartrate: 151,
+    totalCalories: null,
+    totalElevationGain: 180,
+    workoutCount: 2,
+    zonePercentages: { under130: 12, from130To150: 41, from150To162: 33, from162Plus: 14 }
+  });
+  assert.equal(png.subarray(0, 8).toString("hex"), PNG_SIGNATURE);
+});
+
+await runTest("workout card renders a 7-hour run with a route and without heart rate", async () => {
+  const route: Array<[number, number]> = Array.from({ length: 50 }, (_, index) => [55.75 + index * 1e-4, 37.6 + index * 2e-4]);
+  const png = await cardsModule.renderWorkoutCard({
+    athleteName: "Анна Бегунова",
+    dateLabel: "25 сентября",
+    distanceMeters: 62300,
+    movingTimeSeconds: 7 * 3600 + 40 * 60 + 20,
+    averageSpeed: 2.25,
+    averageHeartrate: null,
+    elevationGain: 0,
+    calories: null,
+    averageCadence: null,
+    maxHeartrate: null,
+    route,
+    zonePercentages: null
+  });
+  assert.equal(png.subarray(0, 8).toString("hex"), PNG_SIGNATURE);
+  assert.equal(cardsModule.formatClock(7 * 3600 + 40 * 60 + 20), "7:40:20");
+});
+
+await runTest("card titles name the month and the week in Russian", () => {
+  assert.equal(telegramModule.formatCardMonthTitle("2026-09-01"), "Сентябрь");
+  assert.equal(telegramModule.formatCardWeekTitle("2026-09-14"), "14–20 сентября");
+  assert.equal(telegramModule.formatCardWeekTitle("2026-09-28"), "28 сен – 4 окт");
+  // 19:30 UTC — уже следующий день по Екатеринбургу
+  assert.equal(telegramModule.formatCardWorkoutDate("2026-09-25T19:30:00Z"), "26 сентября");
 });
 
 console.log("All server tests passed.");
