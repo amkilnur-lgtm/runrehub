@@ -51,6 +51,8 @@ const COLOR = {
   tile: "#1c1c1e",
   text: "#ffffff",
   muted: "#8e8e93",
+  // мелкие подписи светлее основного серого: в ленте Telegram карточка ужата в ~4.5 раза
+  label: "#aeaeb2",
   icon: "#8a8f98",
   accent: "#e5463a",
   zones: ["#5b8def", "#34c77b", "#f5b440", "#e5463a"]
@@ -144,9 +146,13 @@ function fitFont(text: string, maxWidth: number, maxSize: number) {
 }
 
 // Крупная плитка (итоги, 2 колонки): число, под ним «единица · подпись», иконка справа
-function wideTile(stat: StatTile, width: number) {
-  const valueBox = width - 40 - 36 - 44 - 16;
-  const fontSize = fitFont(stat.value, valueBox, 84);
+const WIDE_VALUE_MAX = 84;
+
+function wideValueFont(stat: StatTile, width: number) {
+  return fitFont(stat.value, width - 40 - 36 - 44 - 16, WIDE_VALUE_MAX);
+}
+
+function wideTile(stat: StatTile, width: number, fontSize: number) {
   return h(
     "div",
     {
@@ -173,18 +179,24 @@ function wideTile(stat: StatTile, width: number) {
     ),
     h(
       "div",
-      { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 30, color: COLOR.muted } },
+      { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 32, color: COLOR.label } },
       stat.unit ? `${stat.unit} · ${stat.label}` : stat.label
     )
   );
 }
 
 // Компактная плитка (пробежка, 3 колонки): сверху иконка и подпись, ниже число с единицей
-function compactTile(stat: StatTile, width: number) {
+const COMPACT_VALUE_MAX = 66;
+const COMPACT_UNIT_SIZE = 28;
+
+function compactValueFont(stat: StatTile, width: number) {
   const inner = width - 32 - 28;
-  const unitSize = 24;
-  const unitWidth = stat.unit ? textWidth(stat.unit, unitSize) + 10 : 0;
-  const fontSize = fitFont(stat.value, inner - unitWidth, 66);
+  // +4px запаса: без него «/км» переносилось на вторую строку
+  const unitWidth = stat.unit ? textWidth(stat.unit, COMPACT_UNIT_SIZE) + 14 : 0;
+  return fitFont(stat.value, inner - unitWidth, COMPACT_VALUE_MAX);
+}
+
+function compactTile(stat: StatTile, width: number, fontSize: number) {
   return h(
     "div",
     {
@@ -192,7 +204,7 @@ function compactTile(stat: StatTile, width: number) {
         flexDirection: "column",
         justifyContent: "space-between",
         width,
-        height: 178,
+        height: 186,
         padding: "28px 28px 30px 32px",
         borderRadius: 40,
         backgroundColor: COLOR.tile
@@ -201,10 +213,10 @@ function compactTile(stat: StatTile, width: number) {
     h(
       "div",
       { style: { alignItems: "center" } },
-      icon(stat.icon, 30),
+      icon(stat.icon, 34),
       h(
         "div",
-        { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 26, color: COLOR.muted, marginLeft: 10 } },
+        { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 32, color: COLOR.label, marginLeft: 10 } },
         stat.label
       )
     ),
@@ -223,8 +235,10 @@ function compactTile(stat: StatTile, width: number) {
               style: {
                 fontFamily: TEXT_FONT,
                 fontWeight: 700,
-                fontSize: unitSize,
-                color: COLOR.muted,
+                fontSize: COMPACT_UNIT_SIZE,
+                color: COLOR.label,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
                 marginLeft: 10,
                 marginBottom: 2
               }
@@ -238,10 +252,15 @@ function compactTile(stat: StatTile, width: number) {
 
 function tileGrid(stats: StatTile[], columns: 2 | 3) {
   const width = Math.floor((CONTENT_WIDTH - GAP * (columns - 1)) / columns);
+  // один размер цифр на всю сетку — по самому длинному значению, иначе
+  // «1:00:04» выходит мельче соседей и сетка смотрится неровной
+  const fontSize = Math.min(
+    ...stats.map((stat) => (columns === 2 ? wideValueFont(stat, width) : compactValueFont(stat, width)))
+  );
   return h(
     "div",
     { style: { flexWrap: "wrap", gap: GAP, width: CONTENT_WIDTH } },
-    ...stats.map((stat) => (columns === 2 ? wideTile(stat, width) : compactTile(stat, width)))
+    ...stats.map((stat) => (columns === 2 ? wideTile(stat, width, fontSize) : compactTile(stat, width, fontSize)))
   );
 }
 
@@ -293,6 +312,17 @@ function zonesBlock(zones: ZonePercentages) {
     { label: "150–162", value: zones.from150To162 },
     { label: "162+", value: zones.from162Plus }
   ];
+  // ширины полосы нормируем к 100%: при сумме больше 100 сегменты вылезают за
+  // полосу, и resvg падает с паникой, которая роняет весь процесс Node
+  const zoneTotal = Math.max(
+    1,
+    items.reduce((sum, item) => sum + Math.max(0, item.value), 0)
+  );
+  // в легенде только зоны, где было время: три «0%» места занимают, а не сообщают
+  const legend = items.map((item, index) => ({ item, index })).filter(({ item }) => item.value > 0);
+  // все четыре зоны влезают в строку только помельче
+  const labelSize = legend.length === 4 ? 26 : 30;
+  const valueSize = legend.length === 4 ? 32 : 38;
   return h(
     "div",
     {
@@ -307,21 +337,23 @@ function zonesBlock(zones: ZonePercentages) {
     h(
       "div",
       { style: { justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
-      h("div", { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 28, color: COLOR.muted } }, "зоны пульса")
+      h("div", { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 30, color: COLOR.label } }, "зоны пульса")
     ),
     h(
       "div",
       { style: { height: 18, borderRadius: 9, overflow: "hidden", backgroundColor: "#2c2c2e" } },
       ...items.map((item, index) =>
         item.value > 0
-          ? h("div", { style: { width: `${item.value}%`, height: 18, backgroundColor: COLOR.zones[index] } })
+          ? h("div", {
+              style: { width: `${(item.value / zoneTotal) * 100}%`, height: 18, backgroundColor: COLOR.zones[index] }
+            })
           : null
       )
     ),
     h(
       "div",
-      { style: { justifyContent: "space-between", marginTop: 16 } },
-      ...items.map((item, index) =>
+      { style: { justifyContent: legend.length === 4 ? "space-between" : "flex-start", gap: legend.length === 4 ? 0 : 56, marginTop: 16 } },
+      ...legend.map(({ item, index }) =>
         h(
           "div",
           { style: { alignItems: "center" } },
@@ -330,10 +362,10 @@ function zonesBlock(zones: ZonePercentages) {
           }),
           h(
             "div",
-            { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 24, color: COLOR.muted, marginRight: 10 } },
+            { style: { fontFamily: TEXT_FONT, fontWeight: 500, fontSize: labelSize, color: COLOR.label, marginRight: 10 } },
             item.label
           ),
-          h("div", { style: { fontFamily: DISPLAY_FONT, fontSize: 30, color: COLOR.text } }, `${item.value}%`)
+          h("div", { style: { fontFamily: DISPLAY_FONT, fontSize: valueSize, color: COLOR.text } }, `${item.value}%`)
         )
       )
     )
@@ -362,7 +394,7 @@ function footer() {
     ),
     h(
       "div",
-      { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 24, color: "#636366", letterSpacing: 1 } },
+      { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 26, color: COLOR.muted, letterSpacing: 1 } },
       "runrehab.ru"
     )
   );
@@ -375,7 +407,9 @@ function footer() {
 
 const MAP_TILE = 512;
 const ROUTE_CASING = "#181b26";
-const MAP_MAX_ZOOM = 17;
+// отступ трека от краёв блока карты: меньше — маршрут крупнее
+const ROUTE_INSET = 30;
+const MAP_MAX_ZOOM = 18;
 const MAP_FETCH_TIMEOUT_MS = 6000;
 
 function mercator(lat: number, lng: number) {
@@ -386,11 +420,12 @@ function mercator(lat: number, lng: number) {
   };
 }
 
-// Только MapTiler (ключ тот же, что у карты на сайте). Без ключа карты нет:
-// CARTO больше не отдаёт тайлы без ключа — вместо карты приходит заглушка
+// Только MapTiler (ключ тот же, что у карты на сайте). Стиль basic-v2-dark:
+// спокойный серый фон, красный трек на нём читается лучше, чем на синем
+// streets-v2-dark с сайта. Без ключа карты нет: CARTO без ключа отдаёт заглушку
 function mapTileUrl(z: number, x: number, y: number) {
   const apiKey = process.env.VITE_MAP_API_KEY?.trim();
-  return apiKey ? `https://api.maptiler.com/maps/streets-v2-dark/256/${z}/${x}/${y}@2x.png?key=${apiKey}` : null;
+  return apiKey ? `https://api.maptiler.com/maps/basic-v2-dark/256/${z}/${x}/${y}@2x.png?key=${apiKey}` : null;
 }
 
 async function fetchTile(url: string) {
@@ -485,10 +520,10 @@ async function routeBlock(points: Array<[number, number]>) {
   const height = 290;
   let layout: RouteLayout;
   try {
-    layout = await layoutRoute(points, width, height, 56, true);
+    layout = await layoutRoute(points, width, height, ROUTE_INSET, true);
   } catch {
     // тайлы не скачались — рисуем трек на однотонном фоне, карточка важнее карты
-    layout = await layoutRoute(points, width, height, 56, false);
+    layout = await layoutRoute(points, width, height, ROUTE_INSET, false);
   }
   const hasMap = layout.tiles.length > 0;
   return h(
