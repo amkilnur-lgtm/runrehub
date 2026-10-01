@@ -186,24 +186,24 @@ await runTest("computeHrTrainingLoad weights minutes by Edwards zones", () => {
   assert.equal(fallback, 180);
 });
 
-await runTest("weekly telegram report week start switches after Sunday 20:00 UTC+5", () => {
+await runTest("weekly telegram report week start switches after Sunday 22:00 UTC+5", () => {
   const beforeSend = telegramNotificationsModule.getLatestEligibleWeeklyReportWeekStart(
-    new Date("2026-04-12T14:59:00.000Z")
+    new Date("2026-04-12T16:59:00.000Z")
   );
   const afterSend = telegramNotificationsModule.getLatestEligibleWeeklyReportWeekStart(
-    new Date("2026-04-12T15:01:00.000Z")
+    new Date("2026-04-12T17:01:00.000Z")
   );
 
   assert.equal(beforeSend.toISOString(), "2026-03-29T19:00:00.000Z");
   assert.equal(afterSend.toISOString(), "2026-04-05T19:00:00.000Z");
 });
 
-await runTest("monthly telegram report month start switches after first day 20:00 UTC+5", () => {
+await runTest("monthly telegram report month start switches after first day 09:00 UTC+5", () => {
   const beforeSend = telegramNotificationsModule.getLatestEligibleMonthlyReportMonthStart(
-    new Date("2026-05-01T14:59:00.000Z")
+    new Date("2026-05-01T03:59:00.000Z")
   );
   const afterSend = telegramNotificationsModule.getLatestEligibleMonthlyReportMonthStart(
-    new Date("2026-05-01T15:01:00.000Z")
+    new Date("2026-05-01T04:01:00.000Z")
   );
 
   assert.equal(beforeSend.toISOString(), "2026-02-28T19:00:00.000Z");

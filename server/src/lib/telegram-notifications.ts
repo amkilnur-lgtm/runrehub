@@ -63,9 +63,9 @@ export type MonthlyReportPreviewItem = PeriodReportData & {
 
 const MAX_TELEGRAM_ATTEMPTS = 5;
 const WEEKLY_REPORT_UTC_OFFSET_MINUTES = 5 * 60;
-const WEEKLY_REPORT_SEND_HOUR = 20;
+const WEEKLY_REPORT_SEND_HOUR = 22;
 const WEEKLY_REPORT_SEND_DAY = 0;
-const MONTHLY_REPORT_SEND_HOUR = 20;
+const MONTHLY_REPORT_SEND_HOUR = 9;
 
 function logTelegramEvent(
   level: "info" | "warn" | "error",
