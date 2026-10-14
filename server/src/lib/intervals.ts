@@ -381,6 +381,31 @@ function isRunningActivity(activity: IntervalsActivity) {
   return RUN_TYPES.has((activity.type ?? "").toLowerCase());
 }
 
+// Набор высоты по барометру часов (поток altitude). total_elevation_gain от
+// intervals.icu при включённой коррекции высоты посчитан по рельефной карте под
+// GPS-треком (fixed_altitude): дрожание GPS гоняет точку по склонам, и на ровной
+// пробежке выходит 99 м вместо 36 м с часов. Фильтр шума 2 м: подъём засчитываем,
+// только когда высота ушла от опорной точки дальше порога (на примере — 34 м)
+export const ELEVATION_NOISE_THRESHOLD_M = 2;
+
+export function computeElevationGain(altitude: number[], threshold = ELEVATION_NOISE_THRESHOLD_M) {
+  const points = altitude.filter((value) => Number.isFinite(value));
+  if (points.length < 2) {
+    return null;
+  }
+  let gain = 0;
+  let reference = points[0]!;
+  for (const value of points) {
+    if (value - reference >= threshold) {
+      gain += value - reference;
+      reference = value;
+    } else if (reference - value >= threshold) {
+      reference = value;
+    }
+  }
+  return gain;
+}
+
 async function fetchActivityStreams(apiKey: string, activityId: string) {
   const types = "time,distance,heartrate,cadence,velocity_smooth,altitude,fixed_altitude,latlng,watts";
   const response = await intervalsFetch(
@@ -396,7 +421,8 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
   const numberData = (type: string) => byType.get(type)?.data ?? undefined;
   const latlngEntry = byType.get("latlng");
 
-  return {
+  const deviceAltitude = parseInterpolatedNumberStream(numberData("altitude"));
+  const streams = {
     distance: parseInterpolatedNumberStream(numberData("distance")),
     time: parseInterpolatedNumberStream(numberData("time")),
     // лояльные (null→0, длина сохранена): в этих потоках COROS часто есть null
@@ -409,6 +435,8 @@ async function fetchActivityStreams(apiKey: string, activityId: string) {
       latlngEntry?.data2 != null ? zipLatLng(latlngEntry) : parseLatLngStream(latlngEntry?.data ?? undefined),
     watts: parseLenientNumberStream(numberData("watts"))
   } satisfies ActivityStreams;
+
+  return { streams, deviceElevationGain: computeElevationGain(deviceAltitude) };
 }
 
 // Хвост автокруга (последние метры после целых километров: 3 м / 1 с) — не круг.
@@ -582,8 +610,16 @@ async function syncSingleIntervalsActivity(userId: number, apiKey: string, activ
     await client.query("COMMIT");
 
     if (streamsData) {
-      await saveActivityStreams(workoutId, streamsData);
-      await applyLapElevationChanges(workoutId, streamsData.altitude);
+      await saveActivityStreams(workoutId, streamsData.streams);
+      await applyLapElevationChanges(workoutId, streamsData.streams.altitude);
+      // набор по барометру часов вместо total_elevation_gain с коррекцией по карте;
+      // без потока с часов остаётся значение intervals.icu
+      if (streamsData.deviceElevationGain !== null) {
+        await pool.query(`update workouts set elevation_gain = $2 where id = $1`, [
+          workoutId,
+          streamsData.deviceElevationGain
+        ]);
+      }
     } else {
       // повторы уже исчерпаны — тренировка осталась со старыми потоками, и молча
       // такое не заметить: без стримов не считаются ни анализ, ни GPS-фикс

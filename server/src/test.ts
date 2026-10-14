@@ -687,4 +687,18 @@ await runTest("card titles name the month and the week in Russian", () => {
   assert.equal(telegramModule.formatCardWorkoutDate("2026-09-25T19:30:00Z"), "26 сентября");
 });
 
+await runTest("elevation gain ignores barometer noise but counts real climbs", () => {
+  // ровная дорога с шумом ±0.8 м — набора нет
+  const flat = Array.from({ length: 600 }, (_, index) => 90 + (index % 2 === 0 ? 0.8 : -0.8));
+  assert.equal(intervalsModule.computeElevationGain(flat), 0);
+  // подъём на 20 м и спуск обратно с тем же шумом — 20 м, а не сумма всех дрожаний
+  const hill = [
+    ...Array.from({ length: 200 }, (_, index) => 90 + index / 10 + (index % 2 ? 0.8 : -0.8)),
+    ...Array.from({ length: 200 }, (_, index) => 110 - index / 10 + (index % 2 ? 0.8 : -0.8))
+  ];
+  const gain = intervalsModule.computeElevationGain(hill)!;
+  assert.ok(gain >= 18 && gain <= 22, `gain ${gain}`);
+  assert.equal(intervalsModule.computeElevationGain([]), null);
+});
+
 console.log("All server tests passed.");
