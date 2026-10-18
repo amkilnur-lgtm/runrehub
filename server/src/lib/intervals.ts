@@ -29,9 +29,11 @@ const AUTOFIX_SUSPECT_SPEED_MPS = 5.5;
 const INTERVALS_API_BASE = "https://intervals.icu/api/v1";
 const INTERVALS_SYNC_LOCK_NAMESPACE = 4272;
 const SYNC_LOOKBACK_MS = 36 * 60 * 60 * 1000;
-const FIRST_SYNC_DAYS = 90;
 const DEEP_SYNC_DAYS = 30;
 const DEEP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// Первая синхронизация нового спортсмена берёт всё с этой даты: раньше было
+// окно 90 дней, и у подключённых в октябре терялось начало июля (дыра между
+// Strava-архивом и intervals.icu).
 // Вся история до этой даты уже в БД (Strava-архив по 30.06.2026 включительно).
 // Раньше неё не ходим ни первым, ни глубоким синком: у активностей intervals.icu,
 // залитых не через Strava, нет strava_id — дедупу не за что зацепиться, и старый
@@ -798,7 +800,7 @@ export async function syncIntervalsLatestActivities(
       !connection.last_deep_synced_at ||
       Date.now() - new Date(connection.last_deep_synced_at).getTime() > DEEP_SYNC_INTERVAL_MS;
     const oldestByMode = !connection.last_synced_at
-      ? new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 60 * 60 * 1000)
+      ? SYNC_FLOOR
       : deepDue
         ? new Date(Date.now() - DEEP_SYNC_DAYS * 24 * 60 * 60 * 1000)
         : new Date(new Date(connection.last_synced_at).getTime() - SYNC_LOOKBACK_MS);
