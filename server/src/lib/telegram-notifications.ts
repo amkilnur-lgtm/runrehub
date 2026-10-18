@@ -66,6 +66,10 @@ const WEEKLY_REPORT_UTC_OFFSET_MINUTES = 5 * 60;
 const WEEKLY_REPORT_SEND_HOUR = 22;
 const WEEKLY_REPORT_SEND_DAY = 0;
 const MONTHLY_REPORT_SEND_HOUR = 9;
+// Сколько после события ещё можно уведомить. Первая синхронизация нового
+// спортсмена тянет архив с июля — без окна в чат ушли бы сотни «новых» пробежек
+// и опоздавшие отчёты за прошлые недели и месяцы
+const NOTIFICATION_FRESHNESS_MS = 48 * 60 * 60 * 1000;
 
 function logTelegramEvent(
   level: "info" | "warn" | "error",
@@ -508,6 +512,7 @@ export async function enqueueNewWorkoutTelegramNotification(workoutId: number) {
       join users athlete on athlete.id = w.user_id
       join users coach on coach.id = athlete.coach_id
       where w.id = $1
+        and w.start_date > now() - ($2::int * interval '1 millisecond')
         and athlete.coach_id is not null
         and coach.role = 'trainer'
         and coach.telegram_notifications_enabled = true
@@ -515,7 +520,7 @@ export async function enqueueNewWorkoutTelegramNotification(workoutId: number) {
       on conflict (workout_id, coach_user_id, kind) do nothing
       returning id
     `,
-    [workoutId]
+    [workoutId, NOTIFICATION_FRESHNESS_MS]
   );
 
   if (rows[0]) {
@@ -530,6 +535,10 @@ export async function enqueueWeeklyTelegramReports(now = new Date(), logger?: Fa
   const weekStart = getLatestEligibleWeeklyReportWeekStart(now);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
   const reportWeekStart = getWeekStartDateString(weekStart);
+  const scheduledSendAt = new Date(weekStart.getTime() + 6 * DAY_MS + WEEKLY_REPORT_SEND_HOUR * HOUR_MS);
+  if (now.getTime() - scheduledSendAt.getTime() > NOTIFICATION_FRESHNESS_MS) {
+    return { queued: 0, reportWeekStart };
+  }
 
   const { rows } = await pool.query(
     `
@@ -581,6 +590,10 @@ export async function enqueueMonthlyTelegramReports(now = new Date(), logger?: F
   const monthStart = getLatestEligibleMonthlyReportMonthStart(now);
   const monthEnd = addUtcPlus5Months(monthStart, 1);
   const reportMonthStart = getMonthStartDateString(monthStart);
+  const scheduledSendAt = new Date(monthEnd.getTime() + MONTHLY_REPORT_SEND_HOUR * HOUR_MS);
+  if (now.getTime() - scheduledSendAt.getTime() > NOTIFICATION_FRESHNESS_MS) {
+    return { queued: 0, reportMonthStart };
+  }
 
   const { rows } = await pool.query(
     `

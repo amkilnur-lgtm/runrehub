@@ -701,4 +701,26 @@ await runTest("elevation gain ignores barometer noise but counts real climbs", (
   assert.equal(intervalsModule.computeElevationGain([]), null);
 });
 
+await runTest("late weekly and monthly reports are not queued after a 48h window", async () => {
+  let queries = 0;
+  const queryMock = mock.method(dbModule.pool, "query", async () => {
+    queries += 1;
+    return { rows: [] };
+  });
+  try {
+    // неделя 12–18 октября, отправка вс 18.10 22:00 UTC+5 = 17:00Z
+    await telegramNotificationsModule.enqueueWeeklyTelegramReports(new Date("2026-10-18T18:00:00Z"));
+    assert.equal(queries, 1, "within the window the weekly report is queued");
+    await telegramNotificationsModule.enqueueWeeklyTelegramReports(new Date("2026-10-20T18:00:00Z"));
+    assert.equal(queries, 1, "two days later nothing is queued");
+    // сентябрь, отправка 1.10 09:00 UTC+5 = 04:00Z
+    await telegramNotificationsModule.enqueueMonthlyTelegramReports(new Date("2026-10-01T05:00:00Z"));
+    assert.equal(queries, 2, "within the window the monthly report is queued");
+    await telegramNotificationsModule.enqueueMonthlyTelegramReports(new Date("2026-10-18T05:00:00Z"));
+    assert.equal(queries, 2, "weeks later the September report is not queued");
+  } finally {
+    queryMock.mock.restore();
+  }
+});
+
 console.log("All server tests passed.");
