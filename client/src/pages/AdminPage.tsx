@@ -25,6 +25,8 @@ type AdminUser = {
   intervals_last_synced_at: string | null;
   intervals_last_sync_error: string | null;
   intervals_has_account: boolean;
+  telegram_username: string | null;
+  telegram_linked: boolean;
 };
 
 type Trainer = {
@@ -772,6 +774,7 @@ export function AdminPage() {
                     <span className={`role-chip role-${user.role}`}>{roleLabel(user.role)}</span>
                     {user.coach_name ? <span>тренер: {user.coach_name}</span> : null}
                   </div>
+                  <TelegramLoginField user={user} onSaved={usersApi.refresh} />
                 </div>
                 <div className="align-right">
                   {user.role !== "admin" ? (
@@ -1398,5 +1401,75 @@ export function AdminPage() {
       </>
       ) : null}
     </div>
+  );
+}
+
+// Ник Telegram для входа в Mini App: при первом входе по нику запоминаем id Telegram
+function TelegramLoginField({ user, onSaved }: { user: AdminUser; onSaved: () => void }) {
+  const showToast = useToast();
+  const [value, setValue] = useState(user.telegram_username ? `@${user.telegram_username}` : "");
+  const [pending, setPending] = useState(false);
+  const saved = user.telegram_username ? `@${user.telegram_username}` : "";
+  const dirty = value.trim() !== saved;
+
+  async function save(nextValue: string | null) {
+    setPending(true);
+    try {
+      const result = await api<{ telegram_username: string | null }>(`/api/admin/users/${user.id}/telegram`, {
+        method: "PUT",
+        body: JSON.stringify({ username: nextValue })
+      });
+      setValue(result.telegram_username ? `@${result.telegram_username}` : "");
+      onSaved();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Не удалось сохранить");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function unlink() {
+    if (!window.confirm(`Отвязать Telegram у ${user.full_name}? Следующий вход снова сверит ник.`)) return;
+    setPending(true);
+    try {
+      await api(`/api/admin/users/${user.id}/telegram`, { method: "DELETE" });
+      onSaved();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Не удалось отвязать");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form
+      className="admin-telegram-login"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save(value.trim() || null);
+      }}
+    >
+      <input
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="@ник в Telegram"
+        aria-label={`Telegram ${user.full_name}`}
+        disabled={pending}
+      />
+      {dirty ? (
+        <button type="submit" className="ghost-button compact-button" disabled={pending}>
+          Сохранить
+        </button>
+      ) : user.telegram_linked ? (
+        <>
+          <span className="telegram-login-status is-linked">привязан</span>
+          <button type="button" className="ghost-button compact-button" onClick={unlink} disabled={pending}>
+            Отвязать
+          </button>
+        </>
+      ) : user.telegram_username ? (
+        <span className="telegram-login-status">ждёт первого входа</span>
+      ) : null}
+    </form>
   );
 }

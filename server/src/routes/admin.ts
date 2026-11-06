@@ -9,6 +9,7 @@ import {
   setForceIntervalMinutes
 } from "../lib/app-settings.js";
 import { pool } from "../lib/db.js";
+import { normalizeTelegramUsername } from "../lib/telegram-auth.js";
 import { getStravaEvents } from "../lib/strava-events.js";
 import {
   connectIntervalsAccount,
@@ -38,6 +39,10 @@ const createUserSchema = z.object({
   fullName: z.string().min(2),
   role: z.enum(["trainer", "athlete"]),
   coachId: z.number().nullable().optional()
+});
+
+const userTelegramSchema = z.object({
+  username: z.string().trim().max(64).nullable()
 });
 
 const stravaEventsQuerySchema = z.object({
@@ -82,6 +87,7 @@ export async function adminRoutes(app: FastifyInstance) {
       `
         select
           u.id, u.username, u.full_name, u.role, u.coach_id, coach.full_name as coach_name,
+          u.telegram_username, (u.telegram_user_id is not null) as telegram_linked,
           ic.icu_athlete_id,
           ic.last_synced_at as intervals_last_synced_at,
           ic.last_sync_error as intervals_last_sync_error,
@@ -356,6 +362,50 @@ export async function adminRoutes(app: FastifyInstance) {
     } catch {
       return reply.code(400).send({ message: "Не удалось создать пользователя" });
     }
+  });
+
+  // Ник Telegram для входа в Mini App. Смена или очистка ника сбрасывает привязку:
+  // следующий вход снова сверит ник и запомнит id того, кто войдёт
+  app.put("/api/admin/users/:id/telegram", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    const body = userTelegramSchema.parse(request.body);
+    const username = body.username ? normalizeTelegramUsername(body.username) : null;
+    if (body.username && !username) {
+      return reply.code(400).send({ message: "Ник Telegram: латиница, цифры и _, например @max_runner" });
+    }
+
+    try {
+      const { rows } = await pool.query(
+        `
+          update users
+          set telegram_user_id = case when telegram_username is not distinct from $2 then telegram_user_id end,
+              telegram_username = $2
+          where id = $1
+          returning telegram_username, (telegram_user_id is not null) as telegram_linked
+        `,
+        [params.id, username]
+      );
+      if (!rows[0]) {
+        return reply.code(404).send({ message: "Пользователь не найден" });
+      }
+      return rows[0];
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return reply.code(400).send({ message: "Этот ник уже указан у другого пользователя" });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/users/:id/telegram", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["admin"]);
+    const params = request.params as { id: string };
+    const { rowCount } = await pool.query(`update users set telegram_user_id = null where id = $1`, [params.id]);
+    if (rowCount === 0) {
+      return reply.code(404).send({ message: "Пользователь не найден" });
+    }
+    return { telegram_linked: false };
   });
 
   app.delete("/api/admin/users/:id", { preHandler: requireAuth }, async (request, reply) => {

@@ -3,13 +3,28 @@ import { z } from "zod";
 
 import { removeAvatarFile, saveAvatarFromDataUrl } from "../lib/avatar-storage.js";
 import { pool } from "../lib/db.js";
-import { clearAuthCookie, requireAuth, setAuthCookie, verifyPassword } from "../lib/auth.js";
+import { clearAuthCookie, loadCurrentUser, requireAuth, setAuthCookie, verifyPassword } from "../lib/auth.js";
+import { findUserIdForTelegram, linkTelegramToUser, verifyTelegramInitData } from "../lib/telegram-auth.js";
+import { config } from "../config.js";
 import { AuthUser } from "../types.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
-  password: z.string().min(1)
+  password: z.string().min(1),
+  // initData Mini App: если вход паролем идёт изнутри Telegram — заодно привязываем Telegram
+  telegramInitData: z.string().max(4096).optional()
 });
+
+const telegramLoginSchema = z.object({
+  initData: z.string().min(1).max(4096)
+});
+
+function verifiedTelegramUser(initData: string | undefined) {
+  if (!initData || !config.TELEGRAM_BOT_TOKEN) {
+    return null;
+  }
+  return verifyTelegramInitData(initData, config.TELEGRAM_BOT_TOKEN);
+}
 
 const avatarUploadSchema = z.object({
   imageDataUrl: z.string().min(1)
@@ -52,9 +67,42 @@ export async function authRoutes(app: FastifyInstance) {
       coachId: user.coach_id
     };
 
+    const telegramUser = verifiedTelegramUser(body.telegramInitData);
+    if (telegramUser) {
+      await linkTelegramToUser(authUser.id, telegramUser);
+    }
+
     await setAuthCookie(reply, authUser);
     return { user: authUser };
   });
+
+  app.post(
+    "/api/auth/telegram",
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute"
+        }
+      }
+    },
+    async (request, reply) => {
+      const body = telegramLoginSchema.parse(request.body);
+      const telegramUser = verifiedTelegramUser(body.initData);
+      if (!telegramUser) {
+        return reply.code(401).send({ message: "Не удалось проверить данные Telegram" });
+      }
+
+      const userId = await findUserIdForTelegram(telegramUser);
+      const user = userId ? await loadCurrentUser(userId) : null;
+      if (!user) {
+        return reply.code(404).send({ message: "Этот Telegram пока не привязан к аккаунту", code: "TELEGRAM_NOT_LINKED" });
+      }
+
+      await setAuthCookie(reply, user);
+      return { user };
+    }
+  );
 
   app.post("/api/auth/logout", async (_request, reply) => {
     clearAuthCookie(reply);

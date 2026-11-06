@@ -19,6 +19,19 @@ const authModule = await import("./lib/auth.js");
 const cardsModule = await import("./lib/report-cards.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
+const telegramAuthModule = await import("./lib/telegram-auth.js");
+const { createHmac } = await import("node:crypto");
+
+// initData, подписанная так же, как это делает Telegram для Mini App
+function signTelegramInitData(fields: Record<string, string>, botToken: string) {
+  const dataCheckString = Object.entries(fields)
+    .map(([key, value]) => `${key}=${value}`)
+    .sort()
+    .join("\n");
+  const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
+  const hash = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  return new URLSearchParams({ ...fields, hash }).toString();
+}
 
 async function runTest(name: string, fn: () => void | Promise<void>) {
   try {
@@ -721,6 +734,40 @@ await runTest("late weekly and monthly reports are not queued after a 48h window
   } finally {
     queryMock.mock.restore();
   }
+});
+
+await runTest("telegram mini app initData is accepted only with a valid fresh signature", () => {
+  const botToken = "123456:test-bot-token";
+  const now = 1_790_000_000;
+  const fields = {
+    auth_date: String(now - 60),
+    query_id: "AAH",
+    user: JSON.stringify({ id: 4242, first_name: "Макс", username: "Max_Runner" })
+  };
+  const initData = signTelegramInitData(fields, botToken);
+
+  assert.deepEqual(telegramAuthModule.verifyTelegramInitData(initData, botToken, now), {
+    id: 4242,
+    username: "Max_Runner",
+    firstName: "Макс"
+  });
+  assert.equal(telegramAuthModule.verifyTelegramInitData(initData, "999:other-bot", now), null, "other bot");
+  const tampered = initData.replace("4242", "4243");
+  assert.equal(telegramAuthModule.verifyTelegramInitData(tampered, botToken, now), null, "tampered user");
+  assert.equal(
+    telegramAuthModule.verifyTelegramInitData(initData, botToken, now + 2 * 24 * 60 * 60),
+    null,
+    "stale auth_date"
+  );
+  assert.equal(telegramAuthModule.verifyTelegramInitData("user=%7B%7D", botToken, now), null, "no hash");
+});
+
+await runTest("telegram usernames are normalized from @, links and case", () => {
+  assert.equal(telegramAuthModule.normalizeTelegramUsername("@Max_Runner"), "max_runner");
+  assert.equal(telegramAuthModule.normalizeTelegramUsername("https://t.me/max_runner"), "max_runner");
+  assert.equal(telegramAuthModule.normalizeTelegramUsername(" t.me/Max_Runner "), "max_runner");
+  assert.equal(telegramAuthModule.normalizeTelegramUsername("макс"), null);
+  assert.equal(telegramAuthModule.normalizeTelegramUsername("@a b"), null);
 });
 
 console.log("All server tests passed.");

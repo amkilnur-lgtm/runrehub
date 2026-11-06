@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../components/AuthProvider";
+import { isTelegramMiniApp } from "../telegram";
 import logoImage from "../assets/logo_red horizontal.png";
 
 export function LoginPage() {
@@ -57,9 +58,15 @@ export function LoginPage() {
           <img className="login-logo" src={logoImage} alt="Running Rehab" />
         </div>
         <h1>Вход в кабинет</h1>
-        <p className="muted">
-          Админ выдает логин и пароль, а также подключает синхронизацию тренировок.
-        </p>
+        {isTelegramMiniApp ? (
+          <p className="muted">
+            Войдите один раз логином и паролем — дальше вход из Telegram будет автоматическим.
+          </p>
+        ) : (
+          <p className="muted">
+            Админ выдает логин и пароль, а также подключает синхронизацию тренировок.
+          </p>
+        )}
         <form onSubmit={onSubmit} className="form">
           <label>
             Логин

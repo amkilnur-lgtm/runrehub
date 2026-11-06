@@ -3543,3 +3543,9 @@ button.trend-bar-slot:focus-visible {
 }
 .avatar-crop-zoom input[type="range"] { flex: 1; accent-color: var(--accent); }
 .avatar-crop-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Ник Telegram для входа в Mini App (админка → пользователи) */
+.admin-telegram-login { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.admin-telegram-login input { width: 200px; max-width: 100%; padding: 6px 10px; font-size: 14px; }
+.telegram-login-status { font-size: 13px; color: var(--ink-muted); }
+.telegram-login-status.is-linked { color: var(--success); }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 import { api, SESSION_EXPIRED_EVENT } from "../api";
+import { telegramInitData } from "../telegram";
 import { User } from "../types";
 
 type AuthContextValue = {
@@ -23,9 +24,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await api<{ user: User }>("/api/auth/me");
       setUser(data.user);
     } catch {
-      setUser(null);
+      setUser(await loginWithTelegram());
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Внутри Mini App пробуем войти по подписанным данным Telegram; если Telegram
+  // ещё не привязан — покажется обычная форма, и вход паролем его привяжет
+  async function loginWithTelegram(): Promise<User | null> {
+    if (!telegramInitData) {
+      return null;
+    }
+    try {
+      const data = await api<{ user: User }>("/api/auth/telegram", {
+        method: "POST",
+        body: JSON.stringify({ initData: telegramInitData })
+      });
+      return data.user;
+    } catch {
+      return null;
     }
   }
 
@@ -42,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(username: string, password: string) {
     const data = await api<{ user: User }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, telegramInitData: telegramInitData ?? undefined })
     });
     setUser(data.user);
     return data.user;
