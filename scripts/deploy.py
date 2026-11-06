@@ -142,8 +142,76 @@ def print_output(result: CommandResult) -> None:
         print(result.stderr.strip(), file=sys.stderr)
 
 
+def remote_free_mb(password: str, args: argparse.Namespace) -> int | None:
+    result = run_remote(
+        password=password,
+        host=args.host,
+        user=args.user,
+        hostkey=args.hostkey,
+        remote_command="df -Pm / | awk 'NR==2 {print $4}'",
+        retries=args.ssh_retries,
+    )
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return None
+
+
+# Диск на VPS маленький: образы и кеш сборки копятся с каждым деплоем. Когда диск
+# заполнился (06.11.2026), не стартовал Postgres и сайт лёг. Чистим только то, что не
+# используется ни одним контейнером; тома с базой и загрузками не трогаем.
+CLEANUP_COMMAND = (
+    "docker image prune -af && "
+    "docker builder prune -af --filter until=168h && "
+    "df -h /"
+)
+
+
+def cleanup_docker(password: str, args: argparse.Namespace) -> None:
+    result = run_remote(
+        password=password,
+        host=args.host,
+        user=args.user,
+        hostkey=args.hostkey,
+        remote_command=CLEANUP_COMMAND,
+        retries=args.ssh_retries,
+    )
+    lines = [line for line in result.stdout.splitlines() if "reclaimed" in line or line.startswith(("Filesystem", "/dev"))]
+    print("\n".join(lines) if lines else "(nothing reclaimed)")
+    if result.returncode != 0:
+        print(f"Warning: docker cleanup exited with {result.returncode}", file=sys.stderr)
+        print_output(CommandResult(returncode=result.returncode, stdout="", stderr=result.stderr))
+
+
+def ensure_free_space(password: str, args: argparse.Namespace) -> bool:
+    free_mb = remote_free_mb(password, args)
+    if free_mb is None:
+        print("Warning: could not read free disk space, continuing.", file=sys.stderr)
+        return True
+    print(f"Free disk space on server: {free_mb} MB")
+    if free_mb >= args.min_free_mb:
+        return True
+
+    print(f"Less than {args.min_free_mb} MB free, cleaning unused Docker images and build cache...")
+    cleanup_docker(password, args)
+    free_mb = remote_free_mb(password, args)
+    if free_mb is not None and free_mb >= args.min_free_mb:
+        return True
+
+    print(
+        f"Still only {free_mb} MB free (need {args.min_free_mb} MB). Deploy aborted so Postgres "
+        "doesn't run out of disk. Check `du -xh / --max-depth=2 | sort -h | tail` on the server.",
+        file=sys.stderr,
+    )
+    return False
+
+
 def deploy(args: argparse.Namespace) -> int:
     password = require_password(args.password)
+
+    print("[0/3] Checking free disk space...")
+    if not ensure_free_space(password, args):
+        return 1
 
     deploy_command = (
         f"cd {args.remote_dir} && "
@@ -151,7 +219,7 @@ def deploy(args: argparse.Namespace) -> int:
         "docker compose up -d --build"
     )
 
-    print("[1/2] Deploying on server...")
+    print("[1/3] Deploying on server...")
     deploy_result = run_remote_streamed(
         password=password,
         host=args.host,
@@ -165,7 +233,7 @@ def deploy(args: argparse.Namespace) -> int:
 
     health_command = f"docker exec {args.container} wget -qO- {args.health_url}"
 
-    print("[2/2] Waiting for health-check...")
+    print("[2/3] Waiting for health-check...")
     for attempt in range(1, args.health_attempts + 1):
         health_result = run_remote(
             password=password,
@@ -177,6 +245,8 @@ def deploy(args: argparse.Namespace) -> int:
         )
         if health_result.returncode == 0:
             print_output(health_result)
+            print("[3/3] Removing unused Docker images and old build cache...")
+            cleanup_docker(password, args)
             print("Deploy finished successfully.")
             return 0
 
@@ -201,6 +271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--health-url", default=config_data.get("health_url", DEFAULT_HEALTH_URL))
     parser.add_argument("--health-attempts", type=int, default=config_data.get("health_attempts", 8))
     parser.add_argument("--health-wait", type=int, default=config_data.get("health_wait", 3))
+    parser.add_argument("--min-free-mb", type=int, default=config_data.get("min_free_mb", 1500))
     parser.add_argument("--ssh-retries", type=int, default=config_data.get("ssh_retries", 2))
     return parser.parse_args()
 
