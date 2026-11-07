@@ -3570,7 +3570,9 @@ button.trend-bar-slot:focus-visible {
   --hero-bg: var(--brand-navy-deep);
   --hero-bar: oklch(0.45 0.07 272);
   --display-font: "Unbounded", "Manrope Variable", sans-serif;
-  --tabbar-h: 50px;
+  --tabbar-h: 52px;
+  /* отступ под полоску iPhone: системный (~34px) слишком щедрый для таббара */
+  --tabbar-safe: max(6px, calc(env(safe-area-inset-bottom) - 16px));
 }
 
 :root[data-theme="dark"] {
@@ -3814,15 +3816,14 @@ button.trend-bar-slot:focus-visible {
   .app-topbar-actions { gap: 6px; }
   .app-topbar-actions .theme-toggle, .icon-button { width: 40px; height: 40px; min-width: 40px; }
   .app-content { padding: 16px 16px 40px; }
-  .has-tabbar .app-content { padding-bottom: calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)); }
+  .has-tabbar .app-content { padding-bottom: calc(var(--tabbar-h) + var(--tabbar-safe) + 24px); }
   .app-nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    height: calc(var(--tabbar-h) + var(--tabbar-safe)); padding-bottom: var(--tabbar-safe);
     background: var(--surface); border-top: 1px solid var(--border);
     display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0;
   }
-  .app-nav-link { flex-direction: column; justify-content: center; gap: 2px; font-size: 11px; line-height: 1.1; padding: 0; border-bottom: 0; margin: 0; }
-  .app-nav-icon svg { width: 20px; height: 20px; }
+  .app-nav-link { flex-direction: column; justify-content: center; gap: 3px; font-size: 12px; line-height: 1.1; padding: 0; border-bottom: 0; margin: 0; }
   .app-nav-link.active { color: var(--accent); }
   .app-nav-icon { display: block; line-height: 0; }
   .page-stack { gap: 16px; }
