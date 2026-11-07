@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
+import { FEEDBACK_WINDOW_DAYS, getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
 import {
   addWorkoutComment,
   getTrainerFeed,
@@ -110,7 +111,7 @@ export async function trainerRoutes(app: FastifyInstance) {
   app.get("/api/trainer/dashboard", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
 
-    const [athletesResult, workoutsResult, summaryResult, connectedResult, leadersResult] = await Promise.all([
+    const [athletesResult, workoutsResult, summaryResult, connectedResult, leadersResult, pendingResult] = await Promise.all([
       pool.query(
         `
           select u.id, u.full_name, u.username, u.avatar_url,
@@ -132,7 +133,9 @@ export async function trainerRoutes(app: FastifyInstance) {
             coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
             coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate,
             coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
-            u.full_name as athlete_name
+            u.full_name as athlete_name,
+            u.avatar_url as athlete_avatar_url,
+            ${HAS_COACH_FEEDBACK_SQL} as has_feedback
           from workouts w
           join users u on u.id = w.user_id
           left join workout_corrections wc on wc.workout_id = w.id
@@ -197,8 +200,21 @@ export async function trainerRoutes(app: FastifyInstance) {
           limit 3
         `,
         [request.user.id]
+      ),
+      pool.query(
+        `
+          select count(*) as pending_count, min(w.start_date) as oldest_pending_at
+          from workouts w
+          join users u on u.id = w.user_id
+          where u.role = 'athlete' and u.coach_id = $1
+            and w.start_date >= now() - $2::int * interval '1 day'
+            and not ${HAS_COACH_FEEDBACK_SQL}
+        `,
+        [request.user.id, FEEDBACK_WINDOW_DAYS]
       )
     ]);
+
+    const volume = await getWeeklyVolume(athletesResult.rows.map((row) => Number(row.id)));
 
     const summary = summaryResult.rows[0];
 
@@ -206,6 +222,18 @@ export async function trainerRoutes(app: FastifyInstance) {
       athletes: athletesResult.rows,
       recentWorkouts: workoutsResult.rows,
       connectedAthletesCount: Number(connectedResult.rows[0]?.connected_count ?? 0),
+      feedback: {
+        pendingCount: Number(pendingResult.rows[0]?.pending_count ?? 0),
+        oldestPendingAt: pendingResult.rows[0]?.oldest_pending_at ?? null,
+        windowDays: FEEDBACK_WINDOW_DAYS
+      },
+      groupWeeks: {
+        weekStarts: volume.weekStarts,
+        athletes: athletesResult.rows.map((row) => ({
+          id: Number(row.id),
+          distances: volume.byUser.get(Number(row.id)) ?? []
+        }))
+      },
       stats: {
         week: {
           athlete_count: athletesResult.rows.length,

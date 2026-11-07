@@ -20,6 +20,7 @@ const cardsModule = await import("./lib/report-cards.js");
 const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 const telegramAuthModule = await import("./lib/telegram-auth.js");
+const weeklyVolumeModule = await import("./lib/weekly-volume.js");
 const { createHmac } = await import("node:crypto");
 
 // initData, подписанная так же, как это делает Telegram для Mini App
@@ -768,6 +769,15 @@ await runTest("telegram usernames are normalized from @, links and case", () => 
   assert.equal(telegramAuthModule.normalizeTelegramUsername(" t.me/Max_Runner "), "max_runner");
   assert.equal(telegramAuthModule.normalizeTelegramUsername("макс"), null);
   assert.equal(telegramAuthModule.normalizeTelegramUsername("@a b"), null);
+});
+
+await runTest("week streak keeps going while the current week is still empty", () => {
+  const { countWeekStreak } = weeklyVolumeModule;
+  assert.equal(countWeekStreak([true, true, true, true]), 4);
+  assert.equal(countWeekStreak([false, true, true, false]), 2, "empty current week doesn't break the streak");
+  assert.equal(countWeekStreak([true, false, true, true]), 2);
+  assert.equal(countWeekStreak([true, true, false, false]), 0, "a whole missed week does");
+  assert.equal(countWeekStreak([]), 0);
 });
 
 console.log("All server tests passed.");

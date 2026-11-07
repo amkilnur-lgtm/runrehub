@@ -10,10 +10,13 @@ import { LoginPage } from "./pages/LoginPage";
 import { AdminPage } from "./pages/AdminPage";
 import { TrainerDashboardPage } from "./pages/TrainerDashboardPage";
 import { TrainerAthletePage } from "./pages/TrainerAthletePage";
+import { TrainerFeedPage } from "./pages/TrainerFeedPage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
 import { AthleteProfilePage } from "./pages/AthleteProfilePage";
 import "@fontsource-variable/manrope";
+import "@fontsource/unbounded/cyrillic-700.css";
+import "@fontsource/unbounded/latin-700.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
 
@@ -36,6 +39,7 @@ const router = createBrowserRouter([
             element: <RequireRole roles={["trainer"]} />,
             children: [
               { path: "/trainer", element: <TrainerDashboardPage /> },
+              { path: "/trainer/feed", element: <TrainerFeedPage /> },
               { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
               { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> }
             ]

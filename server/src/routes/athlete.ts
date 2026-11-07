@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
+  downsampleRoute,
   addWorkoutComment,
   getAthleteFeed,
   getAthleteOverview,
@@ -18,6 +19,7 @@ import {
   listWorkoutComments
 } from "../lib/social.js";
 import { getStoredActivityStreams, markWorkoutDeleted } from "../lib/strava.js";
+import { getWeekStreak, getWeeklyVolume } from "../lib/weekly-volume.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
@@ -53,6 +55,63 @@ type AthleteStatsRow = {
   all_time_elevation_gain: number | string | null;
   all_time_workout_count: number | string | null;
 };
+
+async function getAthleteHighlights(userId: number) {
+  const [volume, streakWeeks, latestResult] = await Promise.all([
+    getWeeklyVolume([userId]),
+    getWeekStreak(userId),
+    pool.query(
+      `
+        select
+          w.id, w.name, w.start_date,
+          coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+          coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
+          coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
+          coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate,
+          coalesce(
+            nullif(btrim(w.coach_comment), ''),
+            (select c.body from workout_comments c
+              where c.workout_id = w.id and c.author_id = u.coach_id
+              order by c.created_at desc limit 1)
+          ) as coach_note,
+          coach.full_name as coach_name,
+          coach.avatar_url as coach_avatar_url,
+          s.latlng_stream
+        from workouts w
+        join users u on u.id = w.user_id
+        left join users coach on coach.id = u.coach_id
+        left join workout_corrections wc on wc.workout_id = w.id
+        left join workout_streams s on s.workout_id = w.id
+        where w.user_id = $1
+        order by w.start_date desc, w.id desc
+        limit 1
+      `,
+      [userId]
+    )
+  ]);
+
+  const latest = latestResult.rows[0];
+  return {
+    weekStarts: volume.weekStarts,
+    weeklyDistances: volume.byUser.get(userId) ?? [],
+    streakWeeks,
+    latestWorkout: latest
+      ? {
+          id: Number(latest.id),
+          name: latest.name,
+          start_date: latest.start_date,
+          distance_meters: Number(latest.distance_meters ?? 0),
+          moving_time_seconds: Number(latest.moving_time_seconds ?? 0),
+          average_speed: latest.average_speed === null ? null : Number(latest.average_speed),
+          average_heartrate: latest.average_heartrate === null ? null : Number(latest.average_heartrate),
+          route: downsampleRoute(latest.latlng_stream),
+          coach_note: latest.coach_note ?? null,
+          coach_name: latest.coach_note ? latest.coach_name ?? null : null,
+          coach_avatar_url: latest.coach_note ? latest.coach_avatar_url ?? null : null
+        }
+      : null
+  };
+}
 
 export async function athleteRoutes(app: FastifyInstance) {
   app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request, reply) => {
@@ -153,8 +212,11 @@ export async function athleteRoutes(app: FastifyInstance) {
 
     const workouts = workoutsResult.rows;
     const stats = statsResult.rows[0];
+    // Блок «эта неделя», серия и последняя пробежка нужны только на первой странице
+    const highlights = hasCursor ? null : await getAthleteHighlights(request.user.id);
     return {
       athlete: profileResult.rows[0],
+      highlights,
       stats: {
         week: {
           distance_meters: Number(stats?.week_distance_meters ?? 0),

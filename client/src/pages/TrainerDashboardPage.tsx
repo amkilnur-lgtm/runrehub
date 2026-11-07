@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AthleteFeed } from "../components/AthleteFeed";
+import { GroupWeeksTable, type GroupWeeksAthlete } from "../components/GroupWeeksTable";
 import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../components/AuthProvider";
-import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
 import { useApi } from "../hooks/useApi";
-import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+import { formatAgo, formatPace, formatKm, greetingFor, pluralRu } from "../lib";
 
 type StatsPeriodKey = "week" | "month" | "year" | "allTime";
 
@@ -30,288 +29,239 @@ type DashboardData = {
     id: number;
     user_id: number;
     athlete_name: string;
+    athlete_avatar_url: string | null;
     name: string;
     start_date: string;
     distance_meters: number;
     moving_time_seconds: number;
     average_speed: number | null;
+    average_heartrate: number | null;
+    has_feedback: boolean;
   }>;
   connectedAthletesCount: number;
-  stats: {
-    week: GroupPeriodStats;
-    month: GroupPeriodStats;
-    year: GroupPeriodStats;
-    allTime: GroupPeriodStats;
-  };
+  feedback: { pendingCount: number; oldestPendingAt: string | null; windowDays: number };
+  groupWeeks: { weekStarts: string[]; athletes: Array<{ id: number; distances: number[] }> };
+  stats: Record<StatsPeriodKey, GroupPeriodStats>;
   topAthletesThisWeek: Array<{
     id: number;
     full_name: string;
-    username: string;
     avatar_url: string | null;
     week_distance_meters: number;
     week_workout_count: number;
   }>;
 };
 
-const statsPeriods: Array<{ key: StatsPeriodKey; label: string }> = [
-  { key: "week", label: "Неделя" },
-  { key: "month", label: "Месяц" },
-  { key: "year", label: "Год" },
-  { key: "allTime", label: "Все время" }
+const statsPeriods: Array<{ key: StatsPeriodKey; label: string; phrase: string }> = [
+  { key: "week", label: "Неделя", phrase: "на этой неделе" },
+  { key: "month", label: "Месяц", phrase: "в этом месяце" },
+  { key: "year", label: "Год", phrase: "в этом году" },
+  { key: "allTime", label: "Всё время", phrase: "за всё время" }
 ];
 
-function formatStatsHours(seconds: number) {
-  if (seconds <= 0) {
-    return "0ч 0м";
-  }
+const RECENT_LIMIT = 8;
 
+function formatHoursMinutes(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return `${hours}ч ${minutes}м`;
+  return { hours, minutes };
 }
 
-function pluralize(count: number, one: string, few: string, many: string) {
-  const lastTwo = count % 100;
-  const lastOne = count % 10;
-
-  if (lastTwo >= 11 && lastTwo <= 14) {
-    return many;
-  }
-
-  if (lastOne === 1) {
-    return one;
-  }
-
-  if (lastOne >= 2 && lastOne <= 4) {
-    return few;
-  }
-
-  return many;
-}
-
-function formatAthleteCount(count: number) {
-  return `${count} ${pluralize(count, "спортсмен", "спортсмена", "спортсменов")}`;
-}
-
-function formatConnectedCount(count: number) {
-  return `${count} ${pluralize(count, "спортсмен подключил", "спортсмена подключили", "спортсменов подключили")} синхронизацию`;
-}
-
-function formatWorkoutCount(count: number) {
-  return `${count} ${pluralize(count, "тренировка", "тренировки", "тренировок")}`;
-}
-
-function formatPeriodPhrase(period: StatsPeriodKey) {
-  switch (period) {
-    case "week":
-      return "за неделю";
-    case "month":
-      return "за месяц";
-    case "year":
-      return "за год";
-    case "allTime":
-      return "за все время";
-  }
-}
-
-function formatSummaryCaption(period: StatsPeriodKey, stats: GroupPeriodStats) {
-  const periodPhrase = formatPeriodPhrase(period);
-
-  if (stats.workout_count === 0) {
-    return `У группы пока нет завершенных тренировок ${periodPhrase}.`;
-  }
-
-  return `${formatAthleteCount(stats.active_athlete_count)} из ${formatAthleteCount(stats.athlete_count)} были активны ${periodPhrase}.`;
+function formatDaysAgo(value: string) {
+  const days = Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000);
+  if (days <= 0) return "сегодня";
+  if (days === 1) return "вчера";
+  return `${days} ${pluralRu(days, "день", "дня", "дней")} назад`;
 }
 
 export function TrainerDashboardPage() {
   const { user } = useAuth();
   const { data, loading, error } = useApi<DashboardData>("/api/trainer/dashboard");
-  const [selectedPeriod, setSelectedPeriod] = useState<StatsPeriodKey>("week");
+  const [period, setPeriod] = useState<StatsPeriodKey>("week");
 
   if (loading) {
     return (
-      <div className="stack">
-        <section className="trainer-dashboard-header skeleton-card" />
-        <div className="grid two-columns">
-          <section className="card skeleton-card">
-            <h2>Спортсмены</h2>
-            <p className="muted">Загрузка...</p>
-          </section>
-          <section className="card skeleton-card">
-            <h2>Последние пробежки</h2>
-            <p className="muted">Загрузка...</p>
-          </section>
-        </div>
+      <div className="page-stack">
+        <div className="skeleton-block" style={{ height: 72 }} />
+        <div className="skeleton-block" style={{ height: 120 }} />
+        <div className="skeleton-block" style={{ height: 420 }} />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="card">
-        <h2>Ошибка</h2>
-        <p className="muted">{error || "Не удалось загрузить данные"}</p>
-      </div>
+      <section className="panel panel-pad">
+        <h2 className="panel-title">Не удалось загрузить кабинет</h2>
+        <p className="muted">{error || "Попробуйте обновить страницу."}</p>
+      </section>
     );
   }
 
-  const selectedStats = data.stats[selectedPeriod];
-  const hasLeaderData = data.topAthletesThisWeek.some(
-    (athlete) => athlete.week_distance_meters > 0 || athlete.week_workout_count > 0
+  const stats = data.stats[period];
+  const periodInfo = statsPeriods.find((item) => item.key === period)!;
+  const time = formatHoursMinutes(stats.moving_time_seconds);
+  const firstName = user?.fullName?.split(" ")[0] ?? "";
+  const weekStats = data.stats.week;
+
+  const tableAthletes: GroupWeeksAthlete[] = data.athletes.map((athlete) => ({
+    id: athlete.id,
+    fullName: athlete.full_name,
+    avatarUrl: athlete.avatar_url,
+    lastWorkoutAt: athlete.last_workout_at,
+    distances: data.groupWeeks.athletes.find((row) => row.id === athlete.id)?.distances ?? []
+  }));
+
+  const pending = data.feedback.pendingCount;
+  const leadersWithData = data.topAthletesThisWeek.filter((athlete) => athlete.week_distance_meters > 0);
+  const leaderMax = Math.max(...leadersWithData.map((athlete) => athlete.week_distance_meters), 1);
+  const inactive = data.athletes.filter(
+    (athlete) => !athlete.last_workout_at || Date.now() - new Date(athlete.last_workout_at).getTime() >= 5 * 86_400_000
   );
 
   return (
-    <div className="stack">
-      <section className="trainer-dashboard-header">
-        <div className="trainer-dashboard-grid">
-          <div className="trainer-dashboard-panel trainer-dashboard-identity">
-            <div className="trainer-dashboard-identity-main">
-              <EditableAvatarMenu
-                fullName={user?.fullName}
-                avatarUrl={user?.avatarUrl}
-                className="trainer-dashboard-avatar"
-              />
-              <div className="trainer-dashboard-title">
-                <h2>{user?.fullName}</h2>
-                <p className="muted">@{user?.username}</p>
-              </div>
-            </div>
-            <div className="trainer-dashboard-meta">
-              <div>{formatAthleteCount(data.athletes.length)}</div>
-              <div className="muted">{formatConnectedCount(data.connectedAthletesCount)}</div>
-            </div>
-          </div>
+    <div className="page-stack">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">
+            {greetingFor(new Date())}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="page-subtitle">
+            Бегали на этой неделе {weekStats.active_athlete_count} из{" "}
+            {weekStats.athlete_count} {pluralRu(weekStats.athlete_count, "спортсмена", "спортсменов", "спортсменов")}
+          </p>
+        </div>
+        <div className="segmented" role="tablist" aria-label="Период">
+          {statsPeriods.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={item.key === period}
+              className={item.key === period ? "segmented-item is-active" : "segmented-item"}
+              onClick={() => setPeriod(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div className="trainer-dashboard-panel trainer-dashboard-summary">
-            <div className="trainer-dashboard-summary-topbar">
-              <div className="trainer-dashboard-heading">
-                <span className="muted trainer-dashboard-eyebrow">Сводка</span>
-                <h2>Статистика по спортсменам</h2>
-              </div>
-              <div className="athlete-stats-periods" role="tablist" aria-label="Период статистики">
-                {statsPeriods.map((period) => (
-                  <button
-                    key={period.key}
-                    type="button"
-                    className={
-                      period.key === selectedPeriod
-                        ? "athlete-stats-period is-active"
-                        : "athlete-stats-period"
-                    }
-                    onClick={() => setSelectedPeriod(period.key)}
-                  >
-                    {period.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="trainer-dashboard-stats">
-              <div className="trainer-dashboard-stat">
-                <span className="muted">Активные</span>
-                <strong>{selectedStats.active_athlete_count}</strong>
-              </div>
-              <div className="trainer-dashboard-stat">
-                <span className="muted">Тренировки</span>
-                <strong>{selectedStats.workout_count}</strong>
-              </div>
-              <div className="trainer-dashboard-stat">
-                <span className="muted">Километраж</span>
-                <strong>{formatDistance(selectedStats.distance_meters)}</strong>
-              </div>
-              <div className="trainer-dashboard-stat">
-                <span className="muted">Время</span>
-                <strong>{formatStatsHours(selectedStats.moving_time_seconds)}</strong>
-              </div>
-            </div>
-            <p className="muted trainer-dashboard-caption">
-              {formatSummaryCaption(selectedPeriod, selectedStats)}
-            </p>
+      <section className="kpi-strip" aria-label={`Сводка группы ${periodInfo.phrase}`}>
+        <div className="kpi">
+          <div className="kpi-label">Километраж группы</div>
+          <div className="kpi-value num">
+            {formatKm(stats.distance_meters)}
+            <small>км</small>
           </div>
-
-          <div className="trainer-dashboard-panel trainer-dashboard-leaders">
-            <div className="trainer-dashboard-heading">
-              <span className="muted trainer-dashboard-eyebrow">Лидеры</span>
-              <h2>Топ-3 на неделе</h2>
-            </div>
-            {hasLeaderData ? (
-              <div className="trainer-dashboard-leader-list">
-                {data.topAthletesThisWeek.map((athlete, index) => (
-                  <Link
-                    key={athlete.id}
-                    className="trainer-dashboard-leader-row"
-                    to={`/trainer/athletes/${athlete.id}`}
-                  >
-                    <div className="trainer-dashboard-leader-rank">{index + 1}</div>
-                    <UserAvatar
-                      fullName={athlete.full_name}
-                      avatarUrl={athlete.avatar_url}
-                      className="trainer-dashboard-leader-avatar"
-                      ariaHidden
-                    />
-                    <div className="trainer-dashboard-leader-text">
-                      <strong>{athlete.full_name}</strong>
-                      <div className="muted">{formatWorkoutCount(athlete.week_workout_count)}</div>
-                    </div>
-                    <div className="trainer-dashboard-leader-distance">
-                      {formatDistance(athlete.week_distance_meters)}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="trainer-dashboard-leader-empty">
-                <strong>На этой неделе пока нет завершенных тренировок.</strong>
-                <div className="muted">Лидеры появятся, как только группа начнет набирать объем.</div>
-              </div>
-            )}
+          <div className="kpi-note">{periodInfo.phrase}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Тренировок</div>
+          <div className="kpi-value num">{stats.workout_count}</div>
+          <div className="kpi-note">
+            {stats.active_athlete_count
+              ? `в среднем ${(stats.workout_count / stats.active_athlete_count).toFixed(1).replace(".", ",")} на бегавшего`
+              : "пока ни одной"}
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Время в беге</div>
+          <div className="kpi-value num">
+            {time.hours}
+            <small>ч</small> {time.minutes}
+            <small>м</small>
+          </div>
+          <div className="kpi-note">{periodInfo.phrase}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Ждут комментария</div>
+          <div className={pending ? "kpi-value num is-accent" : "kpi-value num"}>{pending}</div>
+          <div className="kpi-note">
+            {pending && data.feedback.oldestPendingAt
+              ? `самая старая — ${formatDaysAgo(data.feedback.oldestPendingAt)}`
+              : `за последние ${data.feedback.windowDays} дней всё прокомментировано`}
           </div>
         </div>
       </section>
 
-      <div className="grid two-columns trainer-dashboard-sections">
-        <section className="card trainer-dashboard-list-section">
-            <div className="trainer-dashboard-heading">
-              <span className="muted trainer-dashboard-eyebrow">Спортсмены</span>
-            </div>
-            {data.athletes.length === 0 ? (
-              <div className="trainer-dashboard-leader-empty">
-                <strong>У вас пока нет спортсменов.</strong>
-                <div className="muted">Администратор назначает спортсменов тренеру в админке.</div>
-              </div>
-            ) : null}
-            <div className="trainer-dashboard-athlete-list">
-              {data.athletes.map((athlete) => (
-                <Link
-                  key={athlete.id}
-                  className="trainer-dashboard-athlete-row"
-                  to={`/trainer/athletes/${athlete.id}`}
-                >
-                  <UserAvatar
-                    fullName={athlete.full_name}
-                    avatarUrl={athlete.avatar_url}
-                    className="trainer-dashboard-leader-avatar"
-                    ariaHidden
-                  />
-                  <div className="trainer-dashboard-leader-text">
-                    <strong>{athlete.full_name}</strong>
-                    <div className="muted">@{athlete.username}</div>
-                  </div>
-                  <div className="trainer-dashboard-athlete-meta">
-                    <div>{athlete.last_workout_at ? formatDate(athlete.last_workout_at) : "—"}</div>
-                    <div className="muted">последняя пробежка</div>
-                  </div>
-                </Link>
+      {inactive.length ? (
+        <div className="notice notice-warn" role="status">
+          <strong>Не бегали 5+ дней:</strong> {inactive.map((athlete) => athlete.full_name.split(" ")[0]).join(", ")}
+        </div>
+      ) : null}
+
+      <GroupWeeksTable weekStarts={data.groupWeeks.weekStarts} athletes={tableAthletes} />
+
+      <div className="split">
+        <section className="panel split-main">
+          <div className="panel-head">
+            <h2 className="panel-title">Последние пробежки</h2>
+            <span className="panel-hint">Сначала новые</span>
+          </div>
+          {data.recentWorkouts.length === 0 ? (
+            <p className="empty">Пробежки появятся здесь, как только спортсмены синхронизируют часы.</p>
+          ) : (
+            <ul className="run-list">
+              {data.recentWorkouts.slice(0, RECENT_LIMIT).map((workout) => (
+                <li key={workout.id}>
+                  <Link className="run-row" to={`/trainer/workouts/${workout.id}`}>
+                    <UserAvatar fullName={workout.athlete_name} avatarUrl={workout.athlete_avatar_url} className="avatar-sm" ariaHidden />
+                    <div className="run-row-main">
+                      <strong>{workout.athlete_name}</strong>
+                      <span>
+                        {workout.name} · {formatAgo(workout.start_date)}
+                      </span>
+                    </div>
+                    <div className="run-metric num">
+                      {formatKm(workout.distance_meters)}
+                      <small>км</small>
+                    </div>
+                    <div className="run-metric num run-metric-opt">
+                      {formatPace(workout.average_speed).replace("/км", "")}
+                      <small>/км</small>
+                    </div>
+                    <div className="run-metric num run-metric-opt">
+                      {workout.average_heartrate ? Math.round(workout.average_heartrate) : "—"}
+                      <small>пульс</small>
+                    </div>
+                    <span className={workout.has_feedback ? "status-tag" : "status-tag is-todo"}>
+                      {workout.has_feedback ? "Прокомментирована" : "Ждёт комментария"}
+                    </span>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
+          )}
+          <Link to="/trainer/feed" className="panel-footer-link">
+            Вся лента
+          </Link>
         </section>
 
-        <div>
-          <div className="feed-head">
-            <span className="muted trainer-dashboard-eyebrow">Лента команды</span>
+        <section className="panel split-side">
+          <div className="panel-head">
+            <h2 className="panel-title">Лидеры недели</h2>
+            <span className="panel-hint">по километражу</span>
           </div>
-          <AthleteFeed viewer="trainer" />
-        </div>
+          {leadersWithData.length === 0 ? (
+            <p className="empty">На этой неделе пока никто не бегал. Лидеры появятся после первых пробежек.</p>
+          ) : (
+            <ol className="leader-list">
+              {leadersWithData.map((athlete, index) => (
+                <li key={athlete.id}>
+                  <Link className="leader-row" to={`/trainer/athletes/${athlete.id}`}>
+                    <span className={index === 0 ? "leader-place is-first" : "leader-place"}>{index + 1}</span>
+                    <span className="leader-name">{athlete.full_name}</span>
+                    <span className="leader-bar" aria-hidden="true">
+                      <i style={{ width: `${(athlete.week_distance_meters / leaderMax) * 100}%` }} />
+                    </span>
+                    <span className="leader-km num">{formatKm(athlete.week_distance_meters)} км</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       </div>
     </div>
   );

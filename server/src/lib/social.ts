@@ -78,7 +78,7 @@ function simplifyRdp(points: Array<[number, number]>, epsilon: number) {
   return keep;
 }
 
-function downsampleRoute(latlng: unknown): [number, number][] | null {
+export function downsampleRoute(latlng: unknown): [number, number][] | null {
   if (!Array.isArray(latlng) || latlng.length < 2) {
     return null;
   }

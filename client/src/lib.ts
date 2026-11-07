@@ -32,7 +32,7 @@ export function formatDate(value: string) {
   });
 }
 
-function pluralRu(n: number, one: string, few: string, many: string) {
+export function pluralRu(n: number, one: string, few: string, many: string) {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return one;
@@ -53,4 +53,19 @@ export function formatAgo(value: string) {
   const time = then.toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   if (hours < 48) return `вчера, ${time}`;
   return then.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// Километры для сводок: «24,6», от 100 км — без десятых
+export function formatKm(meters: number, digits?: number) {
+  const km = meters / 1000;
+  const fraction = digits ?? (km >= 100 ? 0 : 1);
+  return km.toLocaleString("ru-RU", { minimumFractionDigits: fraction, maximumFractionDigits: fraction });
+}
+
+export function greetingFor(date: Date) {
+  const hour = date.getHours();
+  if (hour < 5) return "Доброй ночи";
+  if (hour < 12) return "Доброе утро";
+  if (hour < 18) return "Добрый день";
+  return "Добрый вечер";
 }
