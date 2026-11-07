@@ -6,6 +6,7 @@ import { AthleteFeed } from "../components/AthleteFeed";
 import { AthleteTrends } from "../components/AthleteTrends";
 import { useAuth } from "../components/AuthProvider";
 import { RouteStaticMap } from "../components/RouteStaticMap";
+import { ShareStoryButton } from "../components/ShareStoryButton";
 import { UserAvatar } from "../components/UserAvatar";
 import { useApi } from "../hooks/useApi";
 import { formatAgo, formatDuration, formatKm, formatPace, pluralRu } from "../lib";
@@ -184,8 +185,9 @@ function LatestRun({ workout }: { workout: NonNullable<Highlights["latestWorkout
         </div>
       ) : null}
       <div className="latest-run-actions">
-        <Link className="primary-button" to={`/athlete/workouts/${workout.id}`}>
-          Открыть разбор
+        <ShareStoryButton workoutId={workout.id} role="athlete" title={workout.name} className="primary-button share-primary" />
+        <Link className="secondary-button" to={`/athlete/workouts/${workout.id}`}>
+          Разбор
         </Link>
       </div>
     </article>

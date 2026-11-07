@@ -780,4 +780,22 @@ await runTest("week streak keeps going while the current week is still empty", (
   assert.equal(countWeekStreak([]), 0);
 });
 
+await runTest("story card renders a 1080x1920 PNG with and without a route", async () => {
+  const base = {
+    title: "Темповый бег", athleteName: "Анна", dateLabel: "7 ноября",
+    distanceMeters: 10234, movingTimeSeconds: 3021, averageSpeed: 3.39, averageHeartrate: 151, elevationGain: 34,
+    zonePercentages: { under130: 10, from130To150: 50, from150To162: 30, from162Plus: 10 }
+  };
+  const withRoute = await cardsModule.renderStoryCard({
+    ...base,
+    route: [[54.73, 55.95], [54.735, 55.955], [54.74, 55.95], [54.735, 55.945], [54.73, 55.95]]
+  });
+  const withoutRoute = await cardsModule.renderStoryCard({ ...base, route: null });
+  for (const png of [withRoute, withoutRoute]) {
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    assert.equal(png.readUInt32BE(16), 1080);
+    assert.equal(png.readUInt32BE(20), 1920);
+  }
+});
+
 console.log("All server tests passed.");

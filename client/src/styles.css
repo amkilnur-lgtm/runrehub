@@ -3955,3 +3955,21 @@ button.trend-bar-slot:focus-visible {
   .profile-periods { flex: 1 1 100%; }
 }
 .section-title { margin: 8px 0 -8px; font-size: 18px; font-weight: 750; }
+
+/* Кнопка «Поделиться» (сторис) */
+.share-button {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 40px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+  font: inherit; font-weight: 700; font-size: 14.5px;
+  color: var(--accent); background: var(--accent-soft); border: 0;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.share-button:hover { background: var(--accent); color: var(--accent-ink); }
+.share-button:disabled { opacity: 0.7; cursor: progress; }
+.share-button:focus-visible, .secondary-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.share-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: pointer; font: inherit; }
+.secondary-button {
+  min-height: 44px; padding: 0 18px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; text-decoration: none; color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.secondary-button:hover { background: var(--surface-2); }

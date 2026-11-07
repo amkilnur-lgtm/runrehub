@@ -3,7 +3,7 @@ import { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
 import { pool } from "./db.js";
 import { addStravaEvent } from "./strava-events.js";
-import { renderPeriodCard, renderWorkoutCard } from "./report-cards.js";
+import { renderPeriodCard, renderStoryCard, renderWorkoutCard } from "./report-cards.js";
 import { getStoredActivityStreams } from "./strava.js";
 import {
   formatCardMonthTitle,
@@ -455,14 +455,15 @@ function stepsPerMinute(cadence: number | null) {
   return cadence < 120 ? cadence * 2 : cadence;
 }
 
-export async function buildWorkoutCardPng(workoutId: number, athleteName: string) {
+// Данные пробежки для картинок: с учётом правок тренера (обрезка, GPS-фикс) —
+// картинка показывает то же, что сайт
+async function loadWorkoutCardData(workoutId: number) {
   const { rows } = await pool.query(`select * from workouts where id = $1`, [workoutId]);
   const row = rows[0];
   if (!row) {
     throw new Error("WORKOUT_NOT_FOUND");
   }
 
-  // с учётом правок тренера (обрезка, GPS-фикс): карточка = то, что видно на сайте
   const streams = await getStoredActivityStreams(workoutId);
   const correction = await getActiveWorkoutCorrection(workoutId);
   const view = applyWorkoutCorrectionToView(row, [], streams, correction);
@@ -480,7 +481,32 @@ export async function buildWorkoutCardPng(workoutId: number, athleteName: string
       zoneSeconds[zoneIndex] += dt;
     }
   }
+  const route = (viewStreams?.latlng ?? []).filter(
+    (point): point is [number, number] =>
+      Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]) && (point[0] !== 0 || point[1] !== 0)
+  );
+  return { row, workout, zoneSeconds, route };
+}
 
+export async function buildStoryCardPng(workoutId: number, athleteName: string) {
+  const { row, workout, zoneSeconds, route } = await loadWorkoutCardData(workoutId);
+  const toNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+  return renderStoryCard({
+    title: String(workout.name ?? row.name ?? "Пробежка"),
+    athleteName,
+    dateLabel: formatCardWorkoutDate(workout.start_date as string | Date),
+    distanceMeters: Number(workout.distance_meters ?? 0),
+    movingTimeSeconds: Number(workout.moving_time_seconds ?? 0),
+    averageSpeed: toNumber(workout.average_speed),
+    averageHeartrate: toNumber(workout.average_heartrate),
+    elevationGain: Number(workout.elevation_gain ?? 0),
+    route: route.length >= 2 ? route : null,
+    zonePercentages: computeZonePercentages(zoneSeconds)
+  });
+}
+
+export async function buildWorkoutCardPng(workoutId: number, athleteName: string) {
+  const { row, workout, zoneSeconds } = await loadWorkoutCardData(workoutId);
   const toNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
 
   return renderWorkoutCard({

@@ -11,6 +11,7 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 
 import { authRoutes } from "./routes/auth.js";
+import { storyLinkRoutes } from "./lib/story-links.js";
 import { adminRoutes } from "./routes/admin.js";
 import { athleteRoutes } from "./routes/athlete.js";
 import { handleTelegramUpdate } from "./lib/telegram-commands.js";
@@ -105,6 +106,7 @@ app.setErrorHandler((error: any, request, reply) => {
 await ensureSchema();
 
 await app.register(authRoutes);
+await app.register(storyLinkRoutes);
 await app.register(adminRoutes);
 await app.register(athleteRoutes);
 await app.register(trainerRoutes);

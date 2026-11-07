@@ -756,7 +756,7 @@ function storyDistance(meters: number) {
 
 async function storyMap(points: Array<[number, number]>) {
   // трек — между шапкой (до ~320 px) и названием пробежки (с ~980 px)
-  const box = { x: 130, y: (STORY_MAP_H - 600) / 2, centerY: 645 };
+  const box = { x: 130, y: (STORY_MAP_H - 640) / 2, centerY: 690 };
   let layout: RouteLayout;
   try {
     layout = await layoutRoute(points, STORY_W, STORY_MAP_H, box, true);
@@ -791,7 +791,7 @@ async function storyMap(points: Array<[number, number]>) {
     h("div", {
       style: {
         position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H,
-        backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 66%, rgba(0,0,0,1) 92%)"
+        backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 32%, rgba(0,0,0,0) 72%, rgba(0,0,0,1) 98%)"
       }
     }),
     layout.tiles.length
@@ -821,7 +821,7 @@ function storyZonesArt(zones: ZonePercentages | null) {
   bars.length = columns;
   return h(
     "div",
-    { style: { position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H, alignItems: "flex-end", padding: `0 ${STORY_PAD}px 340px`, gap: 10 } },
+    { style: { position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H, alignItems: "flex-end", padding: `0 ${STORY_PAD}px 290px`, gap: 10 } },
     ...bars.map((color, index) =>
       h("div", {
         style: {
@@ -842,13 +842,18 @@ function storyZonesArt(zones: ZonePercentages | null) {
     zones
       ? h(
           "div",
-          { style: { position: "absolute", left: STORY_PAD, top: 880, gap: 28, fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 24, color: COLOR.muted } },
-          ...["до 130", "130–150", "150–162", "162+"].map((label, index) =>
-            h(
-              "div",
-              { style: { alignItems: "center", gap: 10 } },
-              h("div", { style: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLOR.zones[index]! } }),
-              label
+          { style: { position: "absolute", left: STORY_PAD, top: 918, flexDirection: "column", gap: 14, fontFamily: TEXT_FONT, fontWeight: 700 } },
+          h("span", { style: { fontSize: 30, color: COLOR.text } }, "Время в пульсовых зонах"),
+          h(
+            "div",
+            { style: { gap: 28, fontSize: 26, color: COLOR.label } },
+            ...["до 130", "130–150", "150–162", "162+"].map((label, index) =>
+              h(
+                "div",
+                { style: { alignItems: "center", gap: 10 } },
+                h("div", { style: { width: 16, height: 16, borderRadius: 8, backgroundColor: COLOR.zones[index]! } }),
+                label
+              )
             )
           )
         )
@@ -874,31 +879,32 @@ export async function renderStoryCard(input: StoryCardInput) {
   const route = input.route && input.route.length >= 2 ? input.route : null;
   const distance = storyDistance(input.distanceMeters);
   const distanceSize = distance.length >= 5 ? 200 : distance.length === 4 ? 236 : 270;
-  const titleSize = input.title.length > 26 ? 40 : 48;
+  const titleSize = input.title.length > 30 ? 32 : 38;
 
   const tree = h(
     "div",
     { style: { position: "relative", width: STORY_W, height: STORY_H, backgroundColor: COLOR.bg, flexDirection: "column" } },
     route ? await storyMap(route) : storyZonesArt(input.zonePercentages),
-    // шапка ниже зоны интерфейса сторис
+    // шапка ниже зоны интерфейса сторис: бренд крупно, справа дата
     h(
       "div",
-      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 230, justifyContent: "space-between", alignItems: "center" } },
+      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 225, justifyContent: "space-between", alignItems: "center" } },
       h(
         "div",
-        { style: { alignItems: "center", gap: 14 } },
-        h("div", { style: { width: 18, height: 18, borderRadius: 9, backgroundColor: COLOR.accent } }),
-        h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: 30, color: COLOR.text, letterSpacing: 2 } }, "RUNNING REHAB")
+        { style: { alignItems: "center", gap: 16 } },
+        h("div", { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: COLOR.accent } }),
+        h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: 44, color: COLOR.text, letterSpacing: 2 } }, "RUNNING REHAB")
       ),
-      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 30, color: "rgba(255,255,255,0.8)" } }, input.dateLabel)
+      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 32, color: "rgba(255,255,255,0.85)" } }, input.dateLabel)
     ),
     // нижний блок с цифрами
     h(
       "div",
-      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 990, flexDirection: "column" } },
+      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 1070, flexDirection: "column" } },
+      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 800, fontSize: 46, color: COLOR.text } }, input.athleteName),
       h(
         "span",
-        { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: titleSize, color: COLOR.label, maxWidth: STORY_W - STORY_PAD * 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" } },
+        { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: titleSize, color: COLOR.label, marginTop: 2, maxWidth: STORY_W - STORY_PAD * 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" } },
         input.title
       ),
       h(
@@ -917,13 +923,6 @@ export async function renderStoryCard(input: StoryCardInput) {
           ? storyStat(formatHeartRate(input.averageHeartrate), "уд/мин", "пульс")
           : storyStat(String(Math.round(input.elevationGain)), "м", "набор")
       )
-    ),
-    // подпись — выше нижней зоны интерфейса
-    h(
-      "div",
-      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 1640, paddingTop: 28, borderTop: "2px solid rgba(255,255,255,0.14)", justifyContent: "space-between", alignItems: "center" } },
-      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 34, color: COLOR.text } }, input.athleteName),
-      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 30, color: COLOR.muted } }, "runrehab.ru")
     )
   );
 

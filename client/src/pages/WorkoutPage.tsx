@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import { ShareStoryButton } from "../components/ShareStoryButton";
 import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
 import { WorkoutComments } from "../components/WorkoutComments";
@@ -731,6 +732,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                         ? "Пробежка обрезана"
                         : "GPS исправлено"}
                 </span>
+              ) : null}
+              {canEdit ? (
+                <ShareStoryButton workoutId={data.workout.id} role={mode} title={data.workout.name} />
               ) : null}
             </div>
           </div>

@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
+import { buildStoryCardPng } from "../lib/telegram-notifications.js";
+import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
@@ -115,6 +117,46 @@ async function getAthleteHighlights(userId: number) {
 }
 
 export async function athleteRoutes(app: FastifyInstance) {
+  // Картинка 1080×1920 для сторис (кнопка «Поделиться»). Рендер тяжёлый — ограничиваем частоту
+  app.get(
+    "/api/athlete/workouts/:id/story.png",
+    { preHandler: requireAuth, config: { rateLimit: { max: 12, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      requireRole(request, ["athlete"]);
+      const workoutId = Number((request.params as { id: string }).id);
+      if (!Number.isSafeInteger(workoutId)) {
+        return reply.code(404).send({ message: "Тренировка не найдена" });
+      }
+      const { rows } = await pool.query(
+        `select u.full_name from workouts w join users u on u.id = w.user_id where w.id = $1 and w.user_id = $2`,
+        [workoutId, request.user.id]
+      );
+      if (!rows[0]) {
+        return reply.code(404).send({ message: "Тренировка не найдена" });
+      }
+      const png = await buildStoryCardPng(workoutId, rows[0].full_name as string);
+      return reply
+        .header("Content-Type", "image/png")
+        .header("Cache-Control", "private, max-age=300")
+        .send(png);
+    }
+  );
+
+  // Временная публичная ссылка на ту же картинку: Telegram (shareToStory) скачивает
+  // её сам, без наших кук. Подпись JWT, живёт 15 минут
+  app.get("/api/athlete/workouts/:id/story-link", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    const { rows } = await pool.query(
+      `select 1 from workouts w join users u on u.id = w.user_id where w.id = $1 and w.user_id = $2`,
+      [Number.isSafeInteger(workoutId) ? workoutId : 0, request.user.id]
+    );
+    if (!rows[0]) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    return { url: await signStoryLink(reply, workoutId) };
+  });
+
   app.get("/api/athlete/dashboard", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["athlete"]);
     const query = workoutCursorQuerySchema.parse(request.query);

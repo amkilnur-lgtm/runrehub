@@ -7,7 +7,13 @@ const TELEGRAM_SCRIPT_URL = "https://telegram.org/js/telegram-web-app.js";
 type TelegramWebApp = {
   ready: () => void;
   expand: () => void;
+  isVersionAtLeast?: (version: string) => boolean;
+  shareToStory?: (mediaUrl: string, params?: { text?: string }) => void;
 };
+
+export function getTelegramWebApp(): TelegramWebApp | null {
+  return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp ?? null;
+}
 
 function readInitData(): string | null {
   const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
@@ -37,7 +43,7 @@ if (isTelegramMiniApp) {
   script.src = TELEGRAM_SCRIPT_URL;
   script.async = true;
   script.onload = () => {
-    const webApp = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+    const webApp = getTelegramWebApp();
     webApp?.ready();
     webApp?.expand();
   };
