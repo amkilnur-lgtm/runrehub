@@ -392,9 +392,11 @@ type AthleteTrendsProps = {
   // trendsEndpoint — явный эндпоинт (страница одногруппника)
   athleteId?: number;
   trendsEndpoint?: string;
+  // одногруппнику — только километраж: пульс и нагрузка — разговор спортсмена с тренером
+  volumeOnly?: boolean;
 };
 
-export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps) {
+export function AthleteTrends({ athleteId, trendsEndpoint, volumeOnly = false }: AthleteTrendsProps) {
   const endpoint =
     trendsEndpoint ??
     (athleteId != null ? `/api/trainer/athletes/${athleteId}/trends` : "/api/athlete/trends");
@@ -419,14 +421,22 @@ export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps)
   return (
     <section className="panel trends-section">
       <div className="panel-head">
-        <h2 className="panel-title">Динамика</h2>
-        <span className="panel-hint">последние 12 недель и 6 месяцев</span>
+        <h2 className="panel-title">{volumeOnly ? "Километраж по неделям" : "Динамика"}</h2>
+        <span className="panel-hint">{volumeOnly ? "последние 12 недель" : "последние 12 недель и 6 месяцев"}</span>
       </div>
-      <div className="trends-grid">
-        <WeeklyDistanceChart weekly={data.weekly} />
-        <AerobicPaceChart rows={data.aerobicPace} hrRange={data.aerobicHrRange} />
-      </div>
-      <TrainingLoadChart rows={data.loadWeekly ?? []} />
+      {volumeOnly ? (
+        <div className="trends-single">
+          <WeeklyDistanceChart weekly={data.weekly} />
+        </div>
+      ) : (
+        <>
+          <div className="trends-grid">
+            <WeeklyDistanceChart weekly={data.weekly} />
+            <AerobicPaceChart rows={data.aerobicPace} hrRange={data.aerobicHrRange} />
+          </div>
+          <TrainingLoadChart rows={data.loadWeekly ?? []} />
+        </>
+      )}
     </section>
   );
 }

@@ -23,8 +23,16 @@ type FeedData = {
   leaders?: FeedLeader[];
 };
 
-export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trainer" }) {
-  const { data, loading, error } = useApi<FeedData>(`/api/${viewer}/feed`);
+type AthleteFeedProps = {
+  viewer?: "athlete" | "trainer";
+  // другой источник ленты, например пробежки одного одногруппника
+  endpoint?: string;
+  emptyText?: string;
+};
+
+export function AthleteFeed({ viewer = "athlete", endpoint, emptyText }: AthleteFeedProps) {
+  const feedEndpoint = endpoint ?? `/api/${viewer}/feed`;
+  const { data, loading, error } = useApi<FeedData>(feedEndpoint);
   const [extra, setExtra] = useState<FeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedData["nextCursor"]>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -61,7 +69,7 @@ export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trai
         beforeDate: nextCursor.beforeDate,
         beforeId: String(nextCursor.beforeId)
       });
-      const more = await api<FeedData>(`/api/${viewer}/feed?${search.toString()}`);
+      const more = await api<FeedData>(`${feedEndpoint}?${search.toString()}`);
       setExtra((prev) => [...prev, ...more.feed]);
       setNextCursor(more.nextCursor);
     } catch (err) {
@@ -134,7 +142,7 @@ export function AthleteFeed({ viewer = "athlete" }: { viewer?: "athlete" | "trai
           <div className="trainer-dashboard-leader-empty">
             <strong>Пока пусто.</strong>
             <div className="muted">
-              Здесь появятся свежие пробежки твоей группы, как только кто-нибудь синхронизирует тренировку.
+              {emptyText ?? "Здесь появятся свежие пробежки твоей группы, как только кто-нибудь синхронизирует тренировку."}
             </div>
           </div>
         </section>

@@ -452,6 +452,16 @@ export async function getAthleteFeed(viewerId: number, cursor: WorkoutCursor | n
   return hydrateFeed(items);
 }
 
+// Пробежки одного одногруппника в виде ленты (карточки с картой, лайками, комментариями);
+// доступ проверяет маршрут через isAthleteInGroup
+export async function getTeammateFeed(viewerId: number, athleteId: number, cursor: WorkoutCursor | null) {
+  if (!Number.isSafeInteger(athleteId)) {
+    return { feed: [], nextCursor: null };
+  }
+  const items = await queryFeed(viewerId, `a.id = ${athleteId}`, cursor);
+  return hydrateFeed(items);
+}
+
 // Лента тренера: пробежки его атлетов; liked_by_me — лайки самого тренера
 export async function getTrainerFeed(trainerId: number, cursor: WorkoutCursor | null) {
   const items = await queryFeed(trainerId, `a.coach_id = $1`, cursor);

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useApi } from "../hooks/useApi";
 import { formatAgo, formatDuration, formatKm, formatPace } from "../lib";
+import { AthleteFeed } from "./AthleteFeed";
 import { AthleteTrends } from "./AthleteTrends";
 import { UserAvatar } from "./UserAvatar";
 
@@ -43,7 +44,7 @@ const PERIODS: Array<{ key: StatsPeriodKey; label: string; phrase: string }> = [
   { key: "week", label: "Неделя", phrase: "на этой неделе" },
   { key: "month", label: "Месяц", phrase: "в этом месяце" },
   { key: "year", label: "Год", phrase: "в этом году" },
-  { key: "allTime", label: "Всё время", phrase: "за всё время" }
+  { key: "allTime", label: "Всё", phrase: "за всё время" }
 ];
 
 function hoursMinutes(seconds: number) {
@@ -62,9 +63,11 @@ type AthleteProfileViewProps = {
   workoutHref: (id: number) => string;
   trends: { athleteId?: number; trendsEndpoint?: string };
   emptyHint: (connected: boolean) => string;
+  // тренеру важен статус синхронизации, одногруппнику — когда человек бегал
+  viewer: "trainer" | "teammate";
 };
 
-export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, trends, emptyHint }: AthleteProfileViewProps) {
+export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, trends, emptyHint, viewer }: AthleteProfileViewProps) {
   const { data, loading, error } = useApi<ProfileData>(endpoint);
   const [extra, setExtra] = useState<ProfileWorkout[]>([]);
   const [nextCursor, setNextCursor] = useState<ProfileData["nextCursor"]>(null);
@@ -131,8 +134,16 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
           <UserAvatar fullName={data.athlete.full_name} avatarUrl={data.athlete.avatar_url} className="avatar-lg" ariaHidden />
           <div className="profile-name">
             <h1 className="page-title">{data.athlete.full_name}</h1>
-            <p className="page-subtitle">
-              @{data.athlete.username} · <span className={sync.ok ? "sync-ok" : "sync-off"}>{sync.text}</span>
+            <p className="page-subtitle profile-subtitle">
+              {viewer === "trainer" ? (
+                <>
+                  @{data.athlete.username} · <span className={sync.ok ? "sync-ok" : "sync-off"}>{sync.text}</span>
+                </>
+              ) : data.workouts[0] ? (
+                <>последняя пробежка {formatAgo(data.workouts[0].start_date)}</>
+              ) : (
+                <>@{data.athlete.username}</>
+              )}
             </p>
           </div>
           <div className="segmented profile-periods" role="tablist" aria-label="Период">
@@ -180,8 +191,14 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
         </div>
       </section>
 
-      <AthleteTrends {...trends} />
+      <AthleteTrends {...trends} volumeOnly={viewer === "teammate"} />
 
+      {viewer === "teammate" ? (
+        <>
+          <h2 className="section-title">Пробежки</h2>
+          <AthleteFeed endpoint={`${endpoint}/feed`} emptyText="Пока нет пробежек." />
+        </>
+      ) : (
       <section className="panel">
         <div className="panel-head">
           <h2 className="panel-title">Пробежки</h2>
@@ -221,6 +238,7 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
           </button>
         ) : null}
       </section>
+      )}
     </div>
   );
 }

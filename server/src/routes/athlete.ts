@@ -10,6 +10,7 @@ import {
   addWorkoutComment,
   getAthleteFeed,
   getAthleteOverview,
+  getTeammateFeed,
   getGroupLeaderboard,
   getGroupLeaders,
   getWorkoutLikers,
@@ -295,6 +296,23 @@ export async function athleteRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Спортсмен не найден" });
     }
     return overview;
+  });
+
+  app.get("/api/athlete/athletes/:id/feed", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    const query = workoutCursorQuerySchema.parse(request.query);
+    if (hasPartialCursor(query)) {
+      return reply.code(400).send({ message: "Invalid feed cursor" });
+    }
+    if (!Number.isSafeInteger(athleteId) || !(await isAthleteInGroup(request.user.id, athleteId))) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    const cursor =
+      query.beforeDate && query.beforeId
+        ? { beforeDate: query.beforeDate, beforeId: query.beforeId }
+        : null;
+    return getTeammateFeed(request.user.id, athleteId, cursor);
   });
 
   app.get("/api/athlete/athletes/:id/trends", { preHandler: requireAuth }, async (request, reply) => {

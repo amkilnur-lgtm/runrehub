@@ -9,6 +9,7 @@ export function AthleteProfilePage() {
   return (
     <AthleteProfileView
       key={params.id}
+      viewer="teammate"
       endpoint={`/api/athlete/athletes/${params.id}`}
       backTo="/athlete"
       backLabel="На главную"

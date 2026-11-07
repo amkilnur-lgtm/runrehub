@@ -450,9 +450,13 @@ async function layoutRoute(
   points: Array<[number, number]>,
   width: number,
   height: number,
-  inset: number,
+  inset: number | { x: number; y: number; centerY?: number },
   withMap: boolean
 ): Promise<RouteLayout> {
+  const insetX = typeof inset === "number" ? inset : inset.x;
+  const insetY = typeof inset === "number" ? inset : inset.y;
+  // где по вертикали должен стоять центр трека (по умолчанию — центр блока)
+  const centerYPx = typeof inset === "number" ? height / 2 : inset.centerY ?? height / 2;
   const step = Math.max(1, Math.floor(points.length / 700));
   const sampled = points.filter((_, index) => index % step === 0 || index === points.length - 1);
   const projected = sampled.map(([lat, lng]) => mercator(lat, lng));
@@ -465,7 +469,7 @@ async function layoutRoute(
   // тайлы ближайшего меньшего зума растягиваем (до 2×), трек занимает весь блок
   const spanX = Math.max(maxX - minX, 1e-9);
   const spanY = Math.max(maxY - minY, 1e-9);
-  const fitScale = Math.min((width - inset * 2) / spanX, (height - inset * 2) / spanY);
+  const fitScale = Math.min((width - insetX * 2) / spanX, (height - insetY * 2) / spanY);
   const worldSize = Math.min(fitScale, MAP_TILE * 2 ** MAP_MAX_ZOOM);
   const zoom = Math.max(1, Math.min(MAP_MAX_ZOOM, Math.floor(Math.log2(worldSize / MAP_TILE))));
   const tileSize = worldSize / 2 ** zoom;
@@ -473,7 +477,7 @@ async function layoutRoute(
   const centerX = ((minX + maxX) / 2) * worldSize;
   const centerY = ((minY + maxY) / 2) * worldSize;
   const originX = centerX - width / 2;
-  const originY = centerY - height / 2;
+  const originY = centerY - centerYPx;
 
   const coords = projected.map(
     (p) =>
@@ -719,4 +723,210 @@ export async function renderWorkoutCard(input: WorkoutCardInput) {
     zones ? zonesBlock(zones) : null,
     footer()
   ]);
+}
+
+// --- Картинка для сторис (1080×1920) ---
+// Кнопка «Поделиться» у пробежки. Сверху во всю ширину — тёмная карта с треком,
+// снизу на чёрном — крупная дистанция и три цифры. Верх и низ (по ~220 px)
+// в сторис закрывает интерфейс Instagram/Telegram — там только фон.
+// Без трека (дорожка, манеж) — тот же ритм, но вместо карты сетка зон пульса.
+
+const STORY_W = 1080;
+const STORY_H = 1920;
+const STORY_PAD = 80;
+const STORY_MAP_H = 1180;
+
+export type StoryCardInput = {
+  title: string;
+  athleteName: string;
+  dateLabel: string;
+  distanceMeters: number;
+  movingTimeSeconds: number;
+  averageSpeed: number | null;
+  averageHeartrate: number | null;
+  elevationGain: number;
+  route: Array<[number, number]> | null;
+  zonePercentages: ZonePercentages | null;
+};
+
+function storyDistance(meters: number) {
+  const km = Math.max(0, meters) / 1000;
+  return (km >= 100 ? km.toFixed(0) : km.toFixed(km >= 10 ? 1 : 2)).replace(".", ",");
+}
+
+async function storyMap(points: Array<[number, number]>) {
+  // трек — между шапкой (до ~320 px) и названием пробежки (с ~980 px)
+  const box = { x: 130, y: (STORY_MAP_H - 600) / 2, centerY: 645 };
+  let layout: RouteLayout;
+  try {
+    layout = await layoutRoute(points, STORY_W, STORY_MAP_H, box, true);
+  } catch {
+    layout = await layoutRoute(points, STORY_W, STORY_MAP_H, box, false);
+  }
+  const shift = 0;
+  return h(
+    "div",
+    { style: { position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H, backgroundColor: "#16181f", overflow: "hidden" } },
+    ...layout.tiles.map((tile) =>
+      h("img", {
+        src: tile.src,
+        width: tile.size,
+        height: tile.size,
+        style: { position: "absolute", left: tile.left, top: tile.top + shift, width: tile.size, height: tile.size }
+      })
+    ),
+    h(
+      "svg",
+      { width: STORY_W, height: STORY_MAP_H, viewBox: `0 0 ${STORY_W} ${STORY_MAP_H}`, style: { position: "absolute", left: 0, top: 0 } },
+      // свечение в три слоя: на тёмной карте трек выглядит как неон
+      h("path", { d: layout.d, fill: "none", stroke: COLOR.accent, strokeOpacity: 0.14, strokeWidth: 44, strokeLinecap: "round", strokeLinejoin: "round" }),
+      h("path", { d: layout.d, fill: "none", stroke: COLOR.accent, strokeOpacity: 0.3, strokeWidth: 22, strokeLinecap: "round", strokeLinejoin: "round" }),
+      h("path", { d: layout.d, fill: "none", stroke: "#ff6b57", strokeWidth: 10, strokeLinecap: "round", strokeLinejoin: "round" }),
+      h("circle", { cx: layout.start[0], cy: layout.start[1], r: 20, fill: "#ffffff" }),
+      h("circle", { cx: layout.start[0], cy: layout.start[1], r: 11, fill: "#34c77b" }),
+      h("circle", { cx: layout.finish[0], cy: layout.finish[1], r: 20, fill: "#ffffff" }),
+      h("circle", { cx: layout.finish[0], cy: layout.finish[1], r: 11, fill: COLOR.accent })
+    ),
+    // затемнение сверху (под шапку) и плавный уход в чёрный снизу
+    h("div", {
+      style: {
+        position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H,
+        backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 66%, rgba(0,0,0,1) 92%)"
+      }
+    }),
+    layout.tiles.length
+      ? h(
+          "div",
+          { style: { position: "absolute", right: 40, top: 300, fontFamily: TEXT_FONT, fontWeight: 500, fontSize: 18, color: "rgba(255,255,255,0.35)" } },
+          "© MapTiler © OpenStreetMap"
+        )
+      : null
+  );
+}
+
+// Без трека: крупная «полоса пульса» по зонам вместо карты
+function storyZonesArt(zones: ZonePercentages | null) {
+  const values = zones
+    ? [zones.under130, zones.from130To150, zones.from150To162, zones.from162Plus]
+    : [0, 0, 0, 0];
+  const total = Math.max(1, values.reduce((sum, value) => sum + Math.max(0, value), 0));
+  const columns = 24;
+  // раскладываем 24 вертикальные полосы пропорционально времени в зонах
+  const bars: string[] = [];
+  values.forEach((value, index) => {
+    const count = Math.round((Math.max(0, value) / total) * columns);
+    for (let i = 0; i < count; i += 1) bars.push(COLOR.zones[index]!);
+  });
+  while (bars.length < columns) bars.push("#2a2c33");
+  bars.length = columns;
+  return h(
+    "div",
+    { style: { position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H, alignItems: "flex-end", padding: `0 ${STORY_PAD}px 340px`, gap: 10 } },
+    ...bars.map((color, index) =>
+      h("div", {
+        style: {
+          flex: 1,
+          height: 220 + Math.round(260 * Math.abs(Math.sin(index * 0.55 + 0.6))),
+          borderRadius: 12,
+          backgroundColor: color,
+          opacity: 0.9
+        }
+      })
+    ),
+    h("div", {
+      style: {
+        position: "absolute", left: 0, top: 0, width: STORY_W, height: STORY_MAP_H,
+        backgroundImage: "linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,0) 62%, rgba(0,0,0,1) 100%)"
+      }
+    }),
+    zones
+      ? h(
+          "div",
+          { style: { position: "absolute", left: STORY_PAD, top: 880, gap: 28, fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 24, color: COLOR.muted } },
+          ...["до 130", "130–150", "150–162", "162+"].map((label, index) =>
+            h(
+              "div",
+              { style: { alignItems: "center", gap: 10 } },
+              h("div", { style: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLOR.zones[index]! } }),
+              label
+            )
+          )
+        )
+      : null
+  );
+}
+
+function storyStat(value: string, unit: string | null, label: string) {
+  return h(
+    "div",
+    { style: { flexDirection: "column", flex: 1 } },
+    h(
+      "div",
+      { style: { alignItems: "baseline", gap: 8 } },
+      h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: 60, color: COLOR.text, letterSpacing: -1 } }, value),
+      unit ? h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 30, color: COLOR.label } }, unit) : null
+    ),
+    h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 28, color: COLOR.muted, marginTop: 6, textTransform: "uppercase", letterSpacing: 2 } }, label)
+  );
+}
+
+export async function renderStoryCard(input: StoryCardInput) {
+  const route = input.route && input.route.length >= 2 ? input.route : null;
+  const distance = storyDistance(input.distanceMeters);
+  const distanceSize = distance.length >= 5 ? 200 : distance.length === 4 ? 236 : 270;
+  const titleSize = input.title.length > 26 ? 40 : 48;
+
+  const tree = h(
+    "div",
+    { style: { position: "relative", width: STORY_W, height: STORY_H, backgroundColor: COLOR.bg, flexDirection: "column" } },
+    route ? await storyMap(route) : storyZonesArt(input.zonePercentages),
+    // шапка ниже зоны интерфейса сторис
+    h(
+      "div",
+      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 230, justifyContent: "space-between", alignItems: "center" } },
+      h(
+        "div",
+        { style: { alignItems: "center", gap: 14 } },
+        h("div", { style: { width: 18, height: 18, borderRadius: 9, backgroundColor: COLOR.accent } }),
+        h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: 30, color: COLOR.text, letterSpacing: 2 } }, "RUNNING REHAB")
+      ),
+      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 30, color: "rgba(255,255,255,0.8)" } }, input.dateLabel)
+    ),
+    // нижний блок с цифрами
+    h(
+      "div",
+      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 990, flexDirection: "column" } },
+      h(
+        "span",
+        { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: titleSize, color: COLOR.label, maxWidth: STORY_W - STORY_PAD * 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" } },
+        input.title
+      ),
+      h(
+        "div",
+        { style: { alignItems: "baseline", gap: 24, marginTop: 8 } },
+        h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: distanceSize, lineHeight: 1, color: COLOR.text, letterSpacing: -6 } }, distance),
+        h("span", { style: { fontFamily: DISPLAY_FONT, fontWeight: 800, fontSize: 72, color: COLOR.accent } }, "км")
+      ),
+      h("div", { style: { width: 120, height: 10, borderRadius: 5, backgroundColor: COLOR.accent, marginTop: 30, marginBottom: 40 } }),
+      h(
+        "div",
+        { style: { gap: 24 } },
+        storyStat(formatPaceValue(input.averageSpeed), "/км", "темп"),
+        storyStat(formatClock(input.movingTimeSeconds), null, "время"),
+        input.averageHeartrate
+          ? storyStat(formatHeartRate(input.averageHeartrate), "уд/мин", "пульс")
+          : storyStat(String(Math.round(input.elevationGain)), "м", "набор")
+      )
+    ),
+    // подпись — выше нижней зоны интерфейса
+    h(
+      "div",
+      { style: { position: "absolute", left: STORY_PAD, right: STORY_PAD, top: 1640, paddingTop: 28, borderTop: "2px solid rgba(255,255,255,0.14)", justifyContent: "space-between", alignItems: "center" } },
+      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 34, color: COLOR.text } }, input.athleteName),
+      h("span", { style: { fontFamily: TEXT_FONT, fontWeight: 700, fontSize: 30, color: COLOR.muted } }, "runrehab.ru")
+    )
+  );
+
+  const svg = await satori(tree as never, { width: STORY_W, height: STORY_H, fonts: fonts() });
+  return new Resvg(svg, { fitTo: { mode: "width", value: STORY_W } }).render().asPng();
 }

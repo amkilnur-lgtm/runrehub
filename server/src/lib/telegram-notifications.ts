@@ -481,10 +481,6 @@ export async function buildWorkoutCardPng(workoutId: number, athleteName: string
     }
   }
 
-  const route = (viewStreams?.latlng ?? []).filter(
-    (point): point is [number, number] =>
-      Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]) && (point[0] !== 0 || point[1] !== 0)
-  );
   const toNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
 
   return renderWorkoutCard({
@@ -498,7 +494,8 @@ export async function buildWorkoutCardPng(workoutId: number, athleteName: string
     calories: toNumber(row.calories),
     averageCadence: stepsPerMinute(toNumber(row.average_cadence)),
     maxHeartrate: toNumber(workout.max_heartrate),
-    route: route.length >= 2 ? route : null,
+    // В чате тренера карта не нужна (решение 07.11.2026): карточка без маршрута компактнее
+    route: null,
     zonePercentages: computeZonePercentages(zoneSeconds)
   });
 }

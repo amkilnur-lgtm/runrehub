@@ -3943,3 +3943,15 @@ button.trend-bar-slot:focus-visible {
 .app-topbar-actions .avatar-menu-trigger { display: flex; line-height: 0; }
 .app-topbar .user-avatar.app-topbar-avatar { width: 40px; height: 40px; }
 .status-tag-empty { display: block; }
+
+/* Профиль на телефоне: аватар и имя в одну строку, период — во всю ширину */
+.trends-single { border-top: 1px solid var(--border); }
+.segmented-item { white-space: nowrap; }
+@media (max-width: 760px) {
+  .profile-identity { flex-wrap: wrap; gap: 14px; }
+  .profile-name { flex: 1 1 0; }
+  .profile-name .page-title { font-size: 22px; }
+  .profile-subtitle { font-size: 13.5px; }
+  .profile-periods { flex: 1 1 100%; }
+}
+.section-title { margin: 8px 0 -8px; font-size: 18px; font-weight: 750; }
