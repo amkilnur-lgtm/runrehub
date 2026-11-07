@@ -402,7 +402,7 @@ export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps)
 
   if (loading) {
     // резервируем место, чтобы список тренировок не прыгал вниз после загрузки
-    return <section className="card skeleton-card trends-skeleton" aria-hidden="true" />;
+    return <section className="skeleton-block trends-skeleton" aria-hidden="true" />;
   }
 
   if (error || !data) {
@@ -417,9 +417,10 @@ export function AthleteTrends({ athleteId, trendsEndpoint }: AthleteTrendsProps)
   }
 
   return (
-    <section className="card trainer-dashboard-list-section">
-      <div className="trainer-dashboard-heading">
-        <span className="muted trainer-dashboard-eyebrow">Тренды</span>
+    <section className="panel trends-section">
+      <div className="panel-head">
+        <h2 className="panel-title">Динамика</h2>
+        <span className="panel-hint">последние 12 недель и 6 месяцев</span>
       </div>
       <div className="trends-grid">
         <WeeklyDistanceChart weekly={data.weekly} />

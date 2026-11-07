@@ -682,15 +682,21 @@ export function AdminPage() {
     role === "admin" ? "Админ" : role === "trainer" ? "Тренер" : "Спортсмен";
 
   return (
-    <div className="stack">
-      <div className="admin-tabs" role="tablist">
+    <div className="page-stack admin-page">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Администрирование</h1>
+          <p className="page-subtitle">Учётные записи, синхронизация с часами и Telegram</p>
+        </div>
+      </div>
+      <div className="segmented admin-segmented" role="tablist" aria-label="Разделы администрирования">
         {ADMIN_TABS.map((adminTab) => (
           <button
             key={adminTab.key}
             type="button"
             role="tab"
             aria-selected={tab === adminTab.key}
-            className={`admin-tab${tab === adminTab.key ? " active" : ""}`}
+            className={tab === adminTab.key ? "segmented-item is-active" : "segmented-item"}
             onClick={() => setTab(adminTab.key)}
           >
             {adminTab.label}

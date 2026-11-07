@@ -4,8 +4,6 @@ import { pool } from "./db.js";
 export const VOLUME_WEEKS = 10;
 // Серию недель с пробежками считаем на этой глубине
 const STREAK_LOOKBACK_WEEKS = 104;
-// Пробежки старше этого не попадают в очередь «ждут комментария»
-export const FEEDBACK_WINDOW_DAYS = 14;
 
 export type WeeklyVolume = {
   weekStarts: string[];

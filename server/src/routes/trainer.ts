@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { pool } from "../lib/db.js";
-import { FEEDBACK_WINDOW_DAYS, getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
+import { getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
 import {
   addWorkoutComment,
   getTrainerFeed,
@@ -135,7 +135,8 @@ export async function trainerRoutes(app: FastifyInstance) {
             coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
             u.full_name as athlete_name,
             u.avatar_url as athlete_avatar_url,
-            ${HAS_COACH_FEEDBACK_SQL} as has_feedback
+            ${HAS_COACH_FEEDBACK_SQL} as has_feedback,
+            (w.start_date >= date_trunc('week', now())) as is_this_week
           from workouts w
           join users u on u.id = w.user_id
           left join workout_corrections wc on wc.workout_id = w.id
@@ -207,10 +208,10 @@ export async function trainerRoutes(app: FastifyInstance) {
           from workouts w
           join users u on u.id = w.user_id
           where u.role = 'athlete' and u.coach_id = $1
-            and w.start_date >= now() - $2::int * interval '1 day'
+            and w.start_date >= date_trunc('week', now())
             and not ${HAS_COACH_FEEDBACK_SQL}
         `,
-        [request.user.id, FEEDBACK_WINDOW_DAYS]
+        [request.user.id]
       )
     ]);
 
@@ -224,8 +225,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       connectedAthletesCount: Number(connectedResult.rows[0]?.connected_count ?? 0),
       feedback: {
         pendingCount: Number(pendingResult.rows[0]?.pending_count ?? 0),
-        oldestPendingAt: pendingResult.rows[0]?.oldest_pending_at ?? null,
-        windowDays: FEEDBACK_WINDOW_DAYS
+        oldestPendingAt: pendingResult.rows[0]?.oldest_pending_at ?? null
       },
       groupWeeks: {
         weekStarts: volume.weekStarts,

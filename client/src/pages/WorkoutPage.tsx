@@ -609,9 +609,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const canEdit = mode === "trainer" || data.workout.is_owner !== false;
 
   return (
-    <div className="stack">
-      <Link to={backHref} className="inline-link workout-back-link">
-        Назад
+    <div className="page-stack workout-page">
+      <Link to={backHref} className="back-link">
+        ← Назад
       </Link>
 
       <section
@@ -620,7 +620,10 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         <div className="workout-summary-panel">
           <div className="workout-summary-header">
             <div className="workout-summary-topbar">
-              <span className="muted trainer-dashboard-eyebrow">СВОДКА</span>
+              <p className="workout-summary-meta">
+                {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
+                {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
+              </p>
               {canEdit ? (
               <div className="workout-menu" ref={menuRef}>
                 <button
@@ -712,11 +715,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             </div>
 
             <div className="trainer-dashboard-heading workout-summary-heading">
-              <h2>{data.workout.name}</h2>
-              <p className="muted">
-                {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
-                {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
-              </p>
+              <h1 className="page-title">{data.workout.name}</h1>
               {data.structure ? (
                 <span className="workout-structure-badge">
                   Интервалы · {data.structure.sets.map((set) => set.label).join(" + ")}
@@ -778,7 +777,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
       <section className="grid workout-layout">
         <div className="card">
-          <h2>Отрезки</h2>
+          <h2 className="panel-title workout-card-title">Отрезки</h2>
           {hasSyntheticCorrectedSplits ? (
             <p className="muted">Сплиты восстановлены приближённо по исправленной сводке тренировки.</p>
           ) : null}
@@ -810,12 +809,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 </colgroup>
                 <thead>
                   <tr className="lap-report-head muted">
-                    <th scope="col">КРУГ</th>
-                    <th scope="col">КМ</th>
-                    <th scope="col">ВР</th>
-                    <th scope="col">ТЕМП</th>
-                    <th scope="col">ЧСС</th>
-                    <th scope="col">М</th>
+                    <th scope="col">Круг</th>
+                    <th scope="col">Км</th>
+                    <th scope="col">Время</th>
+                    <th scope="col">Темп</th>
+                    <th scope="col">Пульс</th>
+                    <th scope="col">Набор</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -869,7 +868,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           {canEdit ? (
           <section className="card workout-comment-card">
             <div className="chart-title-row">
-              <strong>Комментарий тренера</strong>
+              <h2 className="panel-title">Комментарий тренера</h2>
             </div>
             {mode === "trainer" ? (
               <div className="stack">
@@ -903,7 +902,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           ) : null}
           <section className="card workout-comment-card">
             <div className="chart-title-row">
-              <strong>Комментарии</strong>
+              <h2 className="panel-title">Обсуждение</h2>
             </div>
             <WorkoutComments workoutId={data.workout.id} viewer={mode} />
           </section>

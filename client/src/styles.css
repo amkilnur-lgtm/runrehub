@@ -3861,3 +3861,85 @@ button.trend-bar-slot:focus-visible {
   .week-bars i, .run-row, .segmented-item, .app-nav-link { transition: none; }
   .skeleton-block { animation: none; }
 }
+
+/* --- Профиль спортсмена (у тренера и у одногруппника) --- */
+.back-link { align-self: flex-start; font-weight: 650; font-size: 14.5px; color: var(--ink-muted); text-decoration: none; padding: 6px 0; }
+.back-link:hover { color: var(--accent); }
+.profile-head { overflow: hidden; }
+.profile-identity { display: flex; align-items: center; gap: 16px 18px; padding: 20px 22px; flex-wrap: wrap; }
+.profile-name { flex: 1 1 260px; min-width: 0; }
+.profile-name .page-title { margin-bottom: 4px; }
+.avatar-lg.user-avatar { width: 64px; height: 64px; font-size: 22px; flex: none; }
+.sync-ok { color: var(--success); font-weight: 600; }
+.sync-off { color: var(--warn-ink); font-weight: 600; }
+.kpi-strip-inner { border: 0; border-top: 1px solid var(--border); border-radius: 0; }
+.run-row-profile { grid-template-columns: minmax(0, 1fr) 64px 72px 60px; }
+.run-list li:first-child .run-row-profile { border-top: 0; }
+
+/* --- Динамика: графики внутри одной панели, без вложенных карточек --- */
+.trends-section .trends-grid { gap: 0; border-top: 1px solid var(--border); }
+.trends-section .chart-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 16px 22px 18px; }
+.trends-section .trends-grid > .chart-card + .chart-card { box-shadow: -1px 0 0 var(--border); }
+.trends-section > .chart-card { border-top: 1px solid var(--border); }
+.trends-section .chart-title-row .trainer-dashboard-eyebrow { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.trends-section .chart-axis-caption { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.trends-section .trend-bar { background: var(--heat-3); opacity: 1; }
+.trends-section .trend-bar-current { background: var(--accent); }
+
+@media (max-width: 760px) {
+  .profile-identity { padding: 16px; }
+  .avatar-lg.user-avatar { width: 52px; height: 52px; font-size: 18px; }
+  .profile-periods { width: 100%; }
+  .profile-periods .segmented-item { flex: 1; padding: 0 6px; }
+  .run-row-profile { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .trends-section .chart-card { padding: 14px 16px 16px; }
+  .trends-section .trends-grid > .chart-card + .chart-card { box-shadow: 0 -1px 0 var(--border); }
+}
+
+/* --- Страница тренировки в новом стиле --- */
+.workout-page .card,
+.workout-page .chart-card {
+  border-radius: var(--radius-l); border: 1px solid var(--border); box-shadow: none; background: var(--surface);
+}
+.workout-page .workout-summary-card { padding: 20px 22px; gap: 22px; }
+.workout-page .workout-summary-panel { padding: 0; border-radius: 0; background: transparent; gap: 16px; }
+.workout-page .workout-summary-topbar { align-items: flex-start; }
+.workout-summary-meta { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--ink-muted); }
+.workout-page .workout-summary-heading { display: flex; flex-direction: column; gap: 8px; }
+.workout-page .workout-summary-heading .page-title { margin: 0; overflow-wrap: anywhere; }
+.workout-page .workout-summary-stat { gap: 2px; }
+.workout-page .workout-summary-stat > span { font-size: 13px; font-weight: 650; }
+.workout-page .workout-summary-stat strong { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.workout-page .workout-route-shell { border-radius: 12px; }
+.workout-card-title { margin-bottom: 12px; }
+.workout-page .workout-comment-card .chart-title-row { margin-bottom: 10px; }
+.workout-page .chart-title-row .trainer-dashboard-eyebrow,
+.workout-page .chart-axis-caption { text-transform: none; letter-spacing: 0; }
+.workout-page .lap-report-head th { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 650; }
+/* рабочие отрезки: заливка строки и красный номер, без боковой полосы */
+.workout-page .lap-report-row-work td:first-child { box-shadow: none; }
+.workout-page .lap-report-row-work .lap-report-index { color: var(--accent); }
+@media (max-width: 760px) {
+  .workout-page .workout-summary-card { padding: 16px; }
+  .workout-page .workout-summary-stat strong { font-size: 22px; }
+}
+.workout-page .card h2.panel-title { text-transform: none; letter-spacing: 0; font-size: 18px; font-weight: 750; color: var(--ink); }
+.workout-page .chart-card .chart-title-row > :first-child { font-size: 15px; font-weight: 700; color: var(--ink); text-transform: none; letter-spacing: 0; }
+
+/* --- Админка в новом стиле --- */
+.admin-segmented { align-self: flex-start; flex-wrap: wrap; }
+.admin-page .card { box-shadow: none; }
+.admin-page .card h2 { margin: 0 0 4px; font-size: 18px; font-weight: 750; text-transform: none; letter-spacing: 0; }
+@media (max-width: 760px) {
+  .admin-segmented { align-self: stretch; }
+  .admin-segmented .segmented-item { flex: 1 1 auto; }
+}
+
+/* Кнопки шапки: одна высота и одна линия с аватаром */
+.app-topbar-actions > * { flex: none; }
+.app-topbar-actions .theme-toggle,
+.app-topbar-actions .icon-button { width: 40px; height: 40px; min-width: 40px; min-height: 40px; margin: 0; transform: none; }
+.app-topbar-actions .avatar-menu { display: flex; }
+.app-topbar-actions .avatar-menu-trigger { display: flex; line-height: 0; }
+.app-topbar .user-avatar.app-topbar-avatar { width: 40px; height: 40px; }
+.status-tag-empty { display: block; }

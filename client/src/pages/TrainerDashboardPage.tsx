@@ -37,9 +37,10 @@ type DashboardData = {
     average_speed: number | null;
     average_heartrate: number | null;
     has_feedback: boolean;
+    is_this_week: boolean;
   }>;
   connectedAthletesCount: number;
-  feedback: { pendingCount: number; oldestPendingAt: string | null; windowDays: number };
+  feedback: { pendingCount: number; oldestPendingAt: string | null };
   groupWeeks: { weekStarts: string[]; athletes: Array<{ id: number; distances: number[] }> };
   stats: Record<StatsPeriodKey, GroupPeriodStats>;
   topAthletesThisWeek: Array<{
@@ -175,12 +176,12 @@ export function TrainerDashboardPage() {
           <div className="kpi-note">{periodInfo.phrase}</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Ждут комментария</div>
+          <div className="kpi-label">Ждут комментария · неделя</div>
           <div className={pending ? "kpi-value num is-accent" : "kpi-value num"}>{pending}</div>
           <div className="kpi-note">
             {pending && data.feedback.oldestPendingAt
               ? `самая старая — ${formatDaysAgo(data.feedback.oldestPendingAt)}`
-              : `за последние ${data.feedback.windowDays} дней всё прокомментировано`}
+              : "на этой неделе всё прокомментировано"}
           </div>
         </div>
       </section>
@@ -225,9 +226,13 @@ export function TrainerDashboardPage() {
                       {workout.average_heartrate ? Math.round(workout.average_heartrate) : "—"}
                       <small>пульс</small>
                     </div>
-                    <span className={workout.has_feedback ? "status-tag" : "status-tag is-todo"}>
-                      {workout.has_feedback ? "Прокомментирована" : "Ждёт комментария"}
-                    </span>
+                    {workout.has_feedback ? (
+                      <span className="status-tag">Прокомментирована</span>
+                    ) : workout.is_this_week ? (
+                      <span className="status-tag is-todo">Ждёт комментария</span>
+                    ) : (
+                      <span className="status-tag-empty" aria-hidden="true" />
+                    )}
                   </Link>
                 </li>
               ))}
