@@ -3623,7 +3623,7 @@ button.trend-bar-slot:focus-visible {
   padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
 }
 .app-logo { display: flex; align-items: center; flex: none; border-radius: 8px; }
-.app-logo img { height: 38px; width: auto; display: block; }
+.app-logo img { height: 46px; width: auto; display: block; }
 :root[data-theme="dark"] .app-logo { background: oklch(0.97 0.004 272); padding: 3px 8px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .app-logo { background: oklch(0.97 0.004 272); padding: 3px 8px; } }
 .app-nav { display: flex; align-self: stretch; gap: 4px; }
@@ -3810,7 +3810,7 @@ button.trend-bar-slot:focus-visible {
 /* --- Телефон --- */
 @media (max-width: 760px) {
   .app-topbar-inner { height: 56px; gap: 12px; padding: 0 16px; }
-  .app-logo img { height: 28px; }
+  .app-logo img { height: 36px; }
   .app-topbar-actions { gap: 6px; }
   .app-topbar-actions .theme-toggle, .icon-button { width: 40px; height: 40px; min-width: 40px; }
   .app-content { padding: 16px 16px 40px; }
