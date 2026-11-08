@@ -82,7 +82,7 @@ export async function registerTelegramWebhook() {
   }).catch(() => undefined);
 }
 
-function escapeTelegramHtml(value: string) {
+export function escapeTelegramHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

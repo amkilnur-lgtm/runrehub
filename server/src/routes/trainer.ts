@@ -7,6 +7,7 @@ import { buildStoryCardPng } from "../lib/telegram-notifications.js";
 import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
 import { getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
+import { getGroupUpcomingStarts } from "../lib/race-results.js";
 import {
   addWorkoutComment,
   getTrainerFeed,
@@ -257,7 +258,10 @@ export async function trainerRoutes(app: FastifyInstance) {
       )
     ]);
 
-    const volume = await getWeeklyVolume(athletesResult.rows.map((row) => Number(row.id)));
+    const [volume, upcomingStarts] = await Promise.all([
+      getWeeklyVolume(athletesResult.rows.map((row) => Number(row.id))),
+      getGroupUpcomingStarts(request.user.id)
+    ]);
 
     const summary = summaryResult.rows[0];
 
@@ -269,6 +273,7 @@ export async function trainerRoutes(app: FastifyInstance) {
         pendingCount: Number(pendingResult.rows[0]?.pending_count ?? 0),
         oldestPendingAt: pendingResult.rows[0]?.oldest_pending_at ?? null
       },
+      upcomingStarts,
       groupWeeks: {
         weekStarts: volume.weekStarts,
         athletes: athletesResult.rows.map((row) => ({

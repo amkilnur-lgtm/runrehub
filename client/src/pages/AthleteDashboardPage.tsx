@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
-import { AthleteFeed } from "../components/AthleteFeed";
 import { AthleteTrends } from "../components/AthleteTrends";
 import { useAuth } from "../components/AuthProvider";
+import { ResultForm, ResultsPanel, type ResultDraft } from "../components/Results";
 import { RouteStaticMap } from "../components/RouteStaticMap";
 import { ShareStoryButton } from "../components/ShareStoryButton";
 import { UserAvatar } from "../components/UserAvatar";
 import { useApi } from "../hooks/useApi";
 import { formatAgo, formatDuration, formatKm, formatPace, pluralRu } from "../lib";
 
-type AthleteTab = "mine" | "feed";
+type AthleteTab = "runs" | "results";
 
 type PeriodStats = {
   distance_meters: number;
@@ -40,6 +40,7 @@ type Highlights = {
         coach_note: string | null;
         coach_name: string | null;
         coach_avatar_url: string | null;
+        race_hint: { distanceMeters: number; label: string } | null;
       })
     | null;
 };
@@ -153,7 +154,13 @@ function Streak({ weeks }: { weeks: number }) {
   );
 }
 
-function LatestRun({ workout }: { workout: NonNullable<Highlights["latestWorkout"]> }) {
+function LatestRun({
+  workout,
+  onRecordRace
+}: {
+  workout: NonNullable<Highlights["latestWorkout"]>;
+  onRecordRace: () => void;
+}) {
   return (
     <article className="panel latest-run">
       <div className="latest-run-head">
@@ -184,6 +191,17 @@ function LatestRun({ workout }: { workout: NonNullable<Highlights["latestWorkout
           </div>
         </div>
       ) : null}
+      {workout.race_hint ? (
+        <button type="button" className="race-hint" onClick={onRecordRace}>
+          <svg className="race-hint-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M5 21V4M5 4h11l-2 4 2 4H5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>
+            <b>Похоже на старт — {workout.race_hint.label}</b>
+            <span>Записать результат по протоколу?</span>
+          </span>
+        </button>
+      ) : null}
       <div className="latest-run-actions">
         <ShareStoryButton workoutId={workout.id} role="athlete" title={workout.name} className="primary-button share-primary" />
         <Link className="secondary-button" to={`/athlete/workouts/${workout.id}`}>
@@ -196,11 +214,12 @@ function LatestRun({ workout }: { workout: NonNullable<Highlights["latestWorkout
 
 export function AthleteDashboardPage() {
   const { user } = useAuth();
-  const { data, loading, error } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
+  const { data, loading, error, refresh } = useApi<AthleteDashboardData>("/api/athlete/dashboard");
   const [extraWorkouts, setExtraWorkouts] = useState<WorkoutRow[]>([]);
   const [nextCursor, setNextCursor] = useState<AthleteDashboardData["nextCursor"]>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [tab, setTab] = useState<AthleteTab>("mine");
+  const [tab, setTab] = useState<AthleteTab>("runs");
+  const [raceDraft, setRaceDraft] = useState<ResultDraft | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -271,7 +290,21 @@ export function AthleteDashboardPage() {
       {highlights ? <Streak weeks={highlights.streakWeeks} /> : null}
 
       {highlights?.latestWorkout ? (
-        <LatestRun workout={highlights.latestWorkout} />
+        <LatestRun
+          workout={highlights.latestWorkout}
+          onRecordRace={() => {
+            const latest = highlights.latestWorkout!;
+            setRaceDraft({
+              status: "finished",
+              name: latest.name,
+              raceDate: latest.start_date.slice(0, 10),
+              distanceMeters: latest.race_hint?.distanceMeters ?? latest.distance_meters,
+              officialTimeSeconds: latest.moving_time_seconds,
+              workoutId: latest.id,
+              watchDistanceMeters: latest.distance_meters
+            });
+          }}
+        />
       ) : (
         <section className="panel panel-pad">
           <h2 className="panel-title">Пока нет пробежек</h2>
@@ -283,29 +316,28 @@ export function AthleteDashboardPage() {
         </section>
       )}
 
-      <div className="segmented segmented-full" role="tablist" aria-label="Что показать">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "mine"}
-          className={tab === "mine" ? "segmented-item is-active" : "segmented-item"}
-          onClick={() => setTab("mine")}
-        >
-          Мои пробежки
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "feed"}
-          className={tab === "feed" ? "segmented-item is-active" : "segmented-item"}
-          onClick={() => setTab("feed")}
-        >
-          Лента клуба
-        </button>
+      <div className="segmented segmented-full" role="tablist" aria-label="Разделы">
+        {(
+          [
+            ["runs", "Пробежки"],
+            ["results", "Результаты"]
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "segmented-item is-active" : "segmented-item"}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {tab === "feed" ? (
-        <AthleteFeed />
+      {tab === "results" && user ? (
+        <ResultsPanel athleteId={user.id} viewer="self" />
       ) : (
         <>
           {workouts.length ? (
@@ -338,6 +370,19 @@ export function AthleteDashboardPage() {
           <AthleteTrends />
         </>
       )}
+
+      {raceDraft && user ? (
+        <ResultForm
+          athleteId={user.id}
+          draft={raceDraft}
+          onClose={() => setRaceDraft(null)}
+          onSaved={() => {
+            setRaceDraft(null);
+            setTab("results");
+            refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { ZodError } from "zod";
 
 import { authRoutes } from "./routes/auth.js";
 import { storyLinkRoutes } from "./lib/story-links.js";
+import { resultsRoutes } from "./routes/results.js";
 import { adminRoutes } from "./routes/admin.js";
 import { athleteRoutes } from "./routes/athlete.js";
 import { handleTelegramUpdate } from "./lib/telegram-commands.js";
@@ -107,6 +108,7 @@ await ensureSchema();
 
 await app.register(authRoutes);
 await app.register(storyLinkRoutes);
+await app.register(resultsRoutes);
 await app.register(adminRoutes);
 await app.register(athleteRoutes);
 await app.register(trainerRoutes);

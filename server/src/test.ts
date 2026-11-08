@@ -21,6 +21,7 @@ const telegramModule = await import("./lib/telegram.js");
 const telegramNotificationsModule = await import("./lib/telegram-notifications.js");
 const telegramAuthModule = await import("./lib/telegram-auth.js");
 const weeklyVolumeModule = await import("./lib/weekly-volume.js");
+const raceResultsModule = await import("./lib/race-results.js");
 const { createHmac } = await import("node:crypto");
 
 // initData, подписанная так же, как это делает Telegram для Mini App
@@ -796,6 +797,28 @@ await runTest("story card renders a 1080x1920 PNG with and without a route", asy
     assert.equal(png.readUInt32BE(16), 1080);
     assert.equal(png.readUInt32BE(20), 1920);
   }
+});
+
+await runTest("personal bests use official times and standard distances with tolerance", () => {
+  const row = (id: number, date: string, meters: number, time: number | null, status: "finished" | "planned" = "finished") => ({
+    id, user_id: 1, status, race_date: date, name: `race ${id}`, city: null, distance_meters: meters,
+    official_time_seconds: time, goal_time_seconds: null, place_overall: null, participants: null,
+    place_category: null, protocol_url: null, note: null, workout_id: null
+  });
+  const { bests, recordIds } = raceResultsModule.computePersonalBests([
+    row(1, "2025-09-14", 10000, 2950),
+    row(2, "2026-05-17", 10050, 2878),
+    row(3, "2026-06-01", 10000, 2900),
+    row(4, "2026-09-07", 21100, 6552),
+    row(5, "2026-11-30", 21097, null, "planned"),
+    row(6, "2026-08-01", 8000, 1800)
+  ]);
+  const ten = bests.find((best) => best.distanceMeters === 10000)!;
+  assert.equal(ten.result?.id, 2, "10.05 km counts as 10 km");
+  assert.equal(ten.improvementSeconds, 72);
+  assert.deepEqual([...recordIds].sort(), [1, 2, 4], "a record at the time it was run");
+  assert.equal(bests.find((best) => best.distanceMeters === 21097)!.improvementSeconds, null, "first half marathon");
+  assert.equal(bests.find((best) => best.distanceMeters === 42195)!.result, null);
 });
 
 console.log("All server tests passed.");

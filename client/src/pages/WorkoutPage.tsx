@@ -2,6 +2,8 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import { useAuth } from "../components/AuthProvider";
+import { ResultForm } from "../components/Results";
 import { ShareStoryButton } from "../components/ShareStoryButton";
 import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
@@ -58,6 +60,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isRaceFormOpen, setIsRaceFormOpen] = useState(false);
+  const { user } = useAuth();
   const [coachComment, setCoachComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [commentStatus, setCommentStatus] = useState<string | null>(null);
@@ -608,6 +612,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
   // Атлет, открывший тренировку одногруппника из ленты, видит её только на чтение.
   const canEdit = mode === "trainer" || data.workout.is_owner !== false;
+  const raceAthleteId = mode === "trainer" ? data.workout.athlete_id : user?.id;
 
   return (
     <div className="page-stack workout-page">
@@ -734,7 +739,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 </span>
               ) : null}
               {canEdit ? (
-                <ShareStoryButton workoutId={data.workout.id} role={mode} title={data.workout.name} />
+                <div className="workout-actions">
+                  <ShareStoryButton workoutId={data.workout.id} role={mode} title={data.workout.name} />
+                  <button type="button" className="share-button share-button-neutral" onClick={() => setIsRaceFormOpen(true)}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                      <path d="M5 21V4M5 4h11l-2 4 2 4H5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Это был старт
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
@@ -912,6 +925,22 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           </section>
         </div>
       </section>
+      {isRaceFormOpen && raceAthleteId ? (
+        <ResultForm
+          athleteId={raceAthleteId}
+          draft={{
+            status: "finished",
+            name: data.workout.name,
+            raceDate: (data.workout.start_date ?? "").slice(0, 10),
+            distanceMeters: data.workout.distance_meters,
+            officialTimeSeconds: data.workout.moving_time_seconds,
+            workoutId: data.workout.id,
+            watchDistanceMeters: data.workout.distance_meters
+          }}
+          onClose={() => setIsRaceFormOpen(false)}
+          onSaved={() => setIsRaceFormOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

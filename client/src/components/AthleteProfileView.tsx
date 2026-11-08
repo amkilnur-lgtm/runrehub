@@ -6,6 +6,7 @@ import { useApi } from "../hooks/useApi";
 import { formatAgo, formatDuration, formatKm, formatPace } from "../lib";
 import { AthleteFeed } from "./AthleteFeed";
 import { AthleteTrends } from "./AthleteTrends";
+import { ResultsPanel } from "./Results";
 import { UserAvatar } from "./UserAvatar";
 
 export type StatsPeriodKey = "week" | "month" | "year" | "allTime";
@@ -73,6 +74,7 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
   const [nextCursor, setNextCursor] = useState<ProfileData["nextCursor"]>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [period, setPeriod] = useState<StatsPeriodKey>("week");
+  const [tab, setTab] = useState<"runs" | "results">("runs");
 
   useEffect(() => {
     if (data) {
@@ -191,6 +193,30 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
         </div>
       </section>
 
+      <div className="segmented segmented-full profile-tabs" role="tablist" aria-label="Разделы спортсмена">
+        {(
+          [
+            ["runs", "Пробежки"],
+            ["results", "Результаты"]
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "segmented-item is-active" : "segmented-item"}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "results" ? (
+        <ResultsPanel athleteId={data.athlete.id} viewer={viewer} />
+      ) : (
+      <>
       <AthleteTrends {...trends} volumeOnly={viewer === "teammate"} />
 
       {viewer === "teammate" ? (
@@ -238,6 +264,8 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
           </button>
         ) : null}
       </section>
+      )}
+      </>
       )}
     </div>
   );

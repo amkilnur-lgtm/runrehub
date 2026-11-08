@@ -20,6 +20,10 @@ const FeedIcon = (
 );
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
+  athlete: [
+    { to: "/athlete", label: "Главная", end: true, icon: HomeIcon },
+    { to: "/athlete/feed", label: "Лента клуба", icon: FeedIcon }
+  ],
   trainer: [
     { to: "/trainer", label: "Обзор", end: true, icon: HomeIcon },
     { to: "/trainer/feed", label: "Лента", icon: FeedIcon }

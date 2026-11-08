@@ -48,6 +48,7 @@ const router = createBrowserRouter([
             element: <RequireRole roles={["athlete"]} />,
             children: [
               { path: "/athlete", element: <AthleteDashboardPage /> },
+              { path: "/athlete/feed", element: <TrainerFeedPage viewer="athlete" /> },
               { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
               { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> }
             ]

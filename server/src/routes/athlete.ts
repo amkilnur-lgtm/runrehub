@@ -23,6 +23,7 @@ import {
 } from "../lib/social.js";
 import { getStoredActivityStreams, markWorkoutDeleted } from "../lib/strava.js";
 import { getWeekStreak, getWeeklyVolume } from "../lib/weekly-volume.js";
+import { detectRaceHint } from "../lib/race-results.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
 const workoutCursorQuerySchema = z.object({
@@ -94,6 +95,15 @@ async function getAthleteHighlights(userId: number) {
   ]);
 
   const latest = latestResult.rows[0];
+  const raceHint = latest
+    ? await detectRaceHint({
+        id: Number(latest.id),
+        user_id: userId,
+        name: String(latest.name ?? ""),
+        distance_meters: Number(latest.distance_meters ?? 0),
+        average_speed: latest.average_speed === null ? null : Number(latest.average_speed)
+      })
+    : null;
   return {
     weekStarts: volume.weekStarts,
     weeklyDistances: volume.byUser.get(userId) ?? [],
@@ -110,7 +120,8 @@ async function getAthleteHighlights(userId: number) {
           route: downsampleRoute(latest.latlng_stream),
           coach_note: latest.coach_note ?? null,
           coach_name: latest.coach_note ? latest.coach_name ?? null : null,
-          coach_avatar_url: latest.coach_note ? latest.coach_avatar_url ?? null : null
+          coach_avatar_url: latest.coach_note ? latest.coach_avatar_url ?? null : null,
+          race_hint: raceHint
         }
       : null
   };

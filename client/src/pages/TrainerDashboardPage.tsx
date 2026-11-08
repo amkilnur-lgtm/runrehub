@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { GroupWeeksTable, type GroupWeeksAthlete } from "../components/GroupWeeksTable";
+import { formatRaceTime } from "../components/Results";
 import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../components/AuthProvider";
 import { useApi } from "../hooks/useApi";
@@ -41,6 +42,16 @@ type DashboardData = {
   }>;
   connectedAthletesCount: number;
   feedback: { pendingCount: number; oldestPendingAt: string | null };
+  upcomingStarts: Array<{
+    id: number;
+    user_id: number;
+    name: string;
+    race_date: string;
+    distance_meters: number;
+    goal_time_seconds: number | null;
+    athlete_name: string;
+    athlete_avatar_url: string | null;
+  }>;
   groupWeeks: { weekStarts: string[]; athletes: Array<{ id: number; distances: number[] }> };
   stats: Record<StatsPeriodKey, GroupPeriodStats>;
   topAthletesThisWeek: Array<{
@@ -243,7 +254,43 @@ export function TrainerDashboardPage() {
           </Link>
         </section>
 
-        <section className="panel split-side">
+        <div className="split-side side-stack">
+        {data.upcomingStarts.length ? (
+          <section className="panel">
+            <div className="panel-head">
+              <h2 className="panel-title">Ближайшие старты</h2>
+              <span className="panel-hint">на 30 дней</span>
+            </div>
+            <ul className="run-list">
+              {data.upcomingStarts.map((start) => {
+                const [y, m, d] = start.race_date.split("-").map(Number);
+                const days = Math.round((new Date(y!, m! - 1, d!).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
+                return (
+                  <li key={start.id}>
+                    <Link className="start-row" to={`/trainer/athletes/${start.user_id}`}>
+                      <span className={days <= 7 ? "countdown countdown-sm is-soon" : "countdown countdown-sm"}>
+                        <b className="num">{days}</b>
+                        <span>{days === 0 ? "сегодня" : pluralRu(days, "день", "дня", "дней")}</span>
+                      </span>
+                      <UserAvatar fullName={start.athlete_name} avatarUrl={start.athlete_avatar_url} className="avatar-sm" ariaHidden />
+                      <span className="run-row-main">
+                        <strong>{start.athlete_name}</strong>
+                        <span>
+                          {start.name} · {formatKm(start.distance_meters, start.distance_meters % 1000 ? 1 : 0)} км
+                        </span>
+                      </span>
+                      {start.goal_time_seconds ? (
+                        <span className="start-goal num">цель {formatRaceTime(start.goal_time_seconds)}</span>
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ) : null}
+
+        <section className="panel">
           <div className="panel-head">
             <h2 className="panel-title">Лидеры недели</h2>
             <span className="panel-hint">по километражу</span>
@@ -267,6 +314,7 @@ export function TrainerDashboardPage() {
             </ol>
           )}
         </section>
+        </div>
       </div>
     </div>
   );
