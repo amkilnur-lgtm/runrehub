@@ -72,6 +72,15 @@ export function parseRaceTime(value: string): number | null {
   return total > 0 ? total : null;
 }
 
+// На iPhone числовая клавиатура без двоеточия: набираем только цифры, двоеточия
+// ставим сами — «4758» → «47:58», «14912» → «1:49:12»
+export function formatTimeDigits(value: string) {
+  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d{3})/, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, -2)}:${digits.slice(-2)}`;
+  return `${digits.slice(0, -4)}:${digits.slice(-4, -2)}:${digits.slice(-2)}`;
+}
+
 function distanceLabel(meters: number) {
   return DISTANCES.find((item) => Math.abs(item.meters - meters) / item.meters <= 0.02)?.label ?? `${formatKm(meters, meters % 1000 ? 2 : 0)} км`;
 }
@@ -152,6 +161,43 @@ export function ResultsPanel({ athleteId, viewer }: { athleteId: number; viewer:
   }
   const latestRecordId = finished.find((result) => result.is_record)?.id;
   const recentDays = 30;
+
+  // совсем пусто — одна понятная карточка, а не четыре плитки «ещё впереди»
+  if (data.results.length === 0) {
+    return (
+      <div className="results">
+        <section className="panel results-empty">
+          <strong>{viewer === "teammate" ? "Результатов пока нет" : "Здесь будут ваши старты и рекорды"}</strong>
+          {viewer === "teammate" ? null : (
+            <p>
+              Добавьте прошедшие старты — личные рекорды на 5, 10, 21,1 и 42,2 км посчитаются сами, по официальному
+              времени. А запланированный старт покажет отсчёт дней.
+            </p>
+          )}
+          {data.canEdit ? (
+            <button type="button" className="primary-button" onClick={() => setEditing({})}>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
+              Добавить результат или старт
+            </button>
+          ) : null}
+        </section>
+        {editing ? (
+          <ResultForm
+            athleteId={athleteId}
+            result={editing.result}
+            draft={editing.draft}
+            onClose={() => setEditing(null)}
+            onSaved={() => {
+              setEditing(null);
+              refresh();
+            }}
+          />
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="results">
@@ -441,12 +487,12 @@ export function ResultForm({ athleteId, result, draft, onClose, onSaved }: Resul
           {status === "finished" ? (
             <label className="field">
               Время по чипу
-              <input inputMode="numeric" value={time} onChange={(e) => setTime(e.target.value)} placeholder="47:58" className="num" />
+              <input inputMode="numeric" value={time} onChange={(e) => setTime(formatTimeDigits(e.target.value))} placeholder="47:58" className="num" aria-describedby="time-hint" />
             </label>
           ) : (
             <label className="field">
               Цель
-              <input inputMode="numeric" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="1:45:00" className="num" />
+              <input inputMode="numeric" value={goal} onChange={(e) => setGoal(formatTimeDigits(e.target.value))} placeholder="1:45:00" className="num" aria-describedby="time-hint" />
             </label>
           )}
           <label className="field">
@@ -454,6 +500,8 @@ export function ResultForm({ athleteId, result, draft, onClose, onSaved }: Resul
             <input type="date" value={raceDate} onChange={(e) => setRaceDate(e.target.value)} required />
           </label>
         </div>
+
+        <p id="time-hint" className="field-hint">Время — только цифры, двоеточия встанут сами: 4758 → 47:58</p>
 
         {status === "finished" ? (
           <div className="field-row field-row-3">

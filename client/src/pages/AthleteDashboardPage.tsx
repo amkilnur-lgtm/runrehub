@@ -88,22 +88,26 @@ function WeekHero({ highlights, week }: { highlights: Highlights; week: PeriodSt
   const usual = finished.length ? finished.reduce((sum, value) => sum + value, 0) / finished.length : 0;
   const max = Math.max(...distances, 1);
   const lastIndex = distances.length - 1;
+  const lastWeek = distances[lastIndex - 1] ?? 0;
 
   return (
     <section className="week-hero" aria-label="Эта неделя">
       <div className="week-hero-top">
         <span>Эта неделя · {weekRangeLabel(highlights.weekStarts[lastIndex])}</span>
-        <span>
-          {week.workout_count} {pluralRu(week.workout_count, "пробежка", "пробежки", "пробежек")}
-        </span>
+        {week.workout_count > 0 ? (
+          <span>
+            {week.workout_count} {pluralRu(week.workout_count, "пробежка", "пробежки", "пробежек")}
+          </span>
+        ) : null}
       </div>
       <div className="week-hero-value num">
         {formatKm(week.distance_meters)}
         <small>км</small>
       </div>
       <div className="week-hero-meta">
-        {hoursMinutes(week.moving_time_seconds)} в беге
-        {usual > 0 ? ` · обычно ${formatKm(usual)} км в неделю` : ""}
+        {week.workout_count === 0
+          ? `Неделя только началась${lastWeek > 0 ? ` · на прошлой — ${formatKm(lastWeek)} км` : ""}`
+          : `${hoursMinutes(week.moving_time_seconds)} в беге${usual > 0 ? ` · обычно ${formatKm(usual)} км в неделю` : ""}`}
       </div>
       <div className="week-bars" role="img" aria-label={`Километраж за ${distances.length} недель, текущая неделя выделена`}>
         {distances.map((meters, index) => (
