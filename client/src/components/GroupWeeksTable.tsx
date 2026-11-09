@@ -76,7 +76,7 @@ export function GroupWeeksTable({ weekStarts, athletes }: { weekStarts: string[]
         <div>
           <h2 className="panel-title">Группа по неделям</h2>
           <p className="panel-hint">
-            Километраж за {weekStarts.length} {pluralRu(weekStarts.length, "неделю", "недели", "недель")}. Красная рамка —
+            Километраж за {weekStarts.length} {pluralRu(weekStarts.length, "неделю", "недели", "недель")}. Рамка —
             текущая неделя, она ещё идёт
           </p>
         </div>

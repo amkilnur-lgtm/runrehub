@@ -7,7 +7,11 @@ export type StreamSeries = {
   latlng: [number, number][];
 } | null;
 
+export type WorkoutFeeling = { effort: "easy" | "normal" | "hard" | null; pain: "none" | "light" | null };
+
 export type WorkoutData = {
+  // самочувствие: у своей тренировки и у тренера; у одногруппника null
+  feeling?: WorkoutFeeling | null;
   workout: {
     id: number;
     name: string;
@@ -18,6 +22,11 @@ export type WorkoutData = {
     average_speed: number | null;
     average_heartrate: number | null;
     max_heartrate?: number | null;
+    elapsed_time_seconds?: number | null;
+    grade_adjusted_speed?: number | null;
+    average_cadence?: number | null;
+    calories?: number | null;
+    device_name?: string | null;
     coach_comment?: string | null;
     athlete_name?: string;
     athlete_id?: number;
@@ -119,4 +128,10 @@ export type ChartModel = {
   summaryLeftLabel: string;
   summaryRight: string;
   summaryRightLabel: string;
+  // для курсора и подсказки: точки в единицах данных (x — метры) и шкала Y
+  series?: { x: number; y: number }[];
+  yMin?: number;
+  yMax?: number;
+  invertY?: boolean;
+  xMax?: number;
 };

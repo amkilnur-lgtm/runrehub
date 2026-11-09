@@ -22,6 +22,7 @@ const telegramNotificationsModule = await import("./lib/telegram-notifications.j
 const telegramAuthModule = await import("./lib/telegram-auth.js");
 const weeklyVolumeModule = await import("./lib/weekly-volume.js");
 const raceResultsModule = await import("./lib/race-results.js");
+const fitnessModule = await import("./lib/fitness.js");
 const { createHmac } = await import("node:crypto");
 
 // initData, подписанная так же, как это делает Telegram для Mini App
@@ -819,6 +820,23 @@ await runTest("personal bests use official times and standard distances with tol
   assert.deepEqual([...recordIds].sort(), [1, 2, 4], "a record at the time it was run");
   assert.equal(bests.find((best) => best.distanceMeters === 21097)!.improvementSeconds, null, "first half marathon");
   assert.equal(bests.find((best) => best.distanceMeters === 42195)!.result, null);
+});
+
+await runTest("fitness: form, fatigue and freshness like TrainingPeaks", () => {
+  const days = (loads: number[]) => loads.map((load, index) => ({ date: `d${index}`, load }));
+  // ровная нагрузка 50 каждый день 200 дней — форма и усталость сходятся к 50, свежесть к 0
+  const steady = fitnessModule.computeFitnessSeries(days(Array(200).fill(50)));
+  const steadySummary = fitnessModule.summarizeFitness(steady)!;
+  assert.ok(Math.abs(steadySummary.ctl - 50) <= 1 && Math.abs(steadySummary.atl - 50) <= 1);
+  assert.equal(steadySummary.zone, "neutral");
+  // неделя отдыха после нагрузки — свежий
+  const taper = fitnessModule.summarizeFitness(fitnessModule.computeFitnessSeries(days([...Array(120).fill(60), ...Array(8).fill(0)])))!;
+  assert.equal(taper.zone, "fresh");
+  assert.ok(taper.ramp7 < 0, "форма падает на отдыхе");
+  // резкий скачок нагрузки — перегруз
+  const spike = fitnessModule.summarizeFitness(fitnessModule.computeFitnessSeries(days([...Array(60).fill(30), ...Array(10).fill(150)])))!;
+  assert.equal(spike.zone, "overload");
+  assert.equal(fitnessModule.freshnessZone(-15), "productive");
 });
 
 console.log("All server tests passed.");

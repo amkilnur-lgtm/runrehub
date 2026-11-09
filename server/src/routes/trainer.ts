@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 import { buildStoryCardPng } from "../lib/telegram-notifications.js";
 import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
+import { getWorkoutFeeling } from "../lib/workout-feeling.js";
 import { getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
 import { getGroupUpcomingStarts } from "../lib/race-results.js";
 import {
@@ -511,7 +512,7 @@ export async function trainerRoutes(app: FastifyInstance) {
       correction
     );
 
-    return correctedView;
+    return { ...correctedView, feeling: await getWorkoutFeeling(workoutId) };
   });
 
   app.delete("/api/trainer/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {

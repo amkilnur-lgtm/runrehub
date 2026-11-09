@@ -5,6 +5,8 @@ import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { buildStoryCardPng } from "../lib/telegram-notifications.js";
 import { signStoryLink } from "../lib/story-links.js";
+import { getFitnessSummaries } from "../lib/fitness.js";
+import { getWorkoutFeeling, saveWorkoutFeeling, workoutFeelingSchema } from "../lib/workout-feeling.js";
 import { pool } from "../lib/db.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
@@ -22,7 +24,7 @@ import {
   listWorkoutComments
 } from "../lib/social.js";
 import { getStoredActivityStreams, markWorkoutDeleted } from "../lib/strava.js";
-import { getWeekStreak, getWeeklyVolume } from "../lib/weekly-volume.js";
+import { HAS_COACH_FEEDBACK_SQL, getWeekStreak, getWeeklyVolume } from "../lib/weekly-volume.js";
 import { detectRaceHint } from "../lib/race-results.js";
 import { applyWorkoutCorrectionToView, getActiveWorkoutCorrection } from "../lib/workout-gps-fix.js";
 
@@ -61,8 +63,9 @@ type AthleteStatsRow = {
 };
 
 async function getAthleteHighlights(userId: number) {
-  const [volume, streakWeeks, latestResult] = await Promise.all([
-    getWeeklyVolume([userId]),
+  const [volume, streakWeeks, latestResult, weekDaysResult, nextStartResult, fitness] = await Promise.all([
+    // 12 недель — график во вкладке «Пробежки»; регулярность на главной берёт последние 6
+    getWeeklyVolume([userId], 12),
     getWeekStreak(userId),
     pool.query(
       `
@@ -91,10 +94,45 @@ async function getAthleteHighlights(userId: number) {
         limit 1
       `,
       [userId]
-    )
+    ),
+    // км по дням этой недели (пн–вс) и сколько было к этому же моменту прошлой недели
+    pool.query(
+      `
+        with days as (
+          select generate_series(date_trunc('week', now()), date_trunc('week', now()) + interval '6 days', interval '1 day') as day
+        )
+        select d.day,
+               coalesce(sum(coalesce(wc.corrected_distance_meters, w.distance_meters)), 0)::float8 as distance_meters,
+               (select coalesce(sum(coalesce(wc2.corrected_distance_meters, w2.distance_meters)), 0)::float8
+                  from workouts w2 left join workout_corrections wc2 on wc2.workout_id = w2.id
+                 where w2.user_id = $1
+                   and w2.start_date >= date_trunc('week', now()) - interval '1 week'
+                   and w2.start_date < now() - interval '1 week') as last_week_to_date
+        from days d
+        left join workouts w on w.user_id = $1 and w.start_date >= d.day and w.start_date < d.day + interval '1 day'
+        left join workout_corrections wc on wc.workout_id = w.id
+        group by d.day
+        order by d.day
+      `,
+      [userId]
+    ),
+    pool.query(
+      `
+        select id, name, race_date::text as race_date, distance_meters, goal_time_seconds,
+               (race_date - current_date) as days_left
+        from race_results
+        where user_id = $1 and status = 'planned' and race_date >= current_date
+        order by race_date, id
+        limit 1
+      `,
+      [userId]
+    ),
+    getFitnessSummaries([userId])
   ]);
 
   const latest = latestResult.rows[0];
+  const nextStart = nextStartResult.rows[0];
+  const freshness = fitness.get(userId) ?? null;
   const raceHint = latest
     ? await detectRaceHint({
         id: Number(latest.id),
@@ -108,6 +146,20 @@ async function getAthleteHighlights(userId: number) {
     weekStarts: volume.weekStarts,
     weeklyDistances: volume.byUser.get(userId) ?? [],
     streakWeeks,
+    weekDays: weekDaysResult.rows.map((row) => Number(row.distance_meters)),
+    lastWeekToDateMeters: Number(weekDaysResult.rows[0]?.last_week_to_date ?? 0),
+    nextStart: nextStart
+      ? {
+          id: Number(nextStart.id),
+          name: String(nextStart.name),
+          race_date: String(nextStart.race_date),
+          distance_meters: Number(nextStart.distance_meters),
+          goal_time_seconds: nextStart.goal_time_seconds === null ? null : Number(nextStart.goal_time_seconds),
+          days_left: Number(nextStart.days_left)
+        }
+      : null,
+    // спортсмену — только упрощённая плашка свежести, без формы и усталости
+    freshness: freshness ? { tsb: freshness.tsb, zone: freshness.zone } : null,
     latestWorkout: latest
       ? {
           id: Number(latest.id),
@@ -204,8 +256,11 @@ export async function athleteRoutes(app: FastifyInstance) {
                 coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
                 coalesce(wc.corrected_elevation_gain, w.elevation_gain) as elevation_gain,
                 coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
-                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate,
+                ${HAS_COACH_FEEDBACK_SQL} as has_feedback,
+                exists (select 1 from race_results r where r.workout_id = w.id and r.status = 'finished') as is_race
               from workouts w
+              join users u on u.id = w.user_id
               left join workout_corrections wc on wc.workout_id = w.id
               where w.user_id = $1
                 and (
@@ -228,8 +283,11 @@ export async function athleteRoutes(app: FastifyInstance) {
                 coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds) as moving_time_seconds,
                 coalesce(wc.corrected_elevation_gain, w.elevation_gain) as elevation_gain,
                 coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
-                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate
+                coalesce(wc.corrected_average_heartrate, w.average_heartrate) as average_heartrate,
+                ${HAS_COACH_FEEDBACK_SQL} as has_feedback,
+                exists (select 1 from race_results r where r.workout_id = w.id and r.status = 'finished') as is_race
               from workouts w
+              join users u on u.id = w.user_id
               left join workout_corrections wc on wc.workout_id = w.id
               where w.user_id = $1
               order by w.start_date desc, w.id desc
@@ -498,7 +556,23 @@ export async function athleteRoutes(app: FastifyInstance) {
       (correctedView.workout as Record<string, unknown>).coach_comment = null;
     }
 
-    return { ...correctedView, like: await getWorkoutLikeState(workoutId, request.user.id) };
+    return {
+      ...correctedView,
+      like: await getWorkoutLikeState(workoutId, request.user.id),
+      // самочувствие — личная отметка: одногруппнику не показываем
+      feeling: workoutResult.rows[0].is_owner ? await getWorkoutFeeling(workoutId) : null
+    };
+  });
+
+  app.put("/api/athlete/workouts/:id/feeling", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    const body = workoutFeelingSchema.parse(request.body);
+    const owned = await pool.query(`select 1 from workouts where id = $1 and user_id = $2`, [workoutId, request.user.id]);
+    if (!owned.rows[0]) {
+      return reply.code(404).send({ message: "Тренировка не найдена" });
+    }
+    return { feeling: await saveWorkoutFeeling(workoutId, request.user.id, body) };
   });
 
   app.delete("/api/athlete/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {

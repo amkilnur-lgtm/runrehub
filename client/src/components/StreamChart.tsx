@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { CHART_HEIGHT, CHART_WIDTH } from "../chart/chart-utils";
+import { CHART_HEIGHT, CHART_WIDTH, projectX, projectY, unprojectX } from "../chart/chart-utils";
 import { ChartModel, IntervalBand, IntervalBandLabel } from "../types/workout";
 
 const LABEL_MIN_GAP_PX = 8;
@@ -11,7 +12,14 @@ export function StreamChart({
   color,
   formatter,
   bands = [],
-  bandLabels = []
+  bandLabels = [],
+  summary,
+  footer,
+  zones = [],
+  refValue,
+  unit = "",
+  cursor = null,
+  onCursor
 }: {
   title: string;
   model: ChartModel | null;
@@ -19,6 +27,17 @@ export function StreamChart({
   formatter: (value: number) => string;
   bands?: IntervalBand[];
   bandLabels?: IntervalBandLabel[];
+  // вывод словами над графиком (client/DESIGN.md → «Графики»)
+  summary?: string | null;
+  footer?: React.ReactNode;
+  // светлые полосы зон под линией (пульс): границы в единицах оси Y
+  zones?: { from: number; to: number; color: string }[];
+  // пунктир (средний темп)
+  refValue?: number | null;
+  unit?: string;
+  // общий курсор для всех графиков тренировки — дистанция в метрах
+  cursor?: number | null;
+  onCursor?: (meters: number | null) => void;
 }) {
   const labelsRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,22 +98,57 @@ export function StreamChart({
     );
   }
 
+  const scale =
+    model.yMin !== undefined && model.yMax !== undefined
+      ? { min: model.yMin, max: model.yMax, invert: Boolean(model.invertY) }
+      : null;
+  const xMax = model.xMax ?? 0;
+  // у пульса ось подписана границами зон (130 · 150 · 162), а не равными шагами
+  const zoneTicks =
+    scale && zones.length
+      ? zones
+          .map((zone) => zone.from)
+          .filter((value) => value > scale.min && value < scale.max)
+          .map((value) => ({ value, top: `${projectY(value, scale.min, scale.max, scale.invert) * 100}%` }))
+      : null;
+  const yTicks = zoneTicks ?? model.yTicks.map((value, index) => ({ value, top: model.yTickPositions[index]! }));
+  const series = model.series ?? [];
+
+  // ближайшая точка ряда к курсору (ряд отсортирован по дистанции)
+  let hover: { left: number; top: number; meters: number; value: number } | null = null;
+  if (cursor !== null && scale && series.length && xMax > 0) {
+    let lo = 0;
+    let hi = series.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (series[mid]!.x < cursor) lo = mid + 1;
+      else hi = mid;
+    }
+    const point = series[lo]!;
+    hover = {
+      left: projectX(point.x, xMax),
+      top: projectY(point.y, scale.min, scale.max, scale.invert),
+      meters: point.x,
+      value: point.y
+    };
+  }
+
+  function handlePointer(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!onCursor || xMax <= 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    onCursor(unprojectX((event.clientX - rect.left) / rect.width, xMax));
+  }
+
   return (
-    <div className="chart-card">
-      <div className="chart-title-row">
-        <span className="muted trainer-dashboard-eyebrow">{title}</span>
-        <span className="muted chart-axis-caption">{model.axisCaption}</span>
+    <div className="chart-card ds-chart">
+      <div className="ds-chart-head">
+        <b>{title}</b>
+        <span>
+          {model.summaryLeftLabel === "Средний" ? "ср." : model.summaryLeftLabel} {model.summaryLeft.replace(" уд/мин", "")}
+          {model.axisCaption === "УД/МИН" ? ` · макс. ${model.summaryRight.replace(" уд/мин", "")}` : " /км"}
+        </span>
       </div>
-      <div className="chart-metrics">
-        <div className="chart-metric">
-          <div className="chart-metric-value">{model.summaryLeft}</div>
-          <div className="chart-metric-label">{model.summaryLeftLabel}</div>
-        </div>
-        <div className="chart-metric">
-          <div className="chart-metric-value">{model.summaryRight}</div>
-          <div className="chart-metric-label">{model.summaryRightLabel}</div>
-        </div>
-      </div>
+      {summary ? <p className="ds-chart-msg">{summary}</p> : null}
       {bandLabels.length ? (
         <div className="chart-x-wrap chart-band-label-row">
           <div />
@@ -115,13 +169,37 @@ export function StreamChart({
       <div className="chart-frame">
         <div className="chart-grid-wrap">
           <div className="chart-y-axis">
-            {model.yTicks.map((tick, index) => (
-              <span key={`${tick}-${index}`} style={{ top: model.yTickPositions[index] }}>
-                {formatter(tick)}
+            {yTicks.map((tick, index) => (
+              <span key={`${tick.value}-${index}`} style={{ top: tick.top }}>
+                {formatter(tick.value)}
               </span>
             ))}
           </div>
-          <div className="chart-grid">
+          <div
+            className="chart-grid"
+            onPointerMove={handlePointer}
+            onPointerDown={handlePointer}
+            onPointerLeave={(event) => {
+              if (event.pointerType === "mouse") onCursor?.(null);
+            }}
+          >
+            {scale
+              ? zones.map((zone) => {
+                  const y1 = projectY(Math.min(zone.to, scale.max), scale.min, scale.max, scale.invert);
+                  const y2 = projectY(Math.max(zone.from, scale.min), scale.min, scale.max, scale.invert);
+                  const top = Math.min(y1, y2);
+                  const height = Math.abs(y2 - y1);
+                  if (zone.from >= scale.max || zone.to <= scale.min || height <= 0) return null;
+                  return (
+                    <div
+                      key={`zone-${zone.from}`}
+                      className="chart-zone-band"
+                      style={{ top: `${top * 100}%`, height: `${height * 100}%`, background: zone.color }}
+                      aria-hidden="true"
+                    />
+                  );
+                })
+              : null}
             {/* Рабочие отрезки интервальной тренировки — подложка под линией */}
             {bands.map((band, index) => (
               <div
@@ -131,41 +209,47 @@ export function StreamChart({
                 aria-hidden="true"
               />
             ))}
-            {model.yTicks.map((tick, index) => (
-              <div
-                key={`${tick}-${index}`}
-                className="chart-grid-line"
-                style={{ top: model.yTickPositions[index] }}
-              />
+            {yTicks.map((tick, index) => (
+              <div key={`${tick.value}-${index}`} className="chart-grid-line" style={{ top: tick.top }} />
             ))}
-            <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id={`${title}-gradient`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.48" />
-                  <stop offset="42%" stopColor={color} stopOpacity="0.18" />
-                  <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-                </linearGradient>
-              </defs>
-              <path d={model.areaPath} fill={`url(#${title}-gradient)`} />
-              <path
-                d={model.linePath}
-                fill="none"
-                stroke="var(--surface)"
-                strokeOpacity="0.86"
-                strokeWidth="2.3"
-                strokeLinejoin="round"
-                strokeLinecap="round"
+            {scale && refValue ? (
+              <div
+                className="chart-ref-line"
+                style={{ top: `${projectY(refValue, scale.min, scale.max, scale.invert) * 100}%`, borderColor: color }}
+                aria-hidden="true"
               />
+            ) : null}
+            <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="chart-svg" preserveAspectRatio="none">
+              {/* тонкая линия без заливки (client/DESIGN.md → «Графики») */}
               <path
                 d={model.linePath}
                 fill="none"
                 stroke={color}
-                strokeOpacity="0.96"
-                strokeWidth="1.5"
+                strokeWidth="2"
                 strokeLinejoin="round"
                 strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
               />
             </svg>
+            {hover ? (
+              <>
+                <div className="chart-cursor" style={{ left: `${hover.left * 100}%` }} aria-hidden="true" />
+                <div
+                  className="chart-dot"
+                  style={{ left: `${hover.left * 100}%`, top: `${hover.top * 100}%`, background: color }}
+                  aria-hidden="true"
+                />
+                <div
+                  className={hover.left > 0.6 ? "chart-tip is-left" : "chart-tip"}
+                  style={{ left: `${hover.left * 100}%` }}
+                  role="status"
+                >
+                  {(hover.meters / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} км ·{" "}
+                  {formatter(hover.value)}
+                  {unit}
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="chart-side-gutter" aria-hidden="true" />
         </div>
@@ -177,21 +261,18 @@ export function StreamChart({
             <span
               key={`${tick}-${index}`}
               className={
-                index === 0 ? "chart-x-tick chart-x-tick-start" : index === model.xTicks.length - 1 ? "chart-x-tick chart-x-tick-end" : "chart-x-tick"
+                index === 0 ? "chart-x-tick chart-x-tick-start" : "chart-x-tick"
               }
               style={{ left: model.xTickPositions[index] }}
             >
               {model.xTickLabels[index]}
+              {index === model.xTicks.length - 1 ? " км" : ""}
             </span>
           ))}
         </div>
         <div className="chart-side-gutter" aria-hidden="true" />
       </div>
-      <div className="chart-x-wrap">
-        <div />
-        <div className="chart-x-label muted">{model.xLabel}</div>
-        <div className="chart-side-gutter" aria-hidden="true" />
-      </div>
+      {footer}
     </div>
   );
 }

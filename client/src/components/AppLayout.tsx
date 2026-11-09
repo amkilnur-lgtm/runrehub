@@ -7,26 +7,41 @@ import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = { to: string; label: string; end?: boolean; icon: React.ReactNode };
 
-const HomeIcon = (
-  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-    <path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+function Icon({ d }: { d: React.ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {d}
+    </svg>
+  );
+}
 
-const FeedIcon = (
-  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-    <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-  </svg>
+const HomeIcon = <Icon d={<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />} />;
+const RunsIcon = <Icon d={<path d="M4 6h16M4 12h16M4 18h10" />} />;
+const StartsIcon = <Icon d={<path d="M5 21V4M5 4h11l-2 4 2 4H5" />} />;
+const ClubIcon = (
+  <Icon
+    d={
+      <>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.7 2.7 2.4 3 5.2" />
+      </>
+    }
+  />
 );
+export const ReviewIcon = <Icon d={<path d="M4 5h16v11H9l-5 4V5z" />} />;
 
+// 4 вкладки на роль, подпись одним словом (client/DESIGN.md → «Информационная архитектура»)
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   athlete: [
     { to: "/athlete", label: "Главная", end: true, icon: HomeIcon },
-    { to: "/athlete/feed", label: "Лента клуба", icon: FeedIcon }
+    { to: "/athlete/runs", label: "Пробежки", icon: RunsIcon },
+    { to: "/athlete/starts", label: "Старты", icon: StartsIcon },
+    { to: "/athlete/feed", label: "Клуб", icon: ClubIcon }
   ],
+  // «Разбор» и «Старты» тренера появятся вместе с их экранами (ReviewIcon, StartsIcon)
   trainer: [
-    { to: "/trainer", label: "Обзор", end: true, icon: HomeIcon },
-    { to: "/trainer/feed", label: "Лента", icon: FeedIcon }
+    { to: "/trainer", label: "Группа", end: true, icon: ClubIcon },
+    { to: "/trainer/feed", label: "Клуб", icon: RunsIcon }
   ]
 };
 

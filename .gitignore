@@ -24,3 +24,5 @@ server/uploads/
 
 # deploy credentials (never commit)
 deploy.json
+research_notes/
+reports/

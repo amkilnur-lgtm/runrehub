@@ -6,13 +6,13 @@ import {
   buildTickPositions,
   buildTicks,
   buildXAxis,
-  buildXAxisPositions,
   clamp,
   medianFilter,
   quantile,
   smoothSeries,
   suppressTransientSpikes
 } from "./chart-utils";
+import { downsample } from "./chart-utils";
 
 export function formatHeartRate(value: number | null | undefined) {
   return value ? `${Math.round(value)} уд/мин` : "—";
@@ -70,12 +70,17 @@ export function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutDat
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: xAxis.xTicks,
     xTickLabels: xAxis.xTickLabels,
-    xTickPositions: buildXAxisPositions(xAxis.xTicks.length),
+    xTickPositions: xAxis.xTickPositions,
     axisCaption: "УД/МИН",
     xLabel: xAxis.xLabel,
     summaryLeft: formatHeartRate(workout?.average_heartrate),
     summaryLeftLabel: "Средний",
     summaryRight: formatHeartRate(workout?.max_heartrate ?? Math.max(...validHr)),
-    summaryRightLabel: "Максимум"
+    summaryRightLabel: "Максимум",
+    series: downsample(points.filter((point) => Number.isFinite(point.y)), 700),
+    yMin: minHr,
+    yMax: maxHr,
+    invertY: false,
+    xMax: points[points.length - 1]?.x ?? 0
   };
 }

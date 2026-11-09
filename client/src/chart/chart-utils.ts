@@ -5,7 +5,8 @@ export const CHART_HEIGHT = 220;
 export const CHART_INSET_X = 2;
 export const CHART_INSET_TOP = 12;
 export const CHART_INSET_BOTTOM = 12;
-export const Y_TICK_COUNT = 4;
+// три линии сетки с подписями (client/DESIGN.md → «Графики»)
+export const Y_TICK_COUNT = 2;
 export const X_TICK_COUNT = 6;
 
 export function clamp(value: number, min: number, max: number) {
@@ -150,16 +151,27 @@ export function buildLinearTicks(maxValue: number) {
 }
 
 export function formatDistanceTick(distanceMeters: number) {
-  return `${(distanceMeters / 1000).toFixed(1)}`;
+  const km = distanceMeters / 1000;
+  return Number.isInteger(Math.round(km * 10) / 10) ? String(Math.round(km)) : km.toFixed(1).replace(".", ",");
+}
+
+// круглые километры по оси X: 0 · 2 · 4 · 6 (шаг 0,5 / 1 / 2 / 5 / 10 / 20 км, не больше 6 подписей)
+function niceDistanceTicks(maxDistance: number) {
+  const km = maxDistance / 1000;
+  const step = [0.5, 1, 2, 5, 10, 20, 50].find((candidate) => km / candidate <= 5) ?? 50;
+  const ticks: number[] = [];
+  for (let value = 0; value <= km + 1e-9; value += step) ticks.push(Math.round(value * 1000));
+  return ticks.length >= 2 ? ticks : [0, Math.round(maxDistance)];
 }
 
 export function buildXAxis(streams: StreamSeries, fallbackDistance: number) {
   const maxDistance = streams?.distance?.[streams!.distance.length - 1] ?? fallbackDistance;
-  const xTicks = buildLinearTicks(maxDistance);
+  const xTicks = niceDistanceTicks(maxDistance);
   return {
     pointsX: streams?.distance ?? [],
     xTicks,
     xTickLabels: xTicks.map(formatDistanceTick),
+    xTickPositions: xTicks.map((tick) => `${projectX(tick, maxDistance) * 100}%`),
     xLabel: "Дистанция (км)"
   };
 }
@@ -225,4 +237,33 @@ export function buildChartPaths(points: ChartPoint[], minY: number, maxY: number
   const areaPath = `${linePath} L ${last.x.toFixed(2)} ${baseY.toFixed(2)} L ${first.x.toFixed(2)} ${baseY.toFixed(2)} Z`;
 
   return { linePath, areaPath };
+}
+
+// равномерно прореживаем ряд для курсора (каждая N-я точка + последняя)
+export function downsample<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return items;
+  const step = items.length / max;
+  const result: T[] = [];
+  for (let index = 0; index < max; index += 1) result.push(items[Math.floor(index * step)]!);
+  result.push(items[items.length - 1]!);
+  return result;
+}
+
+// доля высоты графика (0..1) для значения — та же проекция, что у линии
+export function projectY(value: number, minY: number, maxY: number, invertY: boolean) {
+  const drawableHeight = CHART_HEIGHT - CHART_INSET_TOP - CHART_INSET_BOTTOM;
+  const yRatio = clamp((value - minY) / (maxY - minY || 1), 0, 1);
+  const normalized = invertY ? yRatio : 1 - yRatio;
+  return (CHART_INSET_TOP + normalized * drawableHeight) / CHART_HEIGHT;
+}
+
+// доля ширины графика (0..1) для дистанции и обратно
+export function projectX(meters: number, xMax: number) {
+  const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
+  return (CHART_INSET_X + clamp(meters / (xMax || 1), 0, 1) * drawableWidth) / CHART_WIDTH;
+}
+
+export function unprojectX(fraction: number, xMax: number) {
+  const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
+  return clamp((fraction * CHART_WIDTH - CHART_INSET_X) / drawableWidth, 0, 1) * xMax;
 }

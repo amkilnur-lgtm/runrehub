@@ -8,11 +8,12 @@ import { ShareStoryButton } from "../components/ShareStoryButton";
 import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
 import { WorkoutComments } from "../components/WorkoutComments";
-import { formatHeartRate, prepareHeartRateChart } from "../chart/heartrate-chart";
+import { WorkoutFeeling } from "../components/WorkoutFeeling";
+import { prepareHeartRateChart } from "../chart/heartrate-chart";
 import { buildIntervalBands } from "../chart/interval-bands";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
 import { useApi } from "../hooks/useApi";
-import { formatDate, formatDistance, formatDuration, formatPace } from "../lib";
+import { formatDistance, formatDuration, formatPace } from "../lib";
 import { WorkoutData } from "../types/workout";
 
 const WorkoutRouteMap = lazy(async () =>
@@ -51,6 +52,145 @@ function formatLapTime(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+const WEEKDAYS = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+const MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+
+function longWorkoutDate(date: Date) {
+  const time = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS_GEN[date.getMonth()]} · ${time}`;
+}
+
+function formatKmShort(meters: number) {
+  return (meters / 1000).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: meters >= 100000 ? 0 : 2 });
+}
+
+// Зоны пульса общие для всех: до 130 · 130–150 · 150–162 · 162+ (client/DESIGN.md)
+const HR_ZONES = [
+  { label: "до 130", max: 130 },
+  { label: "130–150", max: 150 },
+  { label: "150–162", max: 162 },
+  { label: "162+", max: Infinity }
+];
+
+type HrZoneShare = { label: string; percent: number };
+
+function heartRateZones(streams: WorkoutData["streams"]): HrZoneShare[] | null {
+  const hr = streams?.heartrate ?? [];
+  const time = streams?.time ?? [];
+  const size = Math.min(hr.length, time.length);
+  if (size < 30) return null;
+  const seconds = [0, 0, 0, 0];
+  for (let index = 1; index < size; index += 1) {
+    const dt = time[index]! - time[index - 1]!;
+    const bpm = hr[index]!;
+    if (!(dt > 0 && dt <= 30) || !(bpm >= 60 && bpm <= 230)) continue;
+    const zone = HR_ZONES.findIndex((item) => bpm < item.max);
+    seconds[zone] += dt;
+  }
+  const total = seconds.reduce((sum, value) => sum + value, 0);
+  if (total < 60) return null;
+  // проценты в сумме ровно 100
+  const raw = seconds.map((value) => (value / total) * 100);
+  const percents = raw.map(Math.floor);
+  let rest = 100 - percents.reduce((sum, value) => sum + value, 0);
+  raw
+    .map((value, index) => ({ index, frac: value - Math.floor(value) }))
+    .sort((a, b) => b.frac - a.frac)
+    .forEach(({ index }) => {
+      if (rest > 0) {
+        percents[index] += 1;
+        rest -= 1;
+      }
+    });
+  return HR_ZONES.map((zone, index) => ({ label: zone.label, percent: percents[index]! }));
+}
+
+function paceOf(speed: number | null | undefined) {
+  return speed && speed > 0 ? 1000 / speed : null;
+}
+
+function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps"], structure: WorkoutData["structure"]) {
+  // несколько серий — по серии на каждую: «5×800 м — 4:12, 5×200 м — 3:29»
+  if (structure && structure.sets.length > 1) {
+    return structure.sets.map((set) => `${set.label} — ${formatPaceSeconds(set.pace_seconds_per_km)}`).join(", ");
+  }
+  const source = workLaps.length >= 2 ? workLaps : laps.filter((lap) => lap.distance_meters >= 500);
+  const paces = source.map((lap) => paceOf(lap.average_speed)).filter((value): value is number => value !== null);
+  if (paces.length < 2) return null;
+  const range = `${formatPaceSeconds(Math.min(...paces))}–${formatPaceSeconds(Math.max(...paces))}`;
+  if (workLaps.length >= 2) {
+    const last = paces[paces.length - 1]!;
+    const others = paces.slice(0, -1);
+    const slowerLast = last > Math.max(...others) + 3;
+    return `${paces.length} ${paces.length < 5 ? "отрезка" : "отрезков"} по ${range}${slowerLast ? ", последний — медленнее остальных" : ""}`;
+  }
+  return `Темп по кругам: ${range} /км`;
+}
+
+function buildHrSummary(zones: HrZoneShare[]) {
+  const above150 = zones[2]!.percent + zones[3]!.percent;
+  if (above150 >= 45) return `Почти половина времени и больше — выше 150 (${above150}%)`;
+  if (above150 >= 15) return `${above150}% времени — выше 150`;
+  return zones[0]!.percent >= 60 ? "Спокойно: большую часть времени пульс до 130" : "В основном 130–150 — аэробная работа";
+}
+
+function HrZonesBar({ zones }: { zones: HrZoneShare[] }) {
+  return (
+    <>
+      <div className="ds-zbar" role="img" aria-label={`Время в зонах: ${zones.map((zone) => `${zone.label} — ${zone.percent}%`).join(", ")}`}>
+        {zones.map((zone, index) =>
+          zone.percent > 0 ? <i key={zone.label} style={{ flex: zone.percent, background: `var(--hrz-${index + 1})` }} /> : null
+        )}
+      </div>
+      <div className="ds-zleg">
+        {zones.map((zone, index) => (
+          <span key={zone.label}>
+            <i style={{ background: `var(--hrz-${index + 1})` }} />
+            {zone.label} · {zone.percent}%
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// «Подробнее»: всё, что не нужно с первого взгляда, — свёрнуто
+function WorkoutDetails({ workout }: { workout: WorkoutData["workout"] }) {
+  // часы отдают каденс одной ноги (об/мин) — показываем шаги в минуту
+  const cadence = workout.average_cadence ? Math.round(workout.average_cadence < 120 ? workout.average_cadence * 2 : workout.average_cadence) : null;
+  const rows = [
+    ["Набор высоты", workout.elevation_gain ? `${Math.round(workout.elevation_gain)} м` : null],
+    ["Каденс", cadence ? `${cadence} шаг/мин` : null],
+    ["Темп с поправкой на рельеф", workout.grade_adjusted_speed ? `${formatPace(workout.grade_adjusted_speed).replace("/км", "")} /км` : null],
+    ["Время с остановками", workout.elapsed_time_seconds ? formatDuration(Math.round(workout.elapsed_time_seconds)) : null],
+    ["Максимальный пульс", workout.max_heartrate ? `${Math.round(workout.max_heartrate)}` : null],
+    ["Калории", workout.calories ? `${Math.round(workout.calories)} ккал` : null],
+    ["Часы", workout.device_name ?? null]
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+  if (!rows.length) return null;
+  return (
+    <details className="ds-list workout-details">
+      <summary className="ds-li">
+        <div className="ds-m">
+          <b>Подробнее</b>
+          <span>{rows.slice(0, 3).map(([label]) => label.toLowerCase()).join(", ")}</span>
+        </div>
+        <svg className="ds-chev workout-details-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </summary>
+      {rows.map(([label, value]) => (
+        <div key={label} className="ds-li">
+          <div className="ds-m">
+            <span style={{ fontSize: 15, color: "var(--ink-2)" }}>{label}</span>
+          </div>
+          <div className="ds-v" style={{ fontSize: 16 }}>{value}</div>
+        </div>
+      ))}
+    </details>
+  );
+}
+
 export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const params = useParams();
   const navigate = useNavigate();
@@ -61,6 +201,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRaceFormOpen, setIsRaceFormOpen] = useState(false);
+  const [lapFilter, setLapFilter] = useState<"all" | "work">("work");
+  const [chartCursor, setChartCursor] = useState<number | null>(null);
   const { user } = useAuth();
   const [coachComment, setCoachComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -74,7 +216,9 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const backHref =
     mode === "trainer" && data?.workout.athlete_id
       ? `/trainer/athletes/${data.workout.athlete_id}`
-      : "/athlete";
+      : data?.workout.is_owner === false
+        ? "/athlete/feed"
+        : "/athlete/runs";
 
   const paceChart = useMemo(
     () => preparePaceChart(data?.streams ?? null, data?.workout ?? null),
@@ -614,317 +758,279 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const canEdit = mode === "trainer" || data.workout.is_owner !== false;
   const raceAthleteId = mode === "trainer" ? data.workout.athlete_id : user?.id;
 
+  const workLaps = data.laps.filter((lap) => workLapIds.has(lap.id));
+  // отрезки над графиком пронумерованы, как строки таблицы в «Рабочих»
+  const bandNumbers =
+    intervals.bands.length > 0 && intervals.bands.length <= 12
+      ? intervals.bands.map((band, index) => ({ label: String(index + 1), center: `calc(${band.left} + ${band.width} / 2)` }))
+      : [];
+  const showingWork = Boolean(data.structure && lapFilter === "work" && workLaps.length);
+  const visibleLaps = showingWork ? workLaps : data.laps;
+  const hrZones = heartRateZones(data.streams);
+  const paceSummary = buildPaceSummary(data.laps, workLaps, data.structure);
+  const hrSummary = hrZones ? buildHrSummary(hrZones) : null;
+  const startDate = data.workout.start_date ? new Date(data.workout.start_date) : null;
+  const metaParts = [
+    mode === "trainer" && data.workout.athlete_name ? data.workout.athlete_name : null,
+    startDate ? longWorkoutDate(startDate) : null,
+    data.workout.elevation_gain ? `набор ${Math.round(data.workout.elevation_gain)} м` : null
+  ].filter(Boolean);
+  const correctionLabel = data.workout.gps_fix?.is_corrected
+    ? data.workout.gps_fix.kind === "manual_distance"
+      ? "Дистанция исправлена"
+      : data.workout.gps_fix.kind === "manual_time"
+        ? "Время исправлено"
+        : data.workout.gps_fix.kind === "trim"
+          ? "Пробежка обрезана"
+          : "GPS исправлено"
+    : null;
+  const busyAny = isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming || isRenaming || isDeleting;
+
   return (
-    <div className="page-stack workout-page">
-      <Link to={backHref} className="back-link">
-        ← Назад
+    <div className="ds-screen workout-screen" style={{ gap: 20 }}>
+      <Link to={backHref} className="ds-link">
+        ‹ {mode === "trainer" ? data.workout.athlete_name ?? "Назад" : canEdit ? "Пробежки" : "Назад"}
       </Link>
 
-      <section
-        className={`card workout-summary-card${data.streams?.latlng?.length ? " workout-summary-card-with-route" : ""}`}
-      >
-        <div className="workout-summary-panel">
-          <div className="workout-summary-header">
-            <div className="workout-summary-topbar">
-              <p className="workout-summary-meta">
-                {mode === "trainer" && data.workout.athlete_name ? `${data.workout.athlete_name} · ` : ""}
-                {data.workout.start_date ? formatDate(data.workout.start_date) : ""}
-              </p>
-              {canEdit ? (
-              <div className="workout-menu" ref={menuRef}>
-                <button
-                  type="button"
-                  className="ghost-button workout-menu-trigger"
-                  aria-label="Действия"
-                  aria-expanded={isMenuOpen}
-                  onClick={() => setIsMenuOpen((open) => !open)}
-                >
-                  <svg
-                    className="workout-menu-icon"
-                    viewBox="0 0 4 18"
-                    aria-hidden="true"
-                    focusable="false"
-                  >
-                    <circle cx="2" cy="2" r="1.25" />
-                    <circle cx="2" cy="9" r="1.25" />
-                    <circle cx="2" cy="16" r="1.25" />
-                  </svg>
-                </button>
-                {isMenuOpen ? (
-                  <div className="workout-menu-popover">
-                    {mode === "trainer" ? (
-                      <>
-                        <button
-                          type="button"
-                          className="workout-menu-item"
-                          disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming || isRenaming || isDeleting}
-                          onClick={handlePreviewAndApplyGpsFix}
-                        >
-                          {isFixingGps ? "Обрабатываем..." : "Исправить пробежку"}
-                        </button>
-                        <button
-                          type="button"
-                          className="workout-menu-item"
-                          disabled={isUpdatingDistance || isFixingGps || isUpdatingTime || isTrimming || isRenaming || isDeleting}
-                          onClick={handlePreviewAndApplyDistanceFix}
-                        >
-                          {isUpdatingDistance ? "Пересчитываем..." : "Изменить дистанцию"}
-                        </button>
-                        <button
-                          type="button"
-                          className="workout-menu-item"
-                          disabled={isUpdatingTime || isFixingGps || isUpdatingDistance || isTrimming || isRenaming || isDeleting}
-                          onClick={handlePreviewAndApplyTimeFix}
-                        >
-                          {isUpdatingTime ? "Пересчитываем..." : "Изменить время"}
-                        </button>
-                        <button
-                          type="button"
-                          className="workout-menu-item"
-                          disabled={isTrimming || isFixingGps || isUpdatingDistance || isUpdatingTime || isRenaming || isDeleting}
-                          onClick={handlePreviewAndApplyTrim}
-                        >
-                          {isTrimming ? "Обрезаем..." : "Обрезать пробежку"}
-                        </button>
-                        {data.workout.gps_fix?.is_corrected ? (
-                          <button
-                            type="button"
-                            className="workout-menu-item"
-                            disabled={isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming || isRenaming || isDeleting}
-                            onClick={handleResetCorrection}
-                          >
-                            Отменить исправление
-                          </button>
-                        ) : null}
-                      </>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="workout-menu-item"
-                      disabled={isRenaming || isDeleting || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming}
-                      onClick={handleRename}
-                    >
-                      {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
-                    </button>
-                    <button
-                      type="button"
-                      className="workout-menu-item workout-menu-item-danger"
-                      disabled={isDeleting || isRenaming || isFixingGps || isUpdatingDistance || isUpdatingTime || isTrimming}
-                      onClick={handleDelete}
-                    >
-                      {isDeleting ? "Удаляем..." : "Удалить тренировку"}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              ) : null}
-            </div>
-
-            <div className="trainer-dashboard-heading workout-summary-heading">
-              <h1 className="page-title">{data.workout.name}</h1>
-              {data.structure ? (
-                <span className="workout-structure-badge">
-                  Интервалы · {data.structure.sets.map((set) => set.label).join(" + ")}
-                </span>
-              ) : null}
-              {data.workout.gps_fix?.is_corrected ? (
-                <span className="muted workout-gps-fix-badge">
-                  {data.workout.gps_fix.kind === "manual_distance"
-                    ? "Дистанция исправлена"
-                    : data.workout.gps_fix.kind === "manual_time"
-                      ? "Время исправлено"
-                      : data.workout.gps_fix.kind === "trim"
-                        ? "Пробежка обрезана"
-                        : "GPS исправлено"}
-                </span>
-              ) : null}
-              {canEdit ? (
-                <div className="workout-actions">
-                  <ShareStoryButton workoutId={data.workout.id} role={mode} title={data.workout.name} />
-                  <button type="button" className="share-button share-button-neutral" onClick={() => setIsRaceFormOpen(true)}>
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                      <path d="M5 21V4M5 4h11l-2 4 2 4H5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Это был старт
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="workout-summary-stats">
-            <div className="workout-summary-stat">
-              <span className="muted">Километраж</span>
-              <strong>{formatDistance(data.workout.distance_meters)}</strong>
-            </div>
-            <div className="workout-summary-stat">
-              <span className="muted">Общее время</span>
-              <strong>{formatDuration(data.workout.moving_time_seconds)}</strong>
-            </div>
-            <div className="workout-summary-stat">
-              <span className="muted">Средний темп</span>
-              <strong>{formatPace(data.workout.average_speed)}</strong>
-            </div>
-            <div className="workout-summary-stat">
-              <span className="muted">Средний пульс</span>
-              <strong>{formatHeartRate(data.workout.average_heartrate)}</strong>
-            </div>
-            <div className="workout-summary-stat">
-              <span className="muted">Набор высоты</span>
-              <strong>{`${Math.round(data.workout.elevation_gain ?? 0)} м`}</strong>
-            </div>
-            <div className="workout-summary-stat workout-summary-stat-placeholder" aria-hidden="true" />
-          </div>
-        </div>
-
-        {data.streams?.latlng?.length ? (
-          <div className="workout-route-shell">
-            <Suspense
-              fallback={
-                <div className="workout-route-loading skeleton-card" aria-hidden="true">
-                  <div className="workout-route-loading-grid" />
-                </div>
-              }
-            >
-              <WorkoutRouteMap points={data.streams.latlng} />
-            </Suspense>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="grid workout-layout">
-        <div className="card">
-          <h2 className="panel-title workout-card-title">Отрезки</h2>
-          {hasSyntheticCorrectedSplits ? (
-            <p className="muted">Сплиты восстановлены приближённо по исправленной сводке тренировки.</p>
-          ) : null}
-          {data.structure ? (
-            <div className="interval-summary">
-              {data.structure.sets.map((set, index) => (
-                <span key={`${set.label}-${index}`} className="interval-summary-chip">
-                  <strong>{set.label}</strong>
-                  <span className="interval-summary-pace">
-                    {formatPaceSeconds(set.pace_seconds_per_km)}
-                  </span>
-                  {set.average_heartrate ? (
-                    <span className="interval-summary-heart">♥ {set.average_heartrate}</span>
-                  ) : null}
-                </span>
-              ))}
+      <div className="workout-th">
+        <div style={{ minWidth: 0 }}>
+          <h1 className="ds-title" style={{ fontSize: 24 }}>
+            {data.workout.name}
+          </h1>
+          <p className="ds-sub">{metaParts.join(" · ")}</p>
+          {correctionLabel ? (
+            <div className="workout-tags">
+              <span className="ds-pill ds-pill-soft">{correctionLabel}</span>
             </div>
           ) : null}
-          {data.laps.length ? (
-            <div className="lap-report-wrap">
-              <table className="lap-report-table" aria-label="Статистика по кругам">
-                <colgroup>
-                  <col className="lap-col-lap" />
-                  <col className="lap-col-distance" />
-                  <col className="lap-col-time" />
-                  <col className="lap-col-pace" />
-                  <col className="lap-col-heart" />
-                  <col className="lap-col-elevation" />
-                </colgroup>
-                <thead>
-                  <tr className="lap-report-head muted">
-                    <th scope="col">Круг</th>
-                    <th scope="col">Км</th>
-                    <th scope="col">Время</th>
-                    <th scope="col">Темп</th>
-                    <th scope="col">Пульс</th>
-                    <th scope="col">Набор</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.laps.map((lap, index) => (
-                    <tr
-                      key={lap.id}
-                      className={`lap-report-row${workLapIds.has(lap.id) ? " lap-report-row-work" : ""}`}
-                    >
-                      <td className="lap-report-index">{index + 1}</td>
-                      <td className="lap-report-distance">{formatLapDistanceKilometers(lap.distance_meters)}</td>
-                      <td className="lap-report-time">{formatLapTime(lap.elapsed_time_seconds)}</td>
-                      <td className="lap-report-pace-cell">
-                        <span className="lap-report-pace-pill">{formatPace(lap.average_speed)}</span>
-                      </td>
-                      <td className="lap-report-heart">
-                        <span className="lap-report-heart-icon" aria-hidden="true">
-                          ♥
-                        </span>
-                        <span className="lap-report-heart-value">
-                          {lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}
-                        </span>
-                      </td>
-                      <td className="lap-report-elevation">{formatLapElevation(lap.elevation_gain)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="muted">У этой тренировки нет отдельных отрезков.</div>
-          )}
         </div>
-
-        <div className="chart-column">
-          <StreamChart
-            title="Темп"
-            model={paceChart}
-            color="var(--chart-pace)"
-            formatter={formatPaceSeconds}
-            bands={intervals.bands}
-            bandLabels={intervals.labels}
-          />
-          <StreamChart
-            title="Пульс"
-            model={heartRateChart}
-            color="var(--chart-hr)"
-            formatter={(value) => `${Math.round(value)}`}
-            bands={intervals.bands}
-          />
-          {/* Разбор тренера — приватный: одногруппникам не показываем */}
-          {canEdit ? (
-          <section className="card workout-comment-card">
-            <div className="chart-title-row">
-              <h2 className="panel-title">Комментарий тренера</h2>
-            </div>
-            {mode === "trainer" ? (
-              <div className="stack">
-                <label className="workout-comment-field">
-                  <textarea
-                    value={coachComment}
-                    onChange={(event) => setCoachComment(event.target.value)}
-                    placeholder="Добавь комментарий к тренировке"
-                    rows={5}
-                  />
-                </label>
-                <div className="workout-comment-actions">
+        {canEdit ? (
+          <div className="workout-th-actions">
+            <ShareStoryButton workoutId={data.workout.id} role={mode} title={data.workout.name} className="ds-icon-btn" iconOnly />
+            <div className="workout-menu" ref={menuRef}>
+              <button
+                type="button"
+                className="ds-icon-btn"
+                aria-label="Действия"
+                aria-expanded={isMenuOpen}
+                onClick={() => setIsMenuOpen((open) => !open)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+                  <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                  <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+                </svg>
+              </button>
+              {isMenuOpen ? (
+                <div className="workout-menu-popover">
                   <button
                     type="button"
-                    className="primary-button"
-                    disabled={isSavingComment}
-                    onClick={handleSaveComment}
+                    className="workout-menu-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsRaceFormOpen(true);
+                    }}
                   >
-                    {isSavingComment ? "Сохраняем..." : "Сохранить"}
+                    Это был старт
                   </button>
-                  {commentStatus ? <span className="muted">{commentStatus}</span> : null}
+                  {mode === "trainer" ? (
+                    <>
+                      <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handlePreviewAndApplyGpsFix}>
+                        {isFixingGps ? "Обрабатываем..." : "Исправить пробежку"}
+                      </button>
+                      <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handlePreviewAndApplyDistanceFix}>
+                        {isUpdatingDistance ? "Пересчитываем..." : "Изменить дистанцию"}
+                      </button>
+                      <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handlePreviewAndApplyTimeFix}>
+                        {isUpdatingTime ? "Пересчитываем..." : "Изменить время"}
+                      </button>
+                      <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handlePreviewAndApplyTrim}>
+                        {isTrimming ? "Обрезаем..." : "Обрезать пробежку"}
+                      </button>
+                      {data.workout.gps_fix?.is_corrected ? (
+                        <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handleResetCorrection}>
+                          Отменить исправление
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <button type="button" className="workout-menu-item" disabled={busyAny} onClick={handleRename}>
+                    {isRenaming ? "Переименовываем..." : "Переименовать пробежку"}
+                  </button>
+                  <button type="button" className="workout-menu-item workout-menu-item-danger" disabled={busyAny} onClick={handleDelete}>
+                    {isDeleting ? "Удаляем..." : "Удалить тренировку"}
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="workout-comment-text">
-                {data.workout.coach_comment?.trim() ||
-                  "Тренер пока не оставил комментарий к этой тренировке."}
-              </div>
-            )}
-          </section>
-          ) : null}
-          <section className="card workout-comment-card">
-            <div className="chart-title-row">
-              <h2 className="panel-title">Обсуждение</h2>
+              ) : null}
             </div>
-            <WorkoutComments workoutId={data.workout.id} viewer={mode} />
-          </section>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="ds-metrics">
+        <div className="ds-metric">
+          <b>{formatKmShort(data.workout.distance_meters)}</b>
+          <span>км</span>
+        </div>
+        <div className="ds-metric">
+          <b>{formatDuration(Math.round(data.workout.moving_time_seconds))}</b>
+          <span>время</span>
+        </div>
+        <div className="ds-metric">
+          <b>{formatPace(data.workout.average_speed).replace("/км", "")}</b>
+          <span>темп /км</span>
+        </div>
+        <div className="ds-metric">
+          <b>{data.workout.average_heartrate ? Math.round(data.workout.average_heartrate) : "—"}</b>
+          <span>пульс</span>
+        </div>
+      </div>
+
+      <section className="ds-block ds-pad workout-coach" aria-label="Тренер">
+        {/* Разбор тренера — приватный: одногруппникам не показываем */}
+        {mode === "trainer" ? (
+          <div className="workout-coach-edit">
+            <b style={{ fontSize: 16 }}>Комментарий тренера</b>
+            <textarea
+              value={coachComment}
+              onChange={(event) => setCoachComment(event.target.value)}
+              placeholder="Что получилось, что поправить в следующий раз"
+              rows={4}
+            />
+            <div className="workout-coach-actions">
+              <button type="button" className="ds-btn ds-btn-1" disabled={isSavingComment} onClick={handleSaveComment}>
+                {isSavingComment ? "Сохраняем..." : "Сохранить"}
+              </button>
+              {commentStatus ? <span className="ds-sub" style={{ margin: 0 }}>{commentStatus}</span> : null}
+            </div>
+          </div>
+        ) : canEdit ? (
+          data.workout.coach_comment?.trim() ? (
+            <div className="ds-coach">
+              <span className="workout-coach-ca" aria-hidden="true">
+                Т
+              </span>
+              <div>
+                <b>Тренер</b>
+                <p>{data.workout.coach_comment.trim()}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="ds-pending">Тренер посмотрит</div>
+          )
+        ) : null}
+        <div className="workout-discussion">
+          <WorkoutComments workoutId={data.workout.id} viewer={mode} collapsed />
         </div>
       </section>
+
+      {mode === "trainer" || canEdit ? (
+        <WorkoutFeeling workoutId={data.workout.id} feeling={data.feeling} editable={mode === "athlete" && canEdit} />
+      ) : null}
+
+      {data.streams?.latlng?.length ? (
+        <div className="ds-block workout-map">
+          <Suspense
+            fallback={
+              <div className="workout-route-loading skeleton-card" aria-hidden="true">
+                <div className="workout-route-loading-grid" />
+              </div>
+            }
+          >
+            <WorkoutRouteMap points={data.streams.latlng} />
+          </Suspense>
+        </div>
+      ) : null}
+
+      <section className="ds-block ds-pad" aria-label="Отрезки">
+        <div className="workout-laps-head">
+          <b style={{ fontSize: 16 }}>Отрезки</b>
+          {data.structure && workLaps.length ? (
+            <div className="ds-seg" role="group" aria-label="Какие отрезки показать">
+              <button type="button" aria-pressed={lapFilter === "all"} onClick={() => setLapFilter("all")}>
+                Все
+              </button>
+              <button type="button" aria-pressed={lapFilter === "work"} onClick={() => setLapFilter("work")}>
+                Рабочие
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {hasSyntheticCorrectedSplits ? (
+          <p className="ds-sub">Сплиты восстановлены приближённо по исправленной сводке тренировки.</p>
+        ) : null}
+        {visibleLaps.length ? (
+          <table className="ds-laps" aria-label="Отрезки">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Дистанция</th>
+                <th scope="col">Время</th>
+                <th scope="col">Темп</th>
+                <th scope="col">Пульс</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleLaps.map((lap, index) => (
+                <tr key={lap.id} className={workLapIds.has(lap.id) ? "is-work" : undefined}>
+                  {/* в «Рабочих» отрезки нумеруются подряд, как подписи над графиком */}
+                  <td>{index + 1}</td>
+                  <td>{formatLapDistanceKilometers(lap.distance_meters).replace(".", ",")}</td>
+                  <td>{formatLapTime(lap.elapsed_time_seconds)}</td>
+                  <td>
+                    {/* темп рабочего отрезка — плашкой цвета темпа, как полосы на графике */}
+                    {workLapIds.has(lap.id) ? (
+                      <span className="lap-pace">{formatPace(lap.average_speed).replace("/км", "")}</span>
+                    ) : (
+                      formatPace(lap.average_speed).replace("/км", "")
+                    )}
+                  </td>
+                  <td>{lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="ds-sub">У этой тренировки нет отдельных отрезков.</p>
+        )}
+      </section>
+
+      <section className="ds-block ds-pad" aria-label="Темп">
+        <StreamChart
+          title="Темп"
+          model={paceChart}
+          color="var(--chart-pace)"
+          formatter={formatPaceSeconds}
+          bands={intervals.bands}
+          bandLabels={bandNumbers.length ? bandNumbers : intervals.labels}
+          summary={paceSummary}
+          refValue={data.workout.average_speed ? 1000 / data.workout.average_speed : null}
+          unit=" /км"
+          cursor={chartCursor}
+          onCursor={setChartCursor}
+        />
+      </section>
+      <section className="ds-block ds-pad" aria-label="Пульс">
+        <StreamChart
+          title="Пульс"
+          model={heartRateChart}
+          color="var(--chart-hr)"
+          formatter={(value) => `${Math.round(value)}`}
+          summary={hrSummary}
+          unit=" уд/мин"
+          cursor={chartCursor}
+          onCursor={setChartCursor}
+          zones={[
+            { from: 130, to: 150, color: "var(--hrz-2-bg)" },
+            { from: 150, to: 162, color: "var(--hrz-3-bg)" },
+            { from: 162, to: 240, color: "var(--hrz-4-bg)" }
+          ]}
+          footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
+        />
+      </section>
+
+      <WorkoutDetails workout={data.workout} />
+
       {isRaceFormOpen && raceAthleteId ? (
         <ResultForm
           athleteId={raceAthleteId}

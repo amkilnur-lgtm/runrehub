@@ -4,64 +4,80 @@
   --chart-axis-gutter: 29px;
   --chart-side-gutter: 7px;
 
-  /* Brand palette (from logo: deep navy + running red) */
-  --brand-navy: oklch(0.32 0.085 272);
-  --brand-navy-deep: oklch(0.25 0.07 272);
-  --brand-red: oklch(0.58 0.2 28);
+  /* UI-система RunRehab (client/DESIGN.md, утверждена 2026-11-09):
+     по образцу TrainingPeaks в цветах клуба — почти всё белое и холодно-серое,
+     цвет только у действий и данных. */
+  /* Клуб: только логотип, сторис, тёмные плашки */
+  --brand-navy: #1f2a55;
+  --brand-navy-deep: #1a2033;
+  --brand-red: #d9392b;
 
-  /* Semantic tokens */
-  --bg: oklch(0.98 0.003 272);
-  --surface: oklch(1 0 0);
-  --surface-2: oklch(0.96 0.006 272);
-  --ink: oklch(0.28 0.055 272);
-  --ink-muted: oklch(0.5 0.03 272);
-  --border: oklch(0.9 0.012 272);
-  --border-strong: oklch(0.82 0.018 272);
+  /* Нейтрали */
+  --bg: #f1f3f7;
+  --surface: #ffffff;
+  --surface-2: #eaecf2;
+  --ink: #1a2033;
+  --ink-2: #4a5470;
+  --ink-muted: #646f8a;
+  --border: #dce0e8;
+  --border-strong: #acb4c7;
 
-  --accent: var(--brand-red);
-  --accent-hover: oklch(0.52 0.2 28);
-  --accent-active: oklch(0.47 0.19 28);
-  --accent-ink: oklch(1 0 0);
-  --accent-soft: oklch(0.96 0.018 28);
+  /* Действие: один синий для всего нажимаемого и выбранного */
+  --accent: #2347d8;
+  --accent-hover: #1a338f;
+  --accent-active: #172d80;
+  --accent-ink: #ffffff;          /* текст на заливке --accent */
+  --accent-soft: #dde5ff;         /* выбрано, вторичная кнопка */
+  --accent-soft-ink: #1a338f;     /* текст на --accent-soft */
 
-  --danger: oklch(0.55 0.19 25);
-  --danger-soft: oklch(0.95 0.025 25);
-  --success: oklch(0.55 0.14 150);
+  /* Статусы: маркер · фон · текст */
+  --success: #259500;  --good-bg: #eff6e9;  --good-ink: #1a6800;
+  --warn: #d85b01;     --warn-bg: #fff2e6;  --warn-ink: #8b4a01;
+  --danger: #cc3634;   --danger-soft: #feebeb; --danger-ink: #a32b2a;
+  --gold: #c79a2e;     --gold-bg: #f8efd9;  --gold-ink: #6a4810;
 
-  /* Цвета линий графиков (пара провалидирована dataviz-валидатором в обеих темах) */
-  --chart-pace: oklch(0.58 0.186 258);
-  --chart-hr: oklch(0.582 0.192 25.5);
-  /* Плашка темпа в отрезках: фон + текст (контраст ≥3:1 для жирного 16px) */
-  --chart-pace-soft: oklch(0.954 0.022 263);
-  --chart-pace-ink: oklch(0.563 0.241 261);
-  /* Внутренний блик плиты графика */
-  --chart-grid-glow: oklch(1 0 0 / 0.2);
+  /* Данные: у каждой метрики свой постоянный цвет */
+  --chart-pace: #2347d8;      /* темп, Форма */
+  --chart-hr: #c2417e;        /* пульс, Усталость */
+  --chart-form: #e86500;      /* Свежесть */
+  --route: #fc4c02;           /* трек на карте */
+  --chart-pace-soft: #dde5ff;
+  --chart-pace-ink: #1a338f;
+  --chart-grid-glow: rgb(255 255 255 / 0.2);
+  /* Зоны пульса — светофор, общие для всех: до 130 · 130–150 · 150–162 · 162+ */
+  --hrz-1: #4f86d9; --hrz-2: #2f9e5b; --hrz-3: #e8a317; --hrz-4: #d9442f;
+  --hrz-1-bg: #eaf1fb; --hrz-2-bg: #ecf6ef; --hrz-3-bg: #fdf4e0; --hrz-4-bg: #fcebe8;
+  /* Тепловая карта: объём · набор · интенсивность (у первой ступени — рамка) */
+  --vol-1: #dde5ff; --vol-2: #b8c8fb; --vol-3: #7e98f2; --vol-4: #3b5ce0; --vol-5: #1a2f8a;
+  --ele-1: #d7efe9; --ele-2: #a6dccf; --ele-3: #63bfa9; --ele-4: #2b8f7a; --ele-5: #145c4f;
+  --int-1: #fde5d3; --int-2: #f9bf94; --int-3: #f0904f; --int-4: #d9602a; --int-5: #a8361c;
+  --cell-ink-light: #1a2033;  --cell-ink-dark: #ffffff;  --cell-hairline: #c9d0de;
+  /* Зоны темпа (маленькие образцы с подписями) */
+  --pz-1: #9fb2f5; --pz-2: #7890ed; --pz-3: #5070e3; --pz-4: #2d4bcc; --pz-5: #1a2f8a;
 
   /* Рабочие отрезки интервальной тренировки: строка таблицы, полоса на графике */
-  --interval-row: oklch(0.972 0.015 28);
-  --interval-band: oklch(0.58 0.2 28 / 0.09);
-  --interval-ink: oklch(0.5 0.18 28);
+  --interval-row: #eef2ff;
+  --interval-band: rgb(35 71 216 / 0.1);
+  --interval-ink: #1a338f;
 
-  /* Карта: подложка до загрузки тайлов, плашка атрибуции, сетка скелетона */
-  --map-surface: oklch(0.924 0.013 244);
-  --map-attrib-bg: oklch(1 0 0 / 0.72);
-  --map-skeleton-line: oklch(1 0 0 / 0.55);
+  /* Карта */
+  --map-surface: #e3e8ef;
+  --map-attrib-bg: rgb(255 255 255 / 0.72);
+  --map-skeleton-line: rgb(255 255 255 / 0.55);
 
-  /* Бейдж «GPS-коррекция» на странице тренировки */
-  --gps-badge-bg: oklch(0.954 0.022 263 / 0.78);
-  --gps-badge-ring: oklch(0.58 0.186 258 / 0.1);
-  --gps-badge-ink: oklch(0.53 0.085 260);
+  /* Бейдж «GPS-коррекция» */
+  --gps-badge-bg: rgb(221 229 255 / 0.85);
+  --gps-badge-ring: rgb(35 71 216 / 0.12);
+  --gps-badge-ink: #1a338f;
 
-  /* Navy-текст на переднем плане (логотип, инициалы аватара): theme-aware,
-     в тёмной теме светлеет до контраста к тёмным поверхностям */
   --brand-ink: var(--brand-navy);
 
   --radius-s: 8px;
   --radius-m: 12px;
   --radius-l: 16px;
 
-  --shadow-1: 0 1px 2px oklch(0.28 0.055 272 / 0.06), 0 2px 8px oklch(0.28 0.055 272 / 0.05);
-  --shadow-2: 0 4px 12px oklch(0.28 0.055 272 / 0.08), 0 12px 32px oklch(0.28 0.055 272 / 0.08);
+  --shadow-1: 0 1px 2px rgb(26 32 51 / 0.06), 0 2px 8px rgb(26 32 51 / 0.05);
+  --shadow-2: 0 4px 12px rgb(26 32 51 / 0.08), 0 12px 32px rgb(26 32 51 / 0.1);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -69,86 +85,102 @@
   color: var(--ink);
 }
 
-/* Blue-accent variant (comparison) */
-:root[data-accent="blue"] {
-  --accent: oklch(0.48 0.17 266);
-  --accent-hover: oklch(0.42 0.17 266);
-  --accent-active: oklch(0.38 0.16 266);
-  --accent-soft: oklch(0.955 0.02 266);
-}
-
 /* --- Тёмная тема ---
    Токены продублированы: media-запрос покрывает "авто" (нет ручного выбора),
    data-theme="dark" — ручной выбор. Менять оба блока синхронно. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: oklch(0.19 0.028 272);
-  --surface: oklch(0.235 0.032 272);
-  --surface-2: oklch(0.28 0.034 272);
-  --ink: oklch(0.93 0.012 272);
-  --ink-muted: oklch(0.71 0.022 272);
-  --border: oklch(0.33 0.03 272);
-  --border-strong: oklch(0.41 0.03 272);
-  --accent: oklch(0.64 0.2 28);
-  --accent-hover: oklch(0.68 0.2 28);
-  --accent-active: oklch(0.6 0.19 28);
-  --accent-soft: oklch(0.29 0.055 28);
-  --danger: oklch(0.68 0.18 25);
-  --danger-soft: oklch(0.29 0.055 25);
-  --success: oklch(0.7 0.13 150);
-  --chart-pace: oklch(0.66 0.15 258);
-  --chart-hr: oklch(0.66 0.17 25);
-  --chart-pace-soft: oklch(0.3 0.06 258);
-  --chart-pace-ink: oklch(0.8 0.1 258);
-  --chart-grid-glow: oklch(1 0 0 / 0.045);
-  --interval-row: oklch(0.275 0.042 28);
-  --interval-band: oklch(0.64 0.2 28 / 0.16);
-  --interval-ink: oklch(0.78 0.13 28);
-  --map-surface: oklch(0.23 0.015 260);
-  --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
-  --map-skeleton-line: oklch(1 0 0 / 0.07);
-  --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
-  --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
-  --gps-badge-ink: oklch(0.78 0.06 258);
-  --brand-ink: oklch(0.82 0.06 272);
-  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
-  --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
+  --bg: #0d0f17;
+  --surface: #171b26;
+  --surface-2: #27303f;
+  --ink: #eef0f6;
+  --ink-2: #c3c9d7;
+  --ink-muted: #9aa3ba;
+  --border: #2c3445;
+  --border-strong: #4a5470;
+  --accent: #5a7cf0;
+  --accent-hover: #7b96f4;
+  --accent-active: #4a6be0;
+  --accent-ink: #ffffff;
+  --accent-soft: #1d2a5c;
+  --accent-soft-ink: #c9d5fc;
+  --success: #6cc04a; --good-bg: #16301a; --good-ink: #8fd36a;
+  --warn: #f2a35c;    --warn-bg: #3a2410; --warn-ink: #f2a35c;
+  --danger: #f08a88;  --danger-soft: #3a1716; --danger-ink: #f08a88;
+  --gold: #f0c66a;    --gold-bg: #3a2e14; --gold-ink: #f0c66a;
+  --chart-pace: #5a7cf0;
+  --chart-hr: #d65a95;
+  --chart-form: #d87318;
+  --chart-pace-soft: #1d2a5c;
+  --chart-pace-ink: #c9d5fc;
+  --chart-grid-glow: rgb(255 255 255 / 0.045);
+  --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
+  --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
+  --vol-1: #36498c; --vol-2: #4862bb; --vol-3: #617fe2; --vol-4: #8ca4f3; --vol-5: #c2d0fb;
+  --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
+  --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
+  --cell-ink-light: #ffffff;  --cell-ink-dark: #0d0f17;  --cell-hairline: transparent;
+  --pz-1: #36498c; --pz-2: #4862bb; --pz-3: #617fe2; --pz-4: #8ca4f3; --pz-5: #c2d0fb;
+  --interval-row: #1b2442;
+  --interval-band: rgb(90 124 240 / 0.16);
+  --interval-ink: #c9d5fc;
+  --map-surface: #1c2130;
+  --map-attrib-bg: rgb(23 27 38 / 0.75);
+  --map-skeleton-line: rgb(255 255 255 / 0.07);
+  --gps-badge-bg: rgb(29 42 92 / 0.85);
+  --gps-badge-ring: rgb(90 124 240 / 0.22);
+  --gps-badge-ink: #c9d5fc;
+  --brand-ink: #c9d0ea;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 4px 12px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: oklch(0.19 0.028 272);
-    --surface: oklch(0.235 0.032 272);
-    --surface-2: oklch(0.28 0.034 272);
-    --ink: oklch(0.93 0.012 272);
-    --ink-muted: oklch(0.71 0.022 272);
-    --border: oklch(0.33 0.03 272);
-    --border-strong: oklch(0.41 0.03 272);
-    --accent: oklch(0.64 0.2 28);
-    --accent-hover: oklch(0.68 0.2 28);
-    --accent-active: oklch(0.6 0.19 28);
-    --accent-soft: oklch(0.29 0.055 28);
-    --danger: oklch(0.68 0.18 25);
-    --danger-soft: oklch(0.29 0.055 25);
-    --success: oklch(0.7 0.13 150);
-    --chart-pace: oklch(0.66 0.15 258);
-    --chart-hr: oklch(0.66 0.17 25);
-    --chart-pace-soft: oklch(0.3 0.06 258);
-    --chart-pace-ink: oklch(0.8 0.1 258);
-    --chart-grid-glow: oklch(1 0 0 / 0.045);
-    --interval-row: oklch(0.275 0.042 28);
-    --interval-band: oklch(0.64 0.2 28 / 0.16);
-    --interval-ink: oklch(0.78 0.13 28);
-    --map-surface: oklch(0.23 0.015 260);
-    --map-attrib-bg: oklch(0.2 0.025 272 / 0.75);
-    --map-skeleton-line: oklch(1 0 0 / 0.07);
-    --gps-badge-bg: oklch(0.3 0.045 258 / 0.8);
-    --gps-badge-ring: oklch(0.66 0.15 258 / 0.22);
-    --gps-badge-ink: oklch(0.78 0.06 258);
-    --brand-ink: oklch(0.82 0.06 272);
-    --shadow-1: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.3);
-    --shadow-2: 0 4px 12px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.35);
+    --bg: #0d0f17;
+    --surface: #171b26;
+    --surface-2: #27303f;
+    --ink: #eef0f6;
+    --ink-2: #c3c9d7;
+    --ink-muted: #9aa3ba;
+    --border: #2c3445;
+    --border-strong: #4a5470;
+    --accent: #5a7cf0;
+    --accent-hover: #7b96f4;
+    --accent-active: #4a6be0;
+    --accent-ink: #ffffff;
+    --accent-soft: #1d2a5c;
+    --accent-soft-ink: #c9d5fc;
+    --success: #6cc04a; --good-bg: #16301a; --good-ink: #8fd36a;
+    --warn: #f2a35c;    --warn-bg: #3a2410; --warn-ink: #f2a35c;
+    --danger: #f08a88;  --danger-soft: #3a1716; --danger-ink: #f08a88;
+    --gold: #f0c66a;    --gold-bg: #3a2e14; --gold-ink: #f0c66a;
+    --chart-pace: #5a7cf0;
+    --chart-hr: #d65a95;
+    --chart-form: #d87318;
+    --chart-pace-soft: #1d2a5c;
+    --chart-pace-ink: #c9d5fc;
+    --chart-grid-glow: rgb(255 255 255 / 0.045);
+    --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
+    --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
+    --vol-1: #36498c; --vol-2: #4862bb; --vol-3: #617fe2; --vol-4: #8ca4f3; --vol-5: #c2d0fb;
+    --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
+    --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
+    --cell-ink-light: #ffffff;  --cell-ink-dark: #0d0f17;  --cell-hairline: transparent;
+    --pz-1: #36498c; --pz-2: #4862bb; --pz-3: #617fe2; --pz-4: #8ca4f3; --pz-5: #c2d0fb;
+    --interval-row: #1b2442;
+    --interval-band: rgb(90 124 240 / 0.16);
+    --interval-ink: #c9d5fc;
+    --map-surface: #1c2130;
+    --map-attrib-bg: rgb(23 27 38 / 0.75);
+    --map-skeleton-line: rgb(255 255 255 / 0.07);
+    --gps-badge-bg: rgb(29 42 92 / 0.85);
+    --gps-badge-ring: rgb(90 124 240 / 0.22);
+    --gps-badge-ink: #c9d5fc;
+    --brand-ink: #c9d0ea;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.3);
+    --shadow-2: 0 4px 12px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
   }
 }
 
@@ -3555,58 +3587,18 @@ button.trend-bar-slot:focus-visible {
    главная спортсмена. Токены — из :root выше; новые — шкала километража.
    ===================================================================== */
 :root {
-  --heat-1: oklch(0.9 0.035 268);
-  --heat-2: oklch(0.8 0.07 268);
-  --heat-3: oklch(0.66 0.11 268);
-  --heat-4: oklch(0.5 0.13 270);
-  --heat-5: oklch(0.36 0.11 272);
-  --heat-ink-light: var(--ink);
-  --heat-ink-dark: oklch(1 0 0);
+  --heat-1: var(--vol-1); --heat-2: var(--vol-2); --heat-3: var(--vol-3); --heat-4: var(--vol-4); --heat-5: var(--vol-5);
+  --heat-ink-light: var(--cell-ink-light);
+  --heat-ink-dark: var(--cell-ink-dark);
   --heat-zero: var(--border-strong);
-  --warn-bg: oklch(0.95 0.05 75);
-  --warn-ink: oklch(0.45 0.11 60);
-  --todo-bg: oklch(0.95 0.03 28);
-  --todo-ink: oklch(0.48 0.18 28);
+  --todo-bg: var(--accent-soft);
+  --todo-ink: var(--accent-soft-ink);
   --hero-bg: var(--brand-navy-deep);
-  --hero-bar: oklch(0.45 0.07 272);
+  --hero-bar: #3a4570;
   --display-font: "Unbounded", "Manrope Variable", sans-serif;
   --tabbar-h: 60px;
   /* отступ под полоску iPhone: системный (~34px) слишком щедрый для таббара */
-  --tabbar-safe: max(6px, calc(env(safe-area-inset-bottom) - 14px));
-}
-
-:root[data-theme="dark"] {
-  --heat-1: oklch(0.32 0.05 270);
-  --heat-2: oklch(0.42 0.08 270);
-  --heat-3: oklch(0.54 0.11 268);
-  --heat-4: oklch(0.68 0.11 268);
-  --heat-5: oklch(0.82 0.08 268);
-  --heat-ink-light: oklch(0.93 0.012 272);
-  --heat-ink-dark: oklch(0.19 0.028 272);
-  --warn-bg: oklch(0.32 0.06 70);
-  --warn-ink: oklch(0.88 0.1 80);
-  --todo-bg: oklch(0.32 0.07 28);
-  --todo-ink: oklch(0.85 0.09 28);
-  --hero-bg: oklch(0.27 0.06 272);
-  --hero-bar: oklch(0.42 0.06 272);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --heat-1: oklch(0.32 0.05 270);
-    --heat-2: oklch(0.42 0.08 270);
-    --heat-3: oklch(0.54 0.11 268);
-    --heat-4: oklch(0.68 0.11 268);
-    --heat-5: oklch(0.82 0.08 268);
-    --heat-ink-light: oklch(0.93 0.012 272);
-    --heat-ink-dark: oklch(0.19 0.028 272);
-    --warn-bg: oklch(0.32 0.06 70);
-    --warn-ink: oklch(0.88 0.1 80);
-    --todo-bg: oklch(0.32 0.07 28);
-    --todo-ink: oklch(0.85 0.09 28);
-    --hero-bg: oklch(0.27 0.06 272);
-    --hero-bar: oklch(0.42 0.06 272);
-  }
+  --tabbar-safe: max(6px, calc(env(safe-area-inset-bottom) - 22px));
 }
 
 .num { font-variant-numeric: tabular-nums; }
@@ -4094,3 +4086,187 @@ button.trend-bar-slot:focus-visible {
 .pb-label { font-size: 16px; font-weight: 800; color: var(--ink); }
 .pb-value { font-size: 25px; margin-top: 4px; }
 .chip { min-height: 44px; font-size: 15px; padding: 0 16px; }
+
+/* =====================================================================
+   UI-система 2026-11 (client/DESIGN.md). Одна мысль на экран:
+   однородное — списками, разнородное — блоками, одна заметная кнопка.
+   ===================================================================== */
+.ds-screen { display: flex; flex-direction: column; gap: 24px; max-width: 720px; margin: 0 auto; width: 100%; }
+.ds-screen.is-wide { max-width: 1280px; }
+.ds-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ds-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; text-wrap: balance; }
+.ds-sub { margin: 4px 0 0; font-size: 14.5px; color: var(--ink-muted); }
+.ds-link { font-size: 15px; font-weight: 700; color: var(--accent); }
+.ds-link:hover { color: var(--accent-hover); }
+
+.ds-block { background: var(--surface); border-radius: 16px; }
+.ds-pad { padding: 16px; }
+a.ds-block { display: block; color: inherit; }
+
+.ds-list { background: var(--surface); border-radius: 16px; overflow: hidden; list-style: none; margin: 0; padding: 0; }
+.ds-li { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 16px; position: relative; color: inherit; width: 100%; background: none; border: 0; font: inherit; text-align: left; }
+.ds-li + .ds-li::before, .ds-list > li + li > .ds-li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+a.ds-li:hover, button.ds-li:hover:not(:disabled) { background: var(--surface-2); }
+button.ds-li { cursor: pointer; }
+button.ds-li:disabled { cursor: default; }
+.ds-li .ds-m { flex: 1; min-width: 0; }
+.ds-li .ds-m b { display: block; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-li .ds-m span { display: block; font-size: 13.5px; color: var(--ink-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-li .ds-v { text-align: right; font-weight: 800; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ds-li .ds-v small { font-size: 13px; color: var(--ink-muted); font-weight: 700; margin-left: 2px; }
+.ds-chev { color: var(--border-strong); flex: none; }
+.ds-grp { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 20px 6px; font-size: 13px; font-weight: 700; color: var(--ink-muted); }
+.ds-grp b { color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ds-grp:first-child { padding-top: 0; }
+.ds-empty { color: var(--ink-muted); font-weight: 700; }
+
+.ds-btn { height: 48px; padding: 0 20px; border-radius: 12px; border: 0; font: inherit; font-weight: 800; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-decoration: none; transition: background-color 150ms var(--ease-out); }
+.ds-btn:disabled { opacity: 0.55; cursor: default; }
+.ds-btn-1 { background: var(--accent); color: var(--accent-ink); }
+.ds-btn-1:hover:not(:disabled) { background: var(--accent-hover); }
+.ds-btn-2 { background: var(--accent-soft); color: var(--accent-soft-ink); }
+.ds-btn-2:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent) 20%); }
+.ds-btn-3 { background: none; color: var(--accent); padding: 0 6px; height: 44px; }
+.ds-btn-x { background: none; color: var(--danger); padding: 0 6px; height: 44px; }
+.ds-btn-sm { height: 40px; padding: 0 14px; font-size: 15px; }
+.ds-btn-full { width: 100%; }
+
+.ds-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.ds-pill-gold { background: var(--gold-bg); color: var(--gold-ink); }
+.ds-pill-soft { background: var(--surface-2); color: var(--ink-2); }
+.ds-pill-accent { background: var(--accent-soft); color: var(--accent-soft-ink); }
+.ds-pill-good { background: var(--good-bg); color: var(--good-ink); }
+.ds-pill-warn { background: var(--warn-bg); color: var(--warn-ink); }
+.ds-pill-danger { background: var(--danger-soft); color: var(--danger-ink); }
+
+.ds-big { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.ds-big small { font-size: 18px; color: var(--ink-muted); font-weight: 700; margin-left: 4px; letter-spacing: 0; }
+.ds-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ds-metric b { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ds-metric span { font-size: 12.5px; color: var(--ink-muted); font-weight: 600; }
+
+.ds-coach { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); }
+.ds-coach .avatar-sm { width: 30px; height: 30px; flex: none; font-size: 11px; }
+.ds-coach b { display: block; font-size: 13px; color: var(--accent-soft-ink); }
+.ds-coach p { margin: 2px 0 0; font-size: 15px; line-height: 1.45; color: var(--ink); white-space: pre-line; }
+.ds-pending { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); font-size: 14px; font-weight: 600; color: var(--ink-2); }
+
+.ds-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.ds-seg button { height: 36px; padding: 0 12px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink-2); border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.ds-seg button[aria-pressed="true"], .ds-seg button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(26 32 51 / 0.14); }
+
+/* Главная спортсмена */
+.home-run-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.home-run-top b { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-run-top span { font-size: 13.5px; color: var(--ink-muted); font-weight: 600; white-space: nowrap; }
+.home-days { display: flex; align-items: flex-end; gap: 6px; height: 48px; }
+.home-days i { flex: 1; border-radius: 4px; background: var(--vol-2); display: block; min-height: 4px; }
+.home-days i.is-zero { height: 4px !important; background: var(--border); }
+.home-days i.is-today { background: var(--accent); }
+.home-days i.is-future { background: transparent; box-shadow: inset 0 -4px 0 var(--border); }
+.home-dl { display: flex; gap: 6px; margin-top: 6px; }
+.home-dl span { flex: 1; text-align: center; font-size: 11.5px; color: var(--ink-muted); font-weight: 700; }
+.home-dl span.is-today { color: var(--ink); font-weight: 800; }
+.home-fresh { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.home-reg { display: flex; align-items: center; gap: 14px; }
+.home-reg-dots { display: flex; gap: 5px; }
+.home-reg-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); display: block; }
+.home-reg-dots i.is-off { background: var(--border); }
+.home-reg b { font-size: 16px; }
+.home-reg-sub { font-size: 13.5px; color: var(--ink-muted); margin-top: 2px; }
+.ds-start-ic { color: var(--accent); flex: none; }
+
+/* Пробежки */
+.runs-vol { display: flex; align-items: flex-end; gap: 5px; height: 64px; margin-top: 12px; }
+.runs-vol i { flex: 1; border-radius: 3px 3px 1px 1px; background: var(--vol-2); display: block; min-height: 3px; }
+.runs-vol i.is-current { background: var(--accent); }
+.runs-vax { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-muted); font-weight: 700; margin-top: 6px; }
+.runs-dd { width: 36px; text-align: center; flex: none; }
+.runs-dd b { display: block; font-size: 18px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.runs-dd span { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); }
+.runs-cm { color: var(--accent); flex: none; }
+
+/* Старты */
+.st-dist { width: 64px; flex: none; font-size: 16px; font-weight: 800; }
+.st-cd { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-soft-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; }
+.st-cd b { font-size: 17px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.st-cd span { font-size: 10px; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-btn { transition: none; }
+}
+.home-run-link { display: block; color: inherit; }
+.home-race-hint { margin-top: 6px; height: auto; min-height: 44px; text-align: left; justify-content: flex-start; font-size: 15px; }
+
+/* Экран тренировки */
+.workout-th { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.workout-th-actions { display: flex; gap: 8px; flex: none; }
+.workout-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ds-icon-btn { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink); border: 0; cursor: pointer; padding: 0; }
+.ds-icon-btn:hover:not(:disabled) { background: var(--border); }
+.ds-icon-btn svg { width: 20px; height: 20px; }
+.workout-screen .workout-menu { position: relative; }
+.workout-coach { display: flex; flex-direction: column; gap: 12px; }
+.workout-coach-ca { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none; }
+.workout-coach-edit { display: flex; flex-direction: column; gap: 10px; }
+.workout-coach-edit textarea { width: 100%; resize: vertical; min-height: 96px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; line-height: 1.45; }
+.workout-coach-edit textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.workout-coach-actions { display: flex; align-items: center; gap: 12px; }
+.workout-discussion:empty { display: none; }
+.workout-map { overflow: hidden; }
+.workout-map .workout-route-map, .workout-map .maplibregl-map, .workout-map > div { height: 200px; }
+.workout-laps-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.workout-laps-head .ds-seg { width: 190px; }
+.ds-laps { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.ds-laps th { font-size: 12.5px; color: var(--ink-muted); font-weight: 700; text-align: right; padding: 6px 6px; border-bottom: 1px solid var(--border); }
+.ds-laps td { padding: 10px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+.ds-laps th:first-child, .ds-laps td:first-child { text-align: left; color: var(--ink-muted); width: 32px; }
+.ds-laps tr:last-child td { border-bottom: 0; }
+.ds-laps tr.is-work td { font-weight: 700; }
+.ds-laps tr.is-work td:first-child { color: var(--accent); font-weight: 800; }
+.ds-chart.chart-card { padding: 0; background: none; border: 0; box-shadow: none; }
+.ds-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ds-chart-head b { font-size: 16px; }
+.ds-chart-head span { font-size: 13px; color: var(--ink-muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ds-chart-msg { margin: 4px 0 10px; font-size: 14.5px; color: var(--ink-2); line-height: 1.4; }
+.ds-zbar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 12px; }
+.ds-zbar i { display: block; }
+.ds-zleg { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ds-zleg span { display: inline-flex; align-items: center; gap: 6px; }
+.ds-zleg i { width: 10px; height: 10px; border-radius: 3px; display: block; }
+
+.runs-more { min-height: 48px; display: grid; place-items: center; font-size: 14px; color: var(--ink-muted); font-weight: 600; }
+.workout-discussion .wc-reply { align-self: flex-start; margin-left: -6px; }
+.workout-discussion .wc { display: flex; flex-direction: column; gap: 8px; }
+.workout-discussion .wc-send { background: var(--accent); color: var(--accent-ink); border-radius: 12px; }
+.chart-zone-band { position: absolute; left: 0; right: 0; pointer-events: none; }
+
+/* Графики в стиле системы: без рамки и фона, бледные колонки отрезков, курсор с плашкой */
+.ds-chart .chart-grid { border-radius: 0; background: none; box-shadow: none; min-height: 150px; overflow: visible; touch-action: pan-y; cursor: crosshair; }
+.ds-chart .chart-y-axis { min-height: 150px; font-size: 10.5px; font-weight: 600; }
+.ds-chart .chart-x-axis { font-size: 10.5px; font-weight: 600; margin-top: 6px; }
+.ds-chart .chart-grid-line { background: var(--border); }
+.ds-chart .chart-work-band { background: var(--accent-soft); border-left: 1px solid var(--surface); border-right: 1px solid var(--surface); }
+.ds-chart .chart-band-label { color: var(--ink-muted); font-size: 10.5px; font-weight: 600; }
+.chart-ref-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed; opacity: 0.5; pointer-events: none; }
+.chart-cursor { position: absolute; top: 0; bottom: 0; width: 1.2px; margin-left: -0.6px; background: var(--ink); pointer-events: none; }
+.chart-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); pointer-events: none; }
+.chart-tip { position: absolute; top: 4px; margin-left: 12px; padding: 4px 8px; border-radius: 6px; background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none; z-index: 2; }
+.chart-tip.is-left { transform: translateX(-100%); margin-left: -12px; }
+@media (max-width: 720px) { .ds-chart .chart-grid, .ds-chart .chart-y-axis { min-height: 150px; } }
+.ds-chart .chart-x-tick:nth-child(even) { display: block; }
+.feel-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.feel-chip { height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--surface-2); font: inherit; font-weight: 700; font-size: 14.5px; color: var(--ink-2); cursor: pointer; }
+.feel-chip:hover { background: var(--border); }
+.feel-chip.is-on { background: var(--accent); color: var(--accent-ink); }
+.feel-new { font-size: 11px; font-weight: 800; color: var(--gold-ink); background: var(--gold-bg); padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+.feel-note { margin: 10px 0 0; font-size: 13px; color: var(--ink-muted); }
+.workout-details summary { list-style: none; cursor: pointer; }
+.workout-details summary::-webkit-details-marker { display: none; }
+.workout-details[open] .workout-details-chev { transform: rotate(90deg); }
+.workout-details-chev { transition: transform 150ms var(--ease-out); }
+.workout-details > .ds-li { min-height: 48px; }
+.workout-details > .ds-li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+@media (prefers-reduced-motion: reduce) { .workout-details-chev { transition: none; } }
+.lap-pace { display: inline-block; min-width: 52px; padding: 3px 8px; border-radius: 8px; background: var(--chart-pace-soft); color: var(--chart-pace-ink); font-weight: 800; text-align: center; }
+.ds-laps td:nth-child(4) { padding-top: 7px; padding-bottom: 7px; }

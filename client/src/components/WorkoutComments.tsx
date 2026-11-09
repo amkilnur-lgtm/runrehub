@@ -22,9 +22,12 @@ type WorkoutCommentsProps = {
   // "athlete" — эндпоинты кабинета атлета, "trainer" — тренерские (с модерацией)
   viewer: "athlete" | "trainer";
   onCountChange?: (count: number) => void;
+  // поле ввода скрыто за текстовой кнопкой «Ответить» (экран тренировки, client/DESIGN.md)
+  collapsed?: boolean;
 };
 
-export function WorkoutComments({ workoutId, viewer, onCountChange }: WorkoutCommentsProps) {
+export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false }: WorkoutCommentsProps) {
+  const [composerOpen, setComposerOpen] = useState(!collapsed);
   const showToast = useToast();
   const base = viewer === "trainer" ? "/api/trainer" : "/api/athlete";
   const [comments, setComments] = useState<WorkoutCommentItem[] | null>(null);
@@ -66,6 +69,7 @@ export function WorkoutComments({ workoutId, viewer, onCountChange }: WorkoutCom
       setComments(res.comments);
       onCountChange?.(res.comments.length);
       setText("");
+      if (collapsed) setComposerOpen(false);
     } catch (err) {
       showToast("error", err instanceof Error ? err.message : "Не удалось отправить комментарий");
     } finally {
@@ -92,9 +96,9 @@ export function WorkoutComments({ workoutId, viewer, onCountChange }: WorkoutCom
   return (
     <div className="wc">
       {comments === null ? (
-        <div className="muted wc-loading">Загрузка комментариев…</div>
+        collapsed ? null : <div className="muted wc-loading">Загрузка комментариев…</div>
       ) : comments.length === 0 ? (
-        <div className="muted wc-empty">Пока нет комментариев — будь первым.</div>
+        collapsed ? null : <div className="muted wc-empty">Пока нет комментариев — будь первым.</div>
       ) : (
         <div className="wc-list">
           {comments.map((comment) => (
@@ -126,12 +130,18 @@ export function WorkoutComments({ workoutId, viewer, onCountChange }: WorkoutCom
           ))}
         </div>
       )}
+      {!composerOpen ? (
+        <button type="button" className="ds-btn ds-btn-3 wc-reply" onClick={() => setComposerOpen(true)}>
+          Ответить
+        </button>
+      ) : (
       <div className="wc-compose">
         <textarea
           value={text}
           rows={1}
           maxLength={1000}
           placeholder="Написать комментарий…"
+          autoFocus={collapsed}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
@@ -149,6 +159,7 @@ export function WorkoutComments({ workoutId, viewer, onCountChange }: WorkoutCom
           {sending ? "…" : "Отправить"}
         </button>
       </div>
+      )}
     </div>
   );
 }

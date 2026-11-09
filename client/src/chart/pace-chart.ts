@@ -6,13 +6,13 @@ import {
   buildTickPositions,
   buildTicks,
   buildXAxis,
-  buildXAxisPositions,
   clamp,
   medianFilter,
   quantile,
   smoothSeries,
   suppressTransientSpikes
 } from "./chart-utils";
+import { downsample } from "./chart-utils";
 
 export function computeWindowedPace(distance: number[], time: number[], windowSeconds: number) {
   const size = Math.min(distance.length, time.length);
@@ -115,14 +115,15 @@ export function preparePaceChart(
   const averagePace = workout?.average_speed ? 1000 / workout.average_speed : quantile(validPaces, 0.5);
   const bestPace = Math.min(...validPaces);
   const coreFastPace = quantile(validPaces, 0.03);
-  const coreSlowPace = quantile(validPaces, 0.97);
+  const coreSlowPace = quantile(validPaces, 0.9);
   const fastBound = clamp(
     Math.floor((Math.min(coreFastPace, averagePace - 10, bestPace) - 15) / 20) * 20,
     180,
     1200
   );
+  // паузы и шаг не растягивают шкалу: медленный край — не дальше 2:30 от среднего
   const slowBound = clamp(
-    Math.ceil((Math.max(coreSlowPace, averagePace + 45) + 15) / 20) * 20,
+    Math.ceil((Math.min(Math.max(coreSlowPace, averagePace + 45), averagePace + 150) + 15) / 20) * 20,
     fastBound + 80,
     1200
   );
@@ -153,12 +154,17 @@ export function preparePaceChart(
     yTickPositions: buildTickPositions(Y_TICK_COUNT + 1),
     xTicks: xAxis.xTicks,
     xTickLabels: xAxis.xTickLabels,
-    xTickPositions: buildXAxisPositions(xAxis.xTicks.length),
+    xTickPositions: xAxis.xTickPositions,
     axisCaption: "МИН/КМ",
     xLabel: xAxis.xLabel,
     summaryLeft: workout?.average_speed ? formatPaceSeconds(1000 / workout.average_speed) : "—",
     summaryLeftLabel: "Средний",
     summaryRight: formatPaceSeconds(bestPace),
-    summaryRightLabel: "Лучший"
+    summaryRightLabel: "Лучший",
+    series: downsample(points.filter((point) => Number.isFinite(point.y)), 700),
+    yMin: fastBound,
+    yMax: slowBound,
+    invertY: true,
+    xMax: points[points.length - 1]?.x ?? 0
   };
 }

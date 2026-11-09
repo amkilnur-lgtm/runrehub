@@ -14,6 +14,8 @@ import { TrainerFeedPage } from "./pages/TrainerFeedPage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
 import { AthleteProfilePage } from "./pages/AthleteProfilePage";
+import { AthleteRunsPage } from "./pages/AthleteRunsPage";
+import { AthleteStartsPage } from "./pages/AthleteStartsPage";
 import "@fontsource-variable/manrope";
 import "@fontsource/unbounded/cyrillic-700.css";
 import "@fontsource/unbounded/latin-700.css";
@@ -48,6 +50,8 @@ const router = createBrowserRouter([
             element: <RequireRole roles={["athlete"]} />,
             children: [
               { path: "/athlete", element: <AthleteDashboardPage /> },
+              { path: "/athlete/runs", element: <AthleteRunsPage /> },
+              { path: "/athlete/starts", element: <AthleteStartsPage /> },
               { path: "/athlete/feed", element: <TrainerFeedPage viewer="athlete" /> },
               { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
               { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> }

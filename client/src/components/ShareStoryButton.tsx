@@ -9,6 +9,8 @@ type ShareStoryButtonProps = {
   role: "athlete" | "trainer";
   title: string;
   className?: string;
+  // иконка в шапке экрана тренировки (не основная кнопка)
+  iconOnly?: boolean;
 };
 
 const ShareIcon = (
@@ -19,7 +21,7 @@ const ShareIcon = (
 
 // Картинка 1080×1920 для сторис. В Telegram — родное «в историю»; на телефоне —
 // системное «Поделиться» с файлом; иначе — скачивание PNG
-export function ShareStoryButton({ workoutId, role, title, className }: ShareStoryButtonProps) {
+export function ShareStoryButton({ workoutId, role, title, className, iconOnly }: ShareStoryButtonProps) {
   const showToast = useToast();
   const [busy, setBusy] = useState(false);
 
@@ -64,9 +66,16 @@ export function ShareStoryButton({ workoutId, role, title, className }: ShareSto
   }
 
   return (
-    <button type="button" className={className ?? "share-button"} onClick={() => void share()} disabled={busy}>
+    <button
+      type="button"
+      className={className ?? "share-button"}
+      onClick={() => void share()}
+      disabled={busy}
+      aria-label={iconOnly ? (busy ? "Готовим картинку" : "Поделиться в сторис") : undefined}
+      title={iconOnly ? "Поделиться в сторис" : undefined}
+    >
       {ShareIcon}
-      {busy ? "Готовим картинку…" : "Поделиться"}
+      {iconOnly ? null : busy ? "Готовим картинку…" : "Поделиться"}
     </button>
   );
 }

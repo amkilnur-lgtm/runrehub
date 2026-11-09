@@ -85,12 +85,6 @@ function distanceLabel(meters: number) {
   return DISTANCES.find((item) => Math.abs(item.meters - meters) / item.meters <= 0.02)?.label ?? `${formatKm(meters, meters % 1000 ? 2 : 0)} км`;
 }
 
-function paceLabel(meters: number, seconds: number | null) {
-  if (!seconds || meters <= 0) return null;
-  const perKm = Math.round(seconds / (meters / 1000));
-  return `${Math.floor(perKm / 60)}:${String(perKm % 60).padStart(2, "0")} /км`;
-}
-
 function dateParts(iso: string) {
   const [year, month, day] = iso.split("-").map(Number);
   return { year: year!, day: day!, month: MONTHS[month! - 1]! };
@@ -113,39 +107,71 @@ function placeLabel(result: RaceResult) {
   return null;
 }
 
-function UpcomingStart({ result }: { result: RaceResult }) {
-  const days = daysUntil(result.race_date);
-  const { day, month } = dateParts(result.race_date);
+const MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+
+function longDate(iso: string) {
+  const [, month, day] = iso.split("-").map(Number);
+  return `${day} ${MONTHS_GEN[month! - 1]}`;
+}
+
+// цель «1:30» вместо «1:30:00»; секунды — только если они заданы
+function formatGoalTime(seconds: number) {
+  return seconds >= 3600 && seconds % 60 === 0 ? formatRaceTime(seconds).slice(0, -3) : formatRaceTime(seconds);
+}
+
+function PlusIcon() {
   return (
-    <section className="upcoming-start" aria-label="Ближайший старт">
-      <div className={days <= 7 ? "countdown is-soon" : "countdown"}>
-        <b className="num">{Math.max(days, 0)}</b>
-        <span>{days === 0 ? "сегодня" : pluralRu(days, "день", "дня", "дней")}</span>
-      </div>
-      <div className="upcoming-start-text">
-        <span className="upcoming-start-kicker">
-          Ближайший старт · {day} {month}
-        </span>
-        <strong>{result.name}</strong>
-        <span>
-          {distanceLabel(result.distance_meters)}
-          {result.city ? ` · ${result.city}` : ""}
-        </span>
-        {result.goal_time_seconds ? <span className="goal-pill">Цель: {formatRaceTime(result.goal_time_seconds)}</span> : null}
-      </div>
-    </section>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
   );
 }
 
-export function ResultsPanel({ athleteId, viewer }: { athleteId: number; viewer: "self" | "trainer" | "teammate" }) {
+// Старты: «Впереди» · «Личные рекорды» (по протоколу) · «Прошедшие» — всё списками.
+// title — заголовок экрана с кнопкой «Добавить» (вкладка «Старты» у спортсмена)
+export function ResultsPanel({
+  athleteId,
+  viewer,
+  title
+}: {
+  athleteId: number;
+  viewer: "self" | "trainer" | "teammate";
+  title?: string;
+}) {
   const { data, loading, error, refresh } = useApi<ResultsData>(`/api/results/athletes/${athleteId}`);
   const [editing, setEditing] = useState<{ result?: RaceResult; draft?: ResultDraft } | null>(null);
 
-  if (loading) return <div className="skeleton-block" style={{ height: 320 }} />;
+  const header = (canEdit: boolean) =>
+    title ? (
+      <div className="ds-head">
+        <h1 className="ds-title">{title}</h1>
+        {canEdit ? (
+          <button type="button" className="ds-btn ds-btn-2 ds-btn-sm" onClick={() => setEditing({})}>
+            <PlusIcon />
+            Добавить
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
+  const form = editing ? (
+    <ResultForm
+      athleteId={athleteId}
+      result={editing.result}
+      draft={editing.draft}
+      onClose={() => setEditing(null)}
+      onSaved={() => {
+        setEditing(null);
+        refresh();
+      }}
+    />
+  ) : null;
+
+  if (loading) return <div className="skeleton-block" style={{ height: 320, borderRadius: 16 }} />;
   if (error || !data) {
     return (
-      <section className="panel panel-pad">
-        <p className="muted">{error || "Не удалось загрузить результаты"}</p>
+      <section className="ds-block ds-pad">
+        <p className="ds-sub">{error || "Не удалось загрузить результаты"}</p>
       </section>
     );
   }
@@ -154,170 +180,144 @@ export function ResultsPanel({ athleteId, viewer }: { athleteId: number; viewer:
     .filter((result) => result.status === "planned" && daysUntil(result.race_date) >= 0)
     .sort((a, b) => a.race_date.localeCompare(b.race_date));
   const finished = data.results.filter((result) => result.status === "finished");
-  const byYear = new Map<number, RaceResult[]>();
-  for (const result of finished) {
-    const { year } = dateParts(result.race_date);
-    byYear.set(year, [...(byYear.get(year) ?? []), result]);
-  }
   const latestRecordId = finished.find((result) => result.is_record)?.id;
   const recentDays = 30;
+  const canEdit = data.canEdit;
 
-  // совсем пусто — одна понятная карточка, а не четыре плитки «ещё впереди»
   if (data.results.length === 0) {
     return (
-      <div className="results">
-        <section className="panel results-empty">
-          <strong>{viewer === "teammate" ? "Результатов пока нет" : "Здесь будут ваши старты и рекорды"}</strong>
+      <div className="ds-screen" style={{ gap: 20, maxWidth: "none" }}>
+        {header(false)}
+        <section className="ds-block ds-pad">
+          <b style={{ fontSize: 17 }}>{viewer === "teammate" ? "Результатов пока нет" : "Здесь будут старты и рекорды"}</b>
           {viewer === "teammate" ? null : (
-            <p>
+            <p className="ds-sub" style={{ lineHeight: 1.45 }}>
               Добавьте прошедшие старты — личные рекорды на 5, 10, 21,1 и 42,2 км посчитаются сами, по официальному
-              времени. А запланированный старт покажет отсчёт дней.
+              времени. Запланированный старт покажет отсчёт дней.
             </p>
           )}
-          {data.canEdit ? (
-            <button type="button" className="primary-button" onClick={() => setEditing({})}>
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-              </svg>
-              Добавить результат или старт
+          {canEdit ? (
+            <button type="button" className="ds-btn ds-btn-1" style={{ marginTop: 14 }} onClick={() => setEditing({})}>
+              <PlusIcon />
+              Добавить старт
             </button>
           ) : null}
         </section>
-        {editing ? (
-          <ResultForm
-            athleteId={athleteId}
-            result={editing.result}
-            draft={editing.draft}
-            onClose={() => setEditing(null)}
-            onSaved={() => {
-              setEditing(null);
-              refresh();
-            }}
-          />
-        ) : null}
+        {form}
       </div>
     );
   }
 
-  return (
-    <div className="results">
-      {upcoming.map((result) => (
-        <button
-          key={result.id}
-          type="button"
-          className="plain-button"
-          disabled={!data.canEdit}
-          onClick={() => setEditing({ result })}
-          aria-label={data.canEdit ? `Изменить старт ${result.name}` : undefined}
-        >
-          <UpcomingStart result={result} />
-        </button>
-      ))}
+  const editProps = (result: RaceResult) =>
+    canEdit
+      ? { type: "button" as const, onClick: () => setEditing({ result }), "aria-label": `Изменить: ${result.name}` }
+      : { type: "button" as const, disabled: true };
 
-      <h3 className="results-heading">Личные рекорды</h3>
-      <div className="pb-grid">
-        {data.personalBests.map((best) => {
-          const fresh =
-            best.result?.id === latestRecordId && best.result && daysUntil(best.result.race_date) > -recentDays;
-          return (
-            <div key={best.distanceMeters} className={fresh ? "pb-tile is-fresh" : "pb-tile"}>
-              <div className="pb-label">
-                {best.label}
-                {fresh ? <span className="record-badge">новый</span> : null}
-              </div>
-              <div className={best.result ? "pb-value num" : "pb-value is-empty"}>
-                {best.result ? formatRaceTime(best.result.official_time_seconds) : "—"}
-              </div>
-              <div className="pb-meta">
-                {best.result
-                  ? `${best.result.name} · ${dateParts(best.result.race_date).day} ${dateParts(best.result.race_date).month}`
-                  : viewer === "teammate"
-                    ? "пока нет"
-                    : "ещё впереди"}
-              </div>
-              {best.improvementSeconds ? (
-                <div className="pb-delta">−{formatRaceTime(best.improvementSeconds)} к прошлому</div>
-              ) : null}
-            </div>
-          );
-        })}
+  return (
+    <div className="ds-screen" style={{ gap: 20, maxWidth: "none" }}>
+      {header(canEdit)}
+
+      {upcoming.length ? (
+        <div>
+          <div className="ds-grp">
+            <span>Впереди</span>
+          </div>
+          <div className="ds-list">
+            {upcoming.map((result) => {
+              const days = daysUntil(result.race_date);
+              return (
+                <button key={result.id} className="ds-li" {...editProps(result)}>
+                  <div className="st-cd">
+                    <b>{days}</b>
+                    <span>{days === 0 ? "сегодня" : pluralRu(days, "день", "дня", "дней")}</span>
+                  </div>
+                  <div className="ds-m">
+                    <b>{result.name}</b>
+                    <span>
+                      {longDate(result.race_date)} · {distanceLabel(result.distance_meters)}
+                      {result.goal_time_seconds ? ` · цель ${formatGoalTime(result.goal_time_seconds)}` : ""}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div>
+        <div className="ds-grp">
+          <span>Личные рекорды</span>
+          <span>по протоколу</span>
+        </div>
+        <div className="ds-list">
+          {data.personalBests.map((best) => {
+            const fresh =
+              best.result?.id === latestRecordId && best.result && daysUntil(best.result.race_date) > -recentDays;
+            if (!best.result) {
+              return (
+                <div key={best.distanceMeters} className="ds-li">
+                  <span className="st-dist">{best.label}</span>
+                  <div className="ds-m">
+                    <span className="ds-empty">{viewer === "teammate" ? "пока нет" : "ещё нет"}</span>
+                  </div>
+                </div>
+              );
+            }
+            const result = best.result;
+            return (
+              <button key={best.distanceMeters} className="ds-li" {...editProps(result)}>
+                <span className="st-dist">{best.label}</span>
+                <div className="ds-m">
+                  <b>{result.name}</b>
+                  <span>
+                    {longDate(result.race_date)}
+                    {best.improvementSeconds ? ` · −${formatRaceTime(best.improvementSeconds)} к прошлому` : ""}
+                  </span>
+                </div>
+                {fresh ? <span className="ds-pill ds-pill-gold">рекорд</span> : null}
+                <div className="ds-v">{formatRaceTime(result.official_time_seconds)}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <h3 className="results-heading">Все старты</h3>
-      {finished.length === 0 ? (
-        <section className="panel">
-          <p className="empty" style={{ paddingTop: 16 }}>
-            {viewer === "teammate"
-              ? "Результатов пока нет."
-              : "Здесь появятся результаты стартов. Рекорды считаются по официальному времени из протокола, а не по GPS."}
-          </p>
-        </section>
-      ) : (
-        <section className="panel results-list">
-          {[...byYear.entries()].map(([year, rows]) => (
-            <div key={year}>
-              <div className="results-year">{year}</div>
-              {rows.map((result) => {
-                const { day, month } = dateParts(result.race_date);
-                const place = placeLabel(result);
-                const pace = paceLabel(result.distance_meters, result.official_time_seconds);
-                return (
-                  <button
-                    key={result.id}
-                    type="button"
-                    className="result-row"
-                    disabled={!data.canEdit}
-                    onClick={() => setEditing({ result })}
-                  >
-                    <span className="result-date">
-                      <b className="num">{day}</b>
-                      <span>{month}</span>
+      {finished.length ? (
+        <div>
+          <div className="ds-grp">
+            <span>Прошедшие</span>
+          </div>
+          <div className="ds-list">
+            {finished.map((result) => {
+              const { day, month, year } = dateParts(result.race_date);
+              const place = placeLabel(result);
+              return (
+                <button key={result.id} className="ds-li" {...editProps(result)}>
+                  <div className="ds-m">
+                    <b>{result.name}</b>
+                    <span>
+                      {day} {month} {year} · {distanceLabel(result.distance_meters)}
+                      {place ? ` · ${place}` : ""}
+                      {result.city ? ` · ${result.city}` : ""}
                     </span>
-                    <span className="result-main">
-                      <strong>
-                        {result.name}
-                        {result.is_record ? <span className="record-badge">рекорд</span> : null}
-                      </strong>
-                      <span>
-                        {distanceLabel(result.distance_meters)}
-                        {place ? ` · ${place}` : ""}
-                        {result.city ? ` · ${result.city}` : ""}
-                      </span>
-                      {result.note ? <span className="result-note">{result.note}</span> : null}
-                    </span>
-                    <span className="result-time num">
-                      {formatRaceTime(result.official_time_seconds)}
-                      {pace ? <small>{pace}</small> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </section>
-      )}
+                  </div>
+                  <div className="ds-v">{formatRaceTime(result.official_time_seconds)}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
-      {data.canEdit ? (
-        <button type="button" className="add-dashed" onClick={() => setEditing({})}>
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-          </svg>
-          Добавить результат или старт
+      {!title && canEdit ? (
+        <button type="button" className="ds-btn ds-btn-2 ds-btn-full" onClick={() => setEditing({})}>
+          <PlusIcon />
+          Добавить старт
         </button>
       ) : null}
 
-      {editing ? (
-        <ResultForm
-          athleteId={athleteId}
-          result={editing.result}
-          draft={editing.draft}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            refresh();
-          }}
-        />
-      ) : null}
+      {form}
     </div>
   );
 }
