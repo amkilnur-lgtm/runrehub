@@ -3570,9 +3570,9 @@ button.trend-bar-slot:focus-visible {
   --hero-bg: var(--brand-navy-deep);
   --hero-bar: oklch(0.45 0.07 272);
   --display-font: "Unbounded", "Manrope Variable", sans-serif;
-  --tabbar-h: 52px;
+  --tabbar-h: 56px;
   /* отступ под полоску iPhone: системный (~34px) слишком щедрый для таббара */
-  --tabbar-safe: max(6px, calc(env(safe-area-inset-bottom) - 16px));
+  --tabbar-safe: max(10px, calc(env(safe-area-inset-bottom) - 8px));
 }
 
 :root[data-theme="dark"] {
@@ -3823,9 +3823,12 @@ button.trend-bar-slot:focus-visible {
     background: var(--surface); border-top: 1px solid var(--border);
     display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0;
   }
-  .app-nav-link { flex-direction: column; justify-content: center; gap: 3px; font-size: 12px; line-height: 1.1; padding: 0; border-bottom: 0; margin: 0; }
+  .app-nav-link { flex-direction: column; justify-content: center; gap: 3px; font-size: 12px; line-height: 1.1; padding: 0; border-bottom: 0; margin: 0; height: var(--tabbar-h); -webkit-tap-highlight-color: transparent; }
+  .app-nav-link:active { background: var(--surface-2); }
+  .app-nav-link.active .app-nav-icon { background: var(--accent-soft); }
+  .app-nav-icon { display: grid; place-items: center; width: 52px; height: 28px; border-radius: 14px; transition: background 160ms var(--ease-out); }
   .app-nav-link.active { color: var(--accent); }
-  .app-nav-icon { display: block; line-height: 0; }
+  .app-nav-icon svg { display: block; }
   .page-stack { gap: 16px; }
   .page-title { font-size: 22px; }
   .page-subtitle { font-size: 14px; }
