@@ -67,19 +67,32 @@ function CommentIcon() {
   );
 }
 
+// догруженные страницы списка живут дольше экрана: после «назад» список той же
+// длины, и прокрутка встаёт на прежнее место
+let rememberedExtra: { firstId: number | null; items: WorkoutRow[]; cursor: RunsData["nextCursor"] } | null = null;
+
 export function AthleteRunsPage() {
   const { data, loading, error } = useApi<RunsData>("/api/athlete/dashboard");
-  const [extra, setExtra] = useState<WorkoutRow[]>([]);
-  const [cursor, setCursor] = useState<RunsData["nextCursor"]>(null);
+  const [extra, setExtra] = useState<WorkoutRow[]>(() => rememberedExtra?.items ?? []);
+  const [cursor, setCursor] = useState<RunsData["nextCursor"]>(() => rememberedExtra?.cursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (data) {
+    if (!data) return;
+    const firstId = data.workouts[0]?.id ?? null;
+    if (rememberedExtra && rememberedExtra.firstId === firstId) {
+      setExtra(rememberedExtra.items);
+      setCursor(rememberedExtra.cursor);
+    } else {
       setExtra([]);
       setCursor(data.nextCursor);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (data) rememberedExtra = { firstId: data.workouts[0]?.id ?? null, items: extra, cursor };
+  }, [data, extra, cursor]);
 
   // подгрузка при прокрутке: следующая страница, когда низ списка близко
   useEffect(() => {

@@ -221,14 +221,25 @@ export function buildChartPaths(points: ChartPoint[], minY: number, maxY: number
   const projected = points.map((point) => {
     const xRatio = clamp(point.x / maxX, 0, 1);
     const x = CHART_INSET_X + xRatio * drawableWidth;
-    const yRatio = clamp((point.y - minY) / yRange, 0, 1);
+    const yRatio = Number.isFinite(point.y) ? clamp((point.y - minY) / yRange, 0, 1) : 0;
     const normalized = invertY ? yRatio : 1 - yRatio;
     const y = CHART_INSET_TOP + normalized * drawableHeight;
     return { x, y };
   });
 
+  // NaN — разрыв линии (пауза, остановка): новый отрезок начинается с «M»
+  let penDown = false;
   const linePath = projected
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+    .map((point, index) => {
+      if (!Number.isFinite(points[index]!.y)) {
+        penDown = false;
+        return "";
+      }
+      const command = penDown ? "L" : "M";
+      penDown = true;
+      return `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+    })
+    .filter(Boolean)
     .join(" ");
 
   const first = projected[0];
@@ -266,4 +277,74 @@ export function projectX(meters: number, xMax: number) {
 export function unprojectX(fraction: number, xMax: number) {
   const drawableWidth = CHART_WIDTH - CHART_INSET_X * 2;
   return clamp((fraction * CHART_WIDTH - CHART_INSET_X) / drawableWidth, 0, 1) * xMax;
+}
+
+// Ряд по дистанции, а не по точкам часов: каждые `step` метров — среднее за окно `window` м.
+// Остановки выпадают сами (дистанция не растёт), шум GPS сглаживается окном.
+// pace — сек/км по времени движения; value — средний показатель (пульс) за окно.
+export function resampleByDistance(
+  distance: number[],
+  time: number[],
+  values: number[] | null,
+  options: { step: number; window: number }
+) {
+  const size = Math.min(distance.length, time.length, values ? values.length : Infinity);
+  if (size < 3) return [];
+  // накопленное время движения и сумма показателя × время
+  const moving = new Float64Array(size);
+  const weighted = new Float64Array(size);
+  const dist = new Float64Array(size);
+  let lastDistance = 0;
+  for (let index = 0; index < size; index += 1) {
+    const d = Number.isFinite(distance[index]) ? Math.max(distance[index]!, lastDistance) : lastDistance;
+    dist[index] = d;
+    if (index === 0) {
+      lastDistance = d;
+      continue;
+    }
+    const dt = time[index]! - time[index - 1]!;
+    const dd = d - lastDistance;
+    const isMoving = Number.isFinite(dt) && dt > 0 && dt <= 10 && dd > 0.2;
+    moving[index] = moving[index - 1]! + (isMoving ? dt : 0);
+    const value = values ? values[index]! : 0;
+    weighted[index] = weighted[index - 1]! + (isMoving && Number.isFinite(value) && value > 0 ? value * dt : 0);
+    lastDistance = d;
+  }
+  const total = dist[size - 1]!;
+  const at = (target: number, series: Float64Array) => {
+    let lo = 0;
+    let hi = size - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (dist[mid]! < target) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo === 0) return series[0]!;
+    const d0 = dist[lo - 1]!;
+    const d1 = dist[lo]!;
+    const ratio = d1 > d0 ? (target - d0) / (d1 - d0) : 1;
+    return series[lo - 1]! + (series[lo]! - series[lo - 1]!) * clamp(ratio, 0, 1);
+  };
+  const half = options.window / 2;
+  const result: { x: number; pace: number; value: number }[] = [];
+  for (let center = 0; center <= total; center += options.step) {
+    const from = clamp(center - half, 0, total);
+    const to = clamp(center + half, 0, total);
+    const span = to - from;
+    const movingTime = at(to, moving) - at(from, moving);
+    if (span < options.window * 0.4 || movingTime <= 0) continue;
+    result.push({
+      x: center,
+      pace: (movingTime / span) * 1000,
+      value: values ? (at(to, weighted) - at(from, weighted)) / movingTime : Number.NaN
+    });
+  }
+  return result;
+}
+
+// шаг и окно под длину пробежки: ~350 точек; окно темпа ~1/50 дистанции (60–250 м)
+export function distanceResampleOptions(totalMeters: number, kind: "pace" | "hr") {
+  const step = clamp(totalMeters / 350, 8, 60);
+  const window = kind === "pace" ? clamp(totalMeters / 50, 60, 250) : clamp(totalMeters / 80, 50, 150);
+  return { step, window };
 }

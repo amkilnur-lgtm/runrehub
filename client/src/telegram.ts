@@ -9,6 +9,8 @@ type TelegramWebApp = {
   expand: () => void;
   isVersionAtLeast?: (version: string) => boolean;
   shareToStory?: (mediaUrl: string, params?: { text?: string }) => void;
+  BackButton?: { show: () => void; hide: () => void; onClick: (cb: () => void) => void; offClick: (cb: () => void) => void };
+  HapticFeedback?: { impactOccurred: (style: "light" | "medium") => void };
 };
 
 export function getTelegramWebApp(): TelegramWebApp | null {

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { CHART_HEIGHT, CHART_WIDTH, projectX, projectY, unprojectX } from "../chart/chart-utils";
@@ -40,6 +40,8 @@ export function StreamChart({
   onCursor?: (meters: number | null) => void;
 }) {
   const labelsRef = useRef<HTMLDivElement | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const cursorHandlerRef = useRef<{ onCursor?: (meters: number | null) => void; xMax: number }>({ xMax: 0 });
 
   // Подписи серий стоят по центру своей группы полос и не обрезаются по её
   // ширине, поэтому на узком экране соседние могут наехать друг на друга.
@@ -87,6 +89,57 @@ export function StreamChart({
     return () => observer.disconnect();
   }, [bandLabels]);
 
+  // Палец: первые 8 px решают направление. Вбок — ведём курсор до отпускания пальца,
+  // даже если он уходит вниз (прокрутку отменяем). Вверх-вниз — обычная прокрутка.
+  useEffect(() => {
+    const node = gridRef.current;
+    if (!node) return undefined;
+    let startX = 0;
+    let startY = 0;
+    let lastY = 0;
+    let mode: "undecided" | "scrub" | "scroll" = "undecided";
+    const moveTo = (clientX: number) => {
+      const { onCursor: handler, xMax: max } = cursorHandlerRef.current;
+      if (!handler || max <= 0) return;
+      const rect = node.getBoundingClientRect();
+      handler(unprojectX((clientX - rect.left) / rect.width, max));
+    };
+    const onStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      lastY = touch.clientY;
+      mode = "undecided";
+      moveTo(touch.clientX);
+    };
+    const onMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      // жест целиком наш (touch-action: none): браузер не перехватит его посередине
+      event.preventDefault();
+      if (mode === "undecided") {
+        const dx = Math.abs(touch.clientX - startX);
+        const dy = Math.abs(touch.clientY - startY);
+        if (dx < 8 && dy < 8) return;
+        mode = dx >= dy ? "scrub" : "scroll";
+      }
+      if (mode === "scrub") {
+        moveTo(touch.clientX);
+      } else {
+        // вертикальный жест над графиком — прокручиваем страницу сами
+        window.scrollBy(0, lastY - touch.clientY);
+      }
+      lastY = touch.clientY;
+    };
+    node.addEventListener("touchstart", onStart, { passive: true });
+    node.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      node.removeEventListener("touchstart", onStart);
+      node.removeEventListener("touchmove", onMove);
+    };
+  }, [model === null]);
+
   if (!model) {
     return (
       <div className="chart-card">
@@ -103,6 +156,7 @@ export function StreamChart({
       ? { min: model.yMin, max: model.yMax, invert: Boolean(model.invertY) }
       : null;
   const xMax = model.xMax ?? 0;
+  cursorHandlerRef.current = { onCursor, xMax };
   // у пульса ось подписана границами зон (130 · 150 · 162), а не равными шагами
   const zoneTicks =
     scale && zones.length
@@ -133,8 +187,9 @@ export function StreamChart({
     };
   }
 
+  // мышь и перо; касания пальцем обрабатывает touch-обработчик выше
   function handlePointer(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!onCursor || xMax <= 0) return;
+    if (event.pointerType === "touch" || !onCursor || xMax <= 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     onCursor(unprojectX((event.clientX - rect.left) / rect.width, xMax));
   }
@@ -176,6 +231,7 @@ export function StreamChart({
             ))}
           </div>
           <div
+            ref={gridRef}
             className="chart-grid"
             onPointerMove={handlePointer}
             onPointerDown={handlePointer}

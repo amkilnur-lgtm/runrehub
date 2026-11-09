@@ -1,12 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api";
 
+// Память последних ответов по адресу: при возврате «назад» экран сразу рисуется
+// прежними данными (и прокрутка встаёт на место), а свежие подтягиваются в фоне
+const cache = new Map<string, unknown>();
+const CACHE_LIMIT = 40;
+
+function remember(url: string, value: unknown) {
+  cache.delete(url);
+  cache.set(url, value);
+  if (cache.size > CACHE_LIMIT) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
+
+// после изменений (удалили, переименовали) старый ответ не показываем
+export function forgetApiCache(prefix?: string) {
+  for (const key of [...cache.keys()]) {
+    if (!prefix || key.startsWith(prefix)) cache.delete(key);
+  }
+}
+
 export function useApi<T>(url: string | null) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<T | null>(() => (url && cache.has(url) ? (cache.get(url) as T) : null));
+  const [loading, setLoading] = useState<boolean>(() => !(url && cache.has(url)));
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const loadedUrl = useRef<string | null>(null);
+  const loadedUrl = useRef<string | null>(url);
 
   const refresh = useCallback(() => {
     setTick((t) => t + 1);
@@ -14,25 +35,28 @@ export function useApi<T>(url: string | null) {
 
   useEffect(() => {
     if (!url) return;
-    
+
     let isMounted = true;
-    // другой адрес (перешли к другому спортсмену) — не показываем чужие данные,
-    // пока грузятся новые; refresh() того же адреса данные оставляет
+    // другой адрес (перешли к другому спортсмену) — чужие данные не показываем;
+    // если этот адрес уже открывали — сразу показываем запомненный ответ
     if (loadedUrl.current !== url) {
       loadedUrl.current = url;
-      setData(null);
+      setData(cache.has(url) ? (cache.get(url) as T) : null);
     }
-    setLoading(true);
+    const hasData = cache.has(url);
+    // фоновое обновление не прячет экран за скелетоном
+    if (!hasData) setLoading(true);
     setError(null);
-    
+
     api<T>(url)
       .then((res) => {
         if (isMounted) {
+          remember(url, res);
           setData(res);
         }
       })
       .catch((err) => {
-        if (isMounted) {
+        if (isMounted && !hasData) {
           setError(err.message || "Failed to load data");
         }
       })

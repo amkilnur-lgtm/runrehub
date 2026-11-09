@@ -73,6 +73,15 @@ const P = {
   AUTO_KM_SHARE: 0.8, // тренировка нарезана автокругами часов
   AUTO_KM_TOLERANCE: 40,
   AUTO_KM_MIN_HR_DELTA: 8,
+  // Повторы по времени («3 мин», «30 с»): GPS на коротких отрезках врёт дистанцию
+  // и темп на десятки процентов, а длительность у таких повторов одинаковая
+  TIMED_DUR_TOL: 0.25, // разброс длительности внутри серии
+  TIMED_DUR_TOL_ABS: 5, // с
+  TIMED_DUR_CV: 0.12,
+  TIMED_PACE_CV: 0.25,
+  TIMED_MIN_COUNT: 3,
+  TIMED_MIN_SECONDS: 20,
+  TIMED_DIST_CV_FOR_TIME_LABEL: 0.08, // дистанции разошлись сильнее — это GPS, серия по времени
   MIN_LAPS: 3,
   MIN_BLOCKS: 3,
   PACE_MIN: 100, // с/км: границы правдоподобного бегового темпа
@@ -305,9 +314,41 @@ export function detectWorkoutIntervals(
     return null;
   }
 
-  // Серии собираем и по темпу, и по длине: иначе 5×1200 и 10×200 сливаются в одну
+  // Сначала серии по времени: повторы одной длительности, быстрее среднего темпа
+  const timedSets: Block[][] = [];
+  for (const block of [...candidates].sort((a, b) => a.moving - b.moving)) {
+    if (block.moving < P.TIMED_MIN_SECONDS || block.pace > averagePace * P.SET_PACE_VS_AVERAGE) {
+      continue;
+    }
+    const fit = timedSets.find((cluster) => {
+      const duration = median(cluster.map((item) => item.moving));
+      return Math.abs(block.moving - duration) <= Math.max(P.TIMED_DUR_TOL_ABS, duration * P.TIMED_DUR_TOL);
+    });
+    if (fit) {
+      fit.push(block);
+    } else {
+      timedSets.push([block]);
+    }
+  }
+  const acceptedTimed = timedSets
+    .filter(
+      (cluster) =>
+        cluster.length >= P.TIMED_MIN_COUNT &&
+        coefficientOfVariation(cluster.map((item) => item.moving)) <= P.TIMED_DUR_CV &&
+        coefficientOfVariation(cluster.map((item) => item.pace)) <= P.TIMED_PACE_CV &&
+        // ровные по дистанции и темпу серии оставляем обычной разметке (она умеет
+        // доращивать серию); по времени — только когда GPS разбросал дистанцию или темп
+        (coefficientOfVariation(cluster.map((item) => item.distance)) > P.TIMED_DIST_CV_FOR_TIME_LABEL ||
+          coefficientOfVariation(cluster.map((item) => item.pace)) > P.SET_PACE_CV)
+    )
+    .map((cluster) => cluster.sort((a, b) => a.index - b.index));
+  const timedClaimed = new Set(acceptedTimed.flat().map((block) => block.index));
+
+  // Остальное — серии и по темпу, и по длине: иначе 5×1200 и 10×200 сливаются в одну
   const clusters: Block[][] = [];
-  for (const block of [...candidates].sort((a, b) => a.pace - b.pace || a.distance - b.distance)) {
+  for (const block of [...candidates]
+    .filter((item) => !timedClaimed.has(item.index))
+    .sort((a, b) => a.pace - b.pace || a.distance - b.distance)) {
     const fit = clusters.find((cluster) => {
       const clusterPace = median(cluster.map((item) => item.pace));
       const clusterDistance = median(cluster.map((item) => item.distance));
@@ -326,7 +367,7 @@ export function detectWorkoutIntervals(
     }
   }
 
-  const repeatSets = clusters
+  const distanceSets = clusters
     .map((cluster) => cluster.sort((a, b) => a.index - b.index))
     .filter((cluster) => {
       if (cluster.length < 2) {
@@ -350,13 +391,15 @@ export function detectWorkoutIntervals(
       return coefficientOfVariation(cluster.map((item) => item.pace)) <= P.SET_PACE_CV;
     });
 
+  const repeatSets = [...acceptedTimed, ...distanceSets];
   if (!repeatSets.length) {
     return null;
   }
 
   // Доращиваем подтверждённую серию соседними похожими блоками: «4 из 7
-  // одинаковых отрезков подсвечены» читается как ошибка.
-  for (const cluster of repeatSets) {
+  // одинаковых отрезков подсвечены» читается как ошибка. Серии по времени уже
+  // собраны по длительности целиком — их не трогаем.
+  for (const cluster of distanceSets) {
     let grew = true;
     while (grew) {
       grew = false;
@@ -524,8 +567,11 @@ export function detectWorkoutIntervals(
       pace_seconds_per_km: Math.round(setPace),
       moving_time_seconds: Math.round(median(cluster.map((item) => item.moving))),
       average_heartrate: setHeartRates.length ? Math.round(median(setHeartRates)) : null,
-      label:
-        cluster.length > 1
+      // серию, собранную по времени (GPS разбросал дистанцию), не называем: «5×3 мин»
+      // не похоже на то, что бежал спортсмен, а честной дистанции у неё нет
+      label: acceptedTimed.includes(cluster)
+        ? ""
+        : cluster.length > 1
           ? `${cluster.length}×${formatDistanceLabel(setDistance)}`
           : formatDistanceLabel(setDistance)
     });

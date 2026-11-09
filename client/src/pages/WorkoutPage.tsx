@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import { isTelegramMiniApp } from "../telegram";
 import { useAuth } from "../components/AuthProvider";
 import { ResultForm } from "../components/Results";
 import { ShareStoryButton } from "../components/ShareStoryButton";
@@ -12,8 +13,8 @@ import { WorkoutFeeling } from "../components/WorkoutFeeling";
 import { prepareHeartRateChart } from "../chart/heartrate-chart";
 import { buildIntervalBands } from "../chart/interval-bands";
 import { formatPaceSeconds, preparePaceChart } from "../chart/pace-chart";
-import { useApi } from "../hooks/useApi";
-import { formatDistance, formatDuration, formatPace } from "../lib";
+import { forgetApiCache, useApi } from "../hooks/useApi";
+import { formatDistance, formatDuration, formatPace, pluralRu } from "../lib";
 import { WorkoutData } from "../types/workout";
 
 const WorkoutRouteMap = lazy(async () =>
@@ -25,12 +26,13 @@ function formatLapElevation(value: number | null | undefined) {
     return "—";
   }
 
+  // круг хранит разницу высоты (конец − начало), поэтому со знаком: «+12», «−7»
   const rounded = Math.round(value);
   if (rounded === 0) {
     return "0";
   }
 
-  return `${rounded}`;
+  return rounded > 0 ? `+${rounded}` : `−${Math.abs(rounded)}`;
 }
 
 function formatLapDistanceKilometers(distanceMeters: number) {
@@ -111,6 +113,11 @@ function paceOf(speed: number | null | undefined) {
 
 function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps"], structure: WorkoutData["structure"]) {
   // несколько серий — по серии на каждую: «5×800 м — 4:12, 5×200 м — 3:29»
+  // у серий без названия (GPS разбросал дистанцию) — просто число рабочих отрезков
+  if (structure && structure.sets.some((set) => !set.label)) {
+    const count = workLaps.length;
+    return `${count} ${pluralRu(count, "рабочий отрезок", "рабочих отрезка", "рабочих отрезков")}`;
+  }
   if (structure && structure.sets.length > 1) {
     return structure.sets.map((set) => `${set.label} — ${formatPaceSeconds(set.pace_seconds_per_km)}`).join(", ");
   }
@@ -221,7 +228,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         : "/athlete/runs";
 
   const paceChart = useMemo(
-    () => preparePaceChart(data?.streams ?? null, data?.workout ?? null),
+    () => {
+      // границы рабочих отрезков в метрах — по индексам точек кругов
+      const distance = data?.streams?.distance ?? [];
+      const ranges = (data?.structure?.segments ?? [])
+        .filter((segment) => segment.start_index !== null && segment.end_index !== null)
+        .map((segment) => [distance[segment.start_index!] ?? 0, distance[segment.end_index!] ?? 0] as [number, number])
+        .filter(([from, to]) => to > from);
+      return preparePaceChart(data?.streams ?? null, data?.workout ?? null, ranges);
+    },
     [data]
   );
   const heartRateChart = useMemo(
@@ -285,6 +300,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
     try {
       await api(`${prefix}${data.workout.id}`, { method: "DELETE" });
+      forgetApiCache();
       navigate(backHref);
     } catch (deleteError) {
       showToast("error", 
@@ -772,8 +788,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const startDate = data.workout.start_date ? new Date(data.workout.start_date) : null;
   const metaParts = [
     mode === "trainer" && data.workout.athlete_name ? data.workout.athlete_name : null,
-    startDate ? longWorkoutDate(startDate) : null,
-    data.workout.elevation_gain ? `набор ${Math.round(data.workout.elevation_gain)} м` : null
+    startDate ? longWorkoutDate(startDate) : null
   ].filter(Boolean);
   const correctionLabel = data.workout.gps_fix?.is_corrected
     ? data.workout.gps_fix.kind === "manual_distance"
@@ -788,9 +803,22 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
   return (
     <div className="ds-screen workout-screen" style={{ gap: 20 }}>
-      <Link to={backHref} className="ds-link">
-        ‹ {mode === "trainer" ? data.workout.athlete_name ?? "Назад" : canEdit ? "Пробежки" : "Назад"}
-      </Link>
+      {/* в Telegram «назад» — нативная кнопка в шапке и свайп (NavGestures); свою не дублируем */}
+      {isTelegramMiniApp ? null : (
+        <Link
+          to={backHref}
+          className="ds-link"
+          onClick={(event) => {
+            // пришли из списка — возвращаемся в историю, чтобы список открылся на том же месте
+            if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) {
+              event.preventDefault();
+              navigate(-1);
+            }
+          }}
+        >
+          ‹ {mode === "trainer" ? data.workout.athlete_name ?? "Назад" : canEdit ? "Пробежки" : "Назад"}
+        </Link>
+      )}
 
       <div className="workout-th">
         <div style={{ minWidth: 0 }}>
@@ -867,7 +895,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         ) : null}
       </div>
 
-      <div className="ds-metrics">
+      <div className="ds-metrics workout-metrics">
         <div className="ds-metric">
           <b>{formatKmShort(data.workout.distance_meters)}</b>
           <span>км</span>
@@ -968,6 +996,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                 <th scope="col">Время</th>
                 <th scope="col">Темп</th>
                 <th scope="col">Пульс</th>
+                <th scope="col" title="Разница высоты от начала до конца круга">Высота</th>
               </tr>
             </thead>
             <tbody>
@@ -979,13 +1008,15 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   <td>{formatLapTime(lap.elapsed_time_seconds)}</td>
                   <td>
                     {/* темп рабочего отрезка — плашкой цвета темпа, как полосы на графике */}
-                    {workLapIds.has(lap.id) ? (
+                    {/* без интервалов выделяем темп всех кругов, с интервалами — только рабочих */}
+                    {(!data.structure && lap.distance_meters >= 100) || workLapIds.has(lap.id) ? (
                       <span className="lap-pace">{formatPace(lap.average_speed).replace("/км", "")}</span>
                     ) : (
                       formatPace(lap.average_speed).replace("/км", "")
                     )}
                   </td>
                   <td>{lap.average_heartrate ? Math.round(lap.average_heartrate) : "—"}</td>
+                  <td className="lap-elev">{formatLapElevation(lap.elevation_gain)}</td>
                 </tr>
               ))}
             </tbody>

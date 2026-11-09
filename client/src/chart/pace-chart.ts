@@ -1,16 +1,16 @@
 import { ChartModel, ChartPoint, StreamSeries, WorkoutData } from "../types/workout";
 import {
   Y_TICK_COUNT,
-  blendExtremesTowardRaw,
   buildChartPaths,
   buildTickPositions,
   buildTicks,
   buildXAxis,
   clamp,
+  distanceResampleOptions,
   medianFilter,
   quantile,
-  smoothSeries,
-  suppressTransientSpikes
+  resampleByDistance,
+  smoothSeries
 } from "./chart-utils";
 import { downsample } from "./chart-utils";
 
@@ -72,40 +72,36 @@ export function formatPaceSeconds(totalSeconds: number) {
 
 export function preparePaceChart(
   streams: StreamSeries,
-  workout: WorkoutData["workout"] | null
+  workout: WorkoutData["workout"] | null,
+  // рабочие отрезки (м от старта): внутри них окно короткое, чтобы отрезки было видно,
+  // вне их — длинное, чтобы шум GPS на разминке и отдыхе не рисовал «пилу»
+  workRanges: [number, number][] = []
 ): ChartModel | null {
   if (!streams?.distance?.length) {
     return null;
   }
 
   const xAxis = buildXAxis(streams, workout?.distance_meters ?? 0);
-  const derivedPace = streams.time.length
-    ? computeWindowedPace(streams.distance, streams.time, 18)
-    : streams.velocity_smooth.map((speed) =>
-        Number.isFinite(speed) && speed > 0 ? 1000 / speed : Number.NaN
-      );
-  const size = Math.min(xAxis.pointsX.length, derivedPace.length);
+  const total = streams.distance[streams.distance.length - 1] ?? 0;
   const validPaces: number[] = [];
   const rawPoints: ChartPoint[] = [];
-
-  for (let index = 0; index < size; index += 1) {
-    const x = xAxis.pointsX[index];
-    const paceValue = derivedPace[index];
-
-    if (!Number.isFinite(x) || x < 0) {
-      continue;
+  if (streams.time.length) {
+    const base = distanceResampleOptions(total, "pace");
+    const long = resampleByDistance(streams.distance, streams.time, null, { step: base.step, window: 300 });
+    const short = workRanges.length
+      ? resampleByDistance(streams.distance, streams.time, null, { step: base.step, window: 100 })
+      : [];
+    const shortByX = new Map(short.map((sample) => [Math.round(sample.x), sample.pace]));
+    // одиночные выбросы GPS в коротком окне гасим медианой по 5 соседям
+    const shortPaces = medianFilter(short.map((sample) => sample.pace), 5);
+    short.forEach((sample, index) => shortByX.set(Math.round(sample.x), shortPaces[index]!));
+    const inWork = (x: number) => workRanges.some(([from, to]) => x >= from - 30 && x <= to + 30);
+    for (const sample of long) {
+      const pace = inWork(sample.x) ? shortByX.get(Math.round(sample.x)) ?? sample.pace : sample.pace;
+      const ok = pace >= 150 && pace <= 1200;
+      if (ok) validPaces.push(pace);
+      rawPoints.push({ x: sample.x, y: ok ? pace : Number.NaN });
     }
-
-    let paceSeconds: number | null = null;
-    if (Number.isFinite(paceValue) && paceValue >= 170 && paceValue <= 1200) {
-      paceSeconds = paceValue;
-      validPaces.push(paceValue);
-    }
-
-    rawPoints.push({
-      x,
-      y: paceSeconds ?? Number.NaN
-    });
   }
 
   if (rawPoints.length < 2 || validPaces.length < 2) {
@@ -128,21 +124,14 @@ export function preparePaceChart(
     1200
   );
 
-  const displayBase = rawPoints.map((point) =>
-    Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound
+  // ряд уже сглажен окном по дистанции — только подрезаем края шкалы и чуть сглаживаем
+  const displaySeries = smoothSeries(
+    rawPoints.map((point) => (Number.isFinite(point.y) ? clamp(point.y, fastBound, slowBound) : slowBound)),
+    3
   );
-  const deSpiked = suppressTransientSpikes(displayBase, 65);
-  const medianSmoothed = medianFilter(deSpiked, 5);
-  const lightlySmoothed = smoothSeries(medianSmoothed, 5);
-  const displaySeries = blendExtremesTowardRaw(displayBase, lightlySmoothed, {
-    preserveHighThreshold: 32,
-    preserveHighFactor: 0.72,
-    preserveLowThreshold: 20,
-    preserveLowFactor: 0.45
-  });
   const points = rawPoints.map((point, index) => ({
     x: point.x,
-    y: displaySeries[index]
+    y: Number.isFinite(point.y) ? displaySeries[index]! : Number.NaN
   }));
 
   const { linePath, areaPath } = buildChartPaths(points, fastBound, slowBound, true);

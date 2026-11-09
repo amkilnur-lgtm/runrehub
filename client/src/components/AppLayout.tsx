@@ -1,8 +1,9 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, ScrollRestoration, useNavigate } from "react-router-dom";
 
 import logoImage from "../assets/logo_red horizontal.png";
 import { useAuth } from "./AuthProvider";
 import { EditableAvatarMenu } from "./EditableAvatarMenu";
+import { NavGestures } from "./NavGestures";
 import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = { to: string; label: string; end?: boolean; icon: React.ReactNode };
@@ -88,6 +89,9 @@ export function AppLayout() {
       <main className="app-content">
         <Outlet />
       </main>
+      {/* «назад» возвращает на то же место страницы, новая страница — сверху */}
+      <ScrollRestoration />
+      <NavGestures home={user ? `/${user.role}` : "/"} />
     </div>
   );
 }

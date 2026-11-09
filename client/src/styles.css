@@ -2182,7 +2182,7 @@ select:focus-visible {
 @media (pointer: coarse) {
   .workout-route-maplibre .maplibregl-canvas-container,
   .workout-route-maplibre .maplibregl-canvas {
-    touch-action: pan-y pinch-zoom;
+    touch-action: none;
   }
 }
 
@@ -4242,7 +4242,7 @@ button.ds-li:disabled { cursor: default; }
 .chart-zone-band { position: absolute; left: 0; right: 0; pointer-events: none; }
 
 /* Графики в стиле системы: без рамки и фона, бледные колонки отрезков, курсор с плашкой */
-.ds-chart .chart-grid { border-radius: 0; background: none; box-shadow: none; min-height: 150px; overflow: visible; touch-action: pan-y; cursor: crosshair; }
+.ds-chart .chart-grid { border-radius: 0; background: none; box-shadow: none; min-height: 150px; overflow: visible; touch-action: none; cursor: crosshair; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .ds-chart .chart-y-axis { min-height: 150px; font-size: 10.5px; font-weight: 600; }
 .ds-chart .chart-x-axis { font-size: 10.5px; font-weight: 600; margin-top: 6px; }
 .ds-chart .chart-grid-line { background: var(--border); }
@@ -4270,3 +4270,16 @@ button.ds-li:disabled { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .workout-details-chev { transition: none; } }
 .lap-pace { display: inline-block; min-width: 52px; padding: 3px 8px; border-radius: 8px; background: var(--chart-pace-soft); color: var(--chart-pace-ink); font-weight: 800; text-align: center; }
 .ds-laps td:nth-child(4) { padding-top: 7px; padding-bottom: 7px; }
+/* длинное время «1:24:27» не слипается с темпом: колонки по содержимому */
+.workout-metrics { grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 6px 12px; }
+.workout-metrics .ds-metric b { font-size: clamp(19px, 5.4vw, 22px); }
+.workout-details > summary.ds-li::before { display: none; }
+/* подсказка свайпа «назад» в Telegram */
+.nav-back-hint { position: fixed; top: 50%; left: 0; z-index: 60; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink-2); box-shadow: var(--shadow-2); pointer-events: none; }
+.nav-back-hint.is-ready { background: var(--accent); color: var(--accent-ink); }
+.ds-laps td.lap-elev { color: var(--ink-2); }
+@media (max-width: 420px) {
+  .ds-laps { font-size: 14px; }
+  .ds-laps th, .ds-laps td { padding-left: 4px; padding-right: 4px; }
+  .lap-pace { min-width: 46px; padding: 3px 6px; }
+}
