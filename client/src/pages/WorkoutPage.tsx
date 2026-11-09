@@ -136,7 +136,11 @@ function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps
 
 function buildHrSummary(zones: HrZoneShare[]) {
   const above150 = zones[2]!.percent + zones[3]!.percent;
-  if (above150 >= 45) return `Почти половина времени и больше — выше 150 (${above150}%)`;
+  const above162 = zones[3]!.percent;
+  if (above162 >= 50) return `Больше половины времени — выше 162 (${above162}%)`;
+  if (above150 >= 85) return `Почти всё время — выше 150 (${above150}%)`;
+  if (above150 >= 55) return `Большая часть времени — выше 150 (${above150}%)`;
+  if (above150 >= 40) return `Около половины времени — выше 150 (${above150}%)`;
   if (above150 >= 15) return `${above150}% времени — выше 150`;
   return zones[0]!.percent >= 60 ? "Спокойно: большую часть времени пульс до 130" : "В основном 130–150 — аэробная работа";
 }

@@ -88,17 +88,23 @@ export function preparePaceChart(
   if (streams.time.length) {
     const base = distanceResampleOptions(total, "pace");
     const long = resampleByDistance(streams.distance, streams.time, null, { step: base.step, window: 300 });
-    const short = workRanges.length
-      ? resampleByDistance(streams.distance, streams.time, null, { step: base.step, window: 100 })
-      : [];
-    const shortByX = new Map(short.map((sample) => [Math.round(sample.x), sample.pace]));
-    // одиночные выбросы GPS в коротком окне гасим медианой по 5 соседям
-    const shortPaces = medianFilter(short.map((sample) => sample.pace), 5);
-    short.forEach((sample, index) => shortByX.set(Math.round(sample.x), shortPaces[index]!));
-    const inWork = (x: number) => workRanges.some(([from, to]) => x >= from - 30 && x <= to + 30);
+    // окно по длине отрезка: у коротких ускорений 100 м (видно пик), у длинных 400 м
+    // (иначе шум GPS рисует ложные пики внутри ровного отрезка)
+    const windowed = (window: number) => {
+      const samples = workRanges.length ? resampleByDistance(streams.distance, streams.time, null, { step: base.step, window }) : [];
+      // одиночные выбросы GPS гасим медианой по 5 соседям
+      const paces = medianFilter(samples.map((sample) => sample.pace), 5);
+      return new Map(samples.map((sample, index) => [Math.round(sample.x), paces[index]!]));
+    };
+    const shortByX = windowed(100);
+    const mediumByX = windowed(400);
+    const rangeAt = (x: number) => workRanges.find(([from, to]) => x >= from - 30 && x <= to + 30);
     for (const sample of long) {
-      const pace = inWork(sample.x) ? shortByX.get(Math.round(sample.x)) ?? sample.pace : sample.pace;
-      const ok = pace >= 150 && pace <= 1200;
+      const range = rangeAt(sample.x);
+      const byX = range && range[1] - range[0] < 400 ? shortByX : mediumByX;
+      const pace = range ? byX.get(Math.round(sample.x)) ?? sample.pace : sample.pace;
+      // быстрее 1:40 /км любитель не бежит — это скачок GPS
+      const ok = pace >= 100 && pace <= 1200;
       if (ok) validPaces.push(pace);
       rawPoints.push({ x: sample.x, y: ok ? pace : Number.NaN });
     }
@@ -112,9 +118,15 @@ export function preparePaceChart(
   const bestPace = Math.min(...validPaces);
   const coreFastPace = quantile(validPaces, 0.03);
   const coreSlowPace = quantile(validPaces, 0.9);
+  // верх шкалы — по самым быстрым рабочим отрезкам (ускорения по 2:20 не упираются
+  // в потолок), а не по одиночному выбросу: вне отрезков берём 3% самых быстрых точек
+  const workPaces = rawPoints
+    .filter((point) => Number.isFinite(point.y) && workRanges.some(([from, to]) => point.x >= from && point.x <= to))
+    .map((point) => point.y);
+  const fastestWork = workPaces.length ? quantile(workPaces, 0.02) : Number.POSITIVE_INFINITY;
   const fastBound = clamp(
-    Math.floor((Math.min(coreFastPace, averagePace - 10, bestPace) - 15) / 20) * 20,
-    180,
+    Math.floor((Math.min(coreFastPace, averagePace - 10, fastestWork) - 15) / 20) * 20,
+    120,
     1200
   );
   // паузы и шаг не растягивают шкалу: медленный край — не дальше 2:30 от среднего

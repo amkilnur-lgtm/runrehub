@@ -1,3 +1,4 @@
+import { SplashScreen } from "../pages/LoginPage";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { AppRole } from "../types";
@@ -7,7 +8,7 @@ export function RequireAuth() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div className="center-screen">Загрузка...</div>;
+    return <SplashScreen />;
   }
 
   if (!user) {

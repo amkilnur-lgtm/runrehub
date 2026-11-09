@@ -214,101 +214,10 @@ select {
 
 .login-screen {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px;
-}
-
-.login-brand {
-  border-radius: var(--radius-l);
-  background: var(--brand-navy-deep);
-  color: oklch(0.97 0.005 272);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 32px;
-  padding: clamp(28px, 5vw, 64px);
-}
-
-.login-brand-mark {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: oklch(0.97 0.005 272 / 0.72);
-}
-
-.login-tagline {
-  font-size: clamp(2rem, 3.6vw, 3.4rem);
-  font-weight: 800;
-  line-height: 1.06;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-
-.login-tagline::before {
-  content: "";
-  display: block;
-  width: 56px;
-  height: 4px;
-  border-radius: 2px;
-  margin-bottom: 24px;
-  background: var(--accent);
-}
-
-.login-tagline em {
-  font-style: normal;
-  color: oklch(0.72 0.17 28);
-}
-
-:root[data-accent="blue"] .login-tagline em {
-  color: oklch(0.78 0.09 266);
-}
-
-.login-brand-note {
-  max-width: 44ch;
-  line-height: 1.5;
-  color: oklch(0.97 0.005 272 / 0.66);
-}
-
-.login-side {
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px;
-}
-
-@media (max-width: 860px) {
-  .login-screen {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-    padding: 12px;
-    gap: 12px;
-  }
-
-  .login-brand {
-    gap: 16px;
-    padding: 20px;
-  }
-
-  .login-tagline {
-    font-size: 1.45rem;
-  }
-
-  .login-tagline::before {
-    width: 40px;
-    height: 3px;
-    margin-bottom: 12px;
-  }
-
-  .login-brand-note {
-    display: none;
-  }
-
-  .login-side {
-    align-items: start;
-    padding: 0;
-  }
+  padding: 24px 16px;
 }
 
 .login-card,
@@ -4282,4 +4191,20 @@ button.ds-li:disabled { cursor: default; }
   .ds-laps { font-size: 14px; }
   .ds-laps th, .ds-laps td { padding-left: 4px; padding-right: 4px; }
   .lap-pace { min-width: 46px; padding: 3px 6px; }
+}
+
+/* Экран входа: только логотип и форма. Заставка на время автоматического входа */
+.login-card { border: 0; box-shadow: none; }
+.login-card h1 { text-wrap: balance; }
+.splash { min-height: 100vh; min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 28px; background: var(--bg); }
+.splash-logo img { width: 200px; height: auto; display: block; animation: splash-in 420ms var(--ease-out) both; }
+:root[data-theme="dark"] .splash-logo, :root[data-theme="dark"] .login-logo-wrap img { background: #f6f7fa; border-radius: 14px; padding: 10px 16px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .splash-logo, :root:not([data-theme="light"]) .login-logo-wrap img { background: #f6f7fa; border-radius: 14px; padding: 10px 16px; } }
+.splash-track { width: 120px; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.splash-track i { display: block; width: 40%; height: 100%; border-radius: 2px; background: var(--accent); animation: splash-run 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+@keyframes splash-run { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+@keyframes splash-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo img { animation: none; }
+  .splash-track i { animation: none; width: 100%; opacity: 0.4; }
 }
