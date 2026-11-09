@@ -4208,3 +4208,19 @@ button.ds-li:disabled { cursor: default; }
   .splash-logo img { animation: none; }
   .splash-track i { animation: none; width: 100%; opacity: 0.4; }
 }
+
+/* Старты: рекорды плитками 2×2, сезоны списками */
+.pb-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pb-tile2 { background: var(--surface); border: 0; border-radius: 16px; padding: 14px 14px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 104px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; min-width: 0; }
+.pb-tile2:disabled { cursor: default; }
+.pb-tile2:hover:not(:disabled) { background: var(--surface-2); }
+.pb-d { font-size: 13px; font-weight: 800; color: var(--ink-muted); }
+.pb-t { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pb-m { font-size: 12.5px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pb-tile2.is-fresh { background: var(--gold-bg); }
+.pb-tile2.is-fresh .pb-d, .pb-tile2.is-fresh .pb-m { color: var(--gold-ink); }
+.pb-new { font-size: 11px; font-weight: 800; color: var(--gold-ink); background: var(--surface); padding: 1px 7px; border-radius: 999px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pb-tile2.is-empty .pb-t { color: var(--border-strong); font-size: 20px; }
+.pb-add { color: var(--accent); font-weight: 700; }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); display: inline-block; margin-right: 6px; vertical-align: 2px; }
+.rec-legend { margin: 8px 20px 0; font-size: 12.5px; color: var(--ink-muted); }

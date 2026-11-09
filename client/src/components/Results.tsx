@@ -140,6 +140,7 @@ export function ResultsPanel({
 }) {
   const { data, loading, error, refresh } = useApi<ResultsData>(`/api/results/athletes/${athleteId}`);
   const [editing, setEditing] = useState<{ result?: RaceResult; draft?: ResultDraft } | null>(null);
+  const [openSeasons, setOpenSeasons] = useState<Set<number>>(new Set());
 
   const header = (canEdit: boolean) =>
     title ? (
@@ -181,6 +182,13 @@ export function ResultsPanel({
     .sort((a, b) => a.race_date.localeCompare(b.race_date));
   const finished = data.results.filter((result) => result.status === "finished");
   const latestRecordId = finished.find((result) => result.is_record)?.id;
+  // сезоны — календарные годы, новый сверху; раскрыт текущий, прошлые — по нажатию
+  const seasonMap = new Map<number, RaceResult[]>();
+  for (const result of finished) {
+    const { year } = dateParts(result.race_date);
+    seasonMap.set(year, [...(seasonMap.get(year) ?? []), result]);
+  }
+  const seasons = [...seasonMap.entries()].sort((a, b) => b[0] - a[0]).map(([year, rows]) => ({ year, rows }));
   const recentDays = 30;
   const canEdit = data.canEdit;
 
@@ -250,65 +258,121 @@ export function ResultsPanel({
           <span>Личные рекорды</span>
           <span>по протоколу</span>
         </div>
-        <div className="ds-list">
+        {/* рекорды — плитками 2×2, чтобы отличались от списков стартов ниже */}
+        <div className="pb-tiles">
           {data.personalBests.map((best) => {
-            const fresh =
-              best.result?.id === latestRecordId && best.result && daysUntil(best.result.race_date) > -recentDays;
-            if (!best.result) {
-              return (
-                <div key={best.distanceMeters} className="ds-li">
-                  <span className="st-dist">{best.label}</span>
-                  <div className="ds-m">
-                    <span className="ds-empty">{viewer === "teammate" ? "пока нет" : "ещё нет"}</span>
-                  </div>
+            const result = best.result;
+            if (!result) {
+              // пустая плитка у своего кабинета открывает форму с этой дистанцией
+              return canEdit ? (
+                <button
+                  key={best.distanceMeters}
+                  type="button"
+                  className="pb-tile2 is-empty"
+                  onClick={() => setEditing({ draft: { status: "finished", distanceMeters: best.distanceMeters } })}
+                  aria-label={`Добавить результат на ${best.label}`}
+                >
+                  <span className="pb-d">{best.label}</span>
+                  <span className="pb-t">ещё нет</span>
+                  <span className="pb-m pb-add">+ добавить</span>
+                </button>
+              ) : (
+                <div key={best.distanceMeters} className="pb-tile2 is-empty">
+                  <span className="pb-d">{best.label}</span>
+                  <span className="pb-t">пока нет</span>
                 </div>
               );
             }
-            const result = best.result;
+            const fresh = result.id === latestRecordId && daysUntil(result.race_date) > -recentDays;
+            const { day, month } = dateParts(result.race_date);
             return (
-              <button key={best.distanceMeters} className="ds-li" {...editProps(result)}>
-                <span className="st-dist">{best.label}</span>
-                <div className="ds-m">
-                  <b>{result.name}</b>
-                  <span>
-                    {longDate(result.race_date)}
-                    {best.improvementSeconds ? ` · −${formatRaceTime(best.improvementSeconds)} к прошлому` : ""}
+              <button
+                key={best.distanceMeters}
+                type="button"
+                className={fresh ? "pb-tile2 is-fresh" : "pb-tile2"}
+                disabled={!canEdit}
+                onClick={() => setEditing({ result })}
+              >
+                <span className="pb-d">{best.label}</span>
+                <span className="pb-t">{formatRaceTime(result.official_time_seconds)}</span>
+                <span className="pb-m">
+                  {result.name} · {day} {month}
+                </span>
+                {fresh ? (
+                  <span className="pb-new">
+                    новый{best.improvementSeconds ? ` · −${formatRaceTime(best.improvementSeconds)}` : ""}
                   </span>
-                </div>
-                {fresh ? <span className="ds-pill ds-pill-gold">рекорд</span> : null}
-                <div className="ds-v">{formatRaceTime(result.official_time_seconds)}</div>
+                ) : null}
               </button>
             );
           })}
         </div>
       </div>
 
-      {finished.length ? (
-        <div>
-          <div className="ds-grp">
-            <span>Прошедшие</span>
+      {seasons.map(({ year, rows }, index) => {
+        const records = rows.filter((row) => row.is_record).length;
+        const summary = `${rows.length} ${pluralRu(rows.length, "старт", "старта", "стартов")}${
+          records ? ` · ${records} ${pluralRu(records, "рекорд", "рекорда", "рекордов")}` : ""
+        }`;
+        const open = index === 0 || openSeasons.has(year);
+        if (!open) {
+          const best = rows
+            .filter((row) => row.official_time_seconds)
+            .sort((a, b) => b.distance_meters - a.distance_meters)[0];
+          return (
+            <div key={year} className="ds-list">
+              <button type="button" className="ds-li" onClick={() => setOpenSeasons((prev) => new Set(prev).add(year))}>
+                <div className="ds-m">
+                  <b>Сезон {year}</b>
+                  <span>
+                    {summary}
+                    {best ? ` · ${distanceLabel(best.distance_meters)} за ${formatRaceTime(best.official_time_seconds)}` : ""}
+                  </span>
+                </div>
+                <svg className="ds-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div key={year}>
+            <div className="ds-grp">
+              <span>Сезон {year}</span>
+              <b>{summary}</b>
+            </div>
+            <div className="ds-list">
+              {rows.map((result) => {
+                const { day, month } = dateParts(result.race_date);
+                const place = placeLabel(result);
+                return (
+                  <button key={result.id} className="ds-li" {...editProps(result)}>
+                    <div className="ds-m">
+                      <b>{result.name}</b>
+                      <span>
+                        {day} {month} · {distanceLabel(result.distance_meters)}
+                        {place ? ` · ${place}` : ""}
+                        {result.city ? ` · ${result.city}` : ""}
+                      </span>
+                    </div>
+                    <div className="ds-v">
+                      {result.is_record ? <span className="rec-dot" aria-label="рекорд" /> : null}
+                      {formatRaceTime(result.official_time_seconds)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {records ? (
+              <p className="rec-legend">
+                <span className="rec-dot" aria-hidden="true" />
+                действующий личный рекорд
+              </p>
+            ) : null}
           </div>
-          <div className="ds-list">
-            {finished.map((result) => {
-              const { day, month, year } = dateParts(result.race_date);
-              const place = placeLabel(result);
-              return (
-                <button key={result.id} className="ds-li" {...editProps(result)}>
-                  <div className="ds-m">
-                    <b>{result.name}</b>
-                    <span>
-                      {day} {month} {year} · {distanceLabel(result.distance_meters)}
-                      {place ? ` · ${place}` : ""}
-                      {result.city ? ` · ${result.city}` : ""}
-                    </span>
-                  </div>
-                  <div className="ds-v">{formatRaceTime(result.official_time_seconds)}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+        );
+      })}
 
       {!title && canEdit ? (
         <button type="button" className="ds-btn ds-btn-2 ds-btn-full" onClick={() => setEditing({})}>
