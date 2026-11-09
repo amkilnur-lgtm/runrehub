@@ -4090,3 +4090,7 @@ button.trend-bar-slot:focus-visible {
 .results-empty p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.45; color: var(--ink-muted); }
 .results-empty .primary-button { min-height: 44px; padding: 0 18px; border-radius: 12px; border: 0; font: inherit; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .field-hint { margin: -6px 2px 0; font-size: 12.5px; color: var(--ink-muted); }
+/* подписи дистанций в рекордах и в форме — крупнее, чтобы читались рядом со временем */
+.pb-label { font-size: 16px; font-weight: 800; color: var(--ink); }
+.pb-value { font-size: 25px; margin-top: 4px; }
+.chip { min-height: 44px; font-size: 15px; padding: 0 16px; }
