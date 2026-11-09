@@ -106,8 +106,8 @@ function WeekHero({ highlights, week }: { highlights: Highlights; week: PeriodSt
       </div>
       <div className="week-hero-meta">
         {week.workout_count === 0
-          ? `Неделя только началась${lastWeek > 0 ? ` · на прошлой — ${formatKm(lastWeek)} км` : ""}`
-          : `${hoursMinutes(week.moving_time_seconds)} в беге${usual > 0 ? ` · обычно ${formatKm(usual)} км в неделю` : ""}`}
+          ? `Неделя только началась${lastWeek > 0 ? ` · на прошлой\u00a0— ${formatKm(lastWeek)}\u00a0км` : ""}`
+          : `${hoursMinutes(week.moving_time_seconds)} в беге${usual > 0 ? ` · обычно ${formatKm(usual)}\u00a0км в\u00a0неделю` : ""}`}
       </div>
       <div className="week-bars" role="img" aria-label={`Километраж за ${distances.length} недель, текущая неделя выделена`}>
         {distances.map((meters, index) => (
