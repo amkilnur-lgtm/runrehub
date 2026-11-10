@@ -19,9 +19,9 @@ import {
 // Главное действие одно: «Отправить и дальше».
 
 const EFFORT_LABEL = {
-  easy: "легко",
-  normal: "нормально",
-  hard: "тяжело",
+  easy: "Легко",
+  normal: "Нормально",
+  hard: "Тяжело",
 } as const;
 const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 
@@ -254,16 +254,16 @@ export function TrainerReviewPage() {
               <div className="feel-row" style={{ marginTop: 0 }}>
                 {feeling.effort ? (
                   <span
-                    className={`ds-pill ${feeling.effort === "hard" ? "ds-pill-warn" : "ds-pill-calm"}`}
+                    className={`feel-tag${feeling.effort === "hard" ? " is-warn" : ""}`}
                   >
-                    Ощущалось: {EFFORT_LABEL[feeling.effort]}
+                    {EFFORT_LABEL[feeling.effort]}
                   </span>
                 ) : null}
                 {feeling.pain === "light" ? (
-                  <span className="ds-pill ds-pill-warn">Лёгкая боль</span>
+                  <span className="feel-tag is-warn">Лёгкая боль</span>
                 ) : null}
                 {feeling.pain === "none" ? (
-                  <span className="ds-pill ds-pill-calm">✓ Ничего не болит</span>
+                  <span className="feel-tag">Ничего не болит</span>
                 ) : null}
               </div>
             </section>
