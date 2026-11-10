@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { removeAvatarFile, saveAvatarFromDataUrl } from "../lib/avatar-storage.js";
 import { pool } from "../lib/db.js";
-import { addLabEntry, getHealth, healthSettingsSchema, labEntrySchema, supplementSchema } from "../lib/health.js";
+import { addLabEntry, cycleEndSchema, cyclePeriodSchema, cycleSettingsSchema, getHealth, healthSettingsSchema, labEntrySchema, supplementSchema } from "../lib/health.js";
 import { achievementSchema, getPublicProfile, publicProfileSchema, savePublicProfile } from "../lib/public-profile.js";
 import { clearAuthCookie, loadCurrentUser, requireAuth, setAuthCookie, verifyPassword } from "../lib/auth.js";
 import { findUserIdForTelegram, linkTelegramToUser, verifyTelegramInitData } from "../lib/telegram-auth.js";
@@ -171,6 +171,8 @@ export async function authRoutes(app: FastifyInstance) {
       // отзыв согласия — удаляем всё о здоровье
       await pool.query(`delete from lab_results where user_id = $1`, [request.user.id]);
       await pool.query(`delete from supplements where user_id = $1`, [request.user.id]);
+      await pool.query(`delete from cycle_periods where user_id = $1`, [request.user.id]);
+      await pool.query(`update users set cycle_enabled = false, cycle_share_coach = false where id = $1`, [request.user.id]);
       await pool.query(`update users set health_consent_at = null where id = $1`, [request.user.id]);
     }
     if (body.share_coach !== undefined) await pool.query(`update users set health_share_coach = $2 where id = $1`, [request.user.id, body.share_coach]);
@@ -190,6 +192,41 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete("/api/auth/health/labs/:id", { preHandler: requireAuth }, async (request) => {
     await pool.query(`delete from lab_results where id = $1 and user_id = $2`, [Number((request.params as { id: string }).id), request.user.id]);
+    return getHealth(request.user.id);
+  });
+
+  app.put("/api/auth/health/cycle/settings", { preHandler: requireAuth }, async (request, reply) => {
+    if (!(await requireConsent(request.user.id))) return reply.code(403).send({ message: "Сначала подтвердите согласие" });
+    const body = cycleSettingsSchema.parse(request.body);
+    if (body.enabled !== undefined) await pool.query(`update users set cycle_enabled = $2 where id = $1`, [request.user.id, body.enabled]);
+    if (body.share_coach !== undefined) await pool.query(`update users set cycle_share_coach = $2 where id = $1`, [request.user.id, body.share_coach]);
+    if (body.hormonal !== undefined) await pool.query(`update users set cycle_hormonal = $2 where id = $1`, [request.user.id, body.hormonal]);
+    return getHealth(request.user.id);
+  });
+
+  app.post("/api/auth/health/cycle", { preHandler: requireAuth }, async (request, reply) => {
+    if (!(await requireConsent(request.user.id))) return reply.code(403).send({ message: "Сначала подтвердите согласие" });
+    const body = cyclePeriodSchema.parse(request.body);
+    if (body.started_on > new Date().toISOString().slice(0, 10)) return reply.code(400).send({ message: "Дата в будущем" });
+    await pool.query(
+      `insert into cycle_periods (user_id, started_on) values ($1, $2) on conflict (user_id, started_on) do nothing`,
+      [request.user.id, body.started_on]
+    );
+    return getHealth(request.user.id);
+  });
+
+  app.put("/api/auth/health/cycle/:id/end", { preHandler: requireAuth }, async (request) => {
+    const body = cycleEndSchema.parse(request.body);
+    await pool.query(`update cycle_periods set ended_on = $3 where id = $1 and user_id = $2 and started_on <= $3`, [
+      Number((request.params as { id: string }).id),
+      request.user.id,
+      body.ended_on
+    ]);
+    return getHealth(request.user.id);
+  });
+
+  app.delete("/api/auth/health/cycle/:id", { preHandler: requireAuth }, async (request) => {
+    await pool.query(`delete from cycle_periods where id = $1 and user_id = $2`, [Number((request.params as { id: string }).id), request.user.id]);
     return getHealth(request.user.id);
   });
 

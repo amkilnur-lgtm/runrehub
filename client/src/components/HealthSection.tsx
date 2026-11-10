@@ -18,11 +18,22 @@ export type Supplement = {
   started_on: string;
   stopped_on: string | null;
 };
+export type Cycle = {
+  enabled: boolean;
+  share_coach: boolean;
+  hormonal: boolean;
+  periods: { id: number; started_on: string; ended_on: string | null }[];
+  day: number | null;
+  avg_length: number | null;
+  next_in_days: number | null;
+  alert: boolean;
+};
 type Health = {
   consent_at: string | null;
   share_coach: boolean;
   labs: LabSession[];
   supplements: Supplement[];
+  cycle: Cycle;
 };
 
 // основные показатели для бегуна (Pedlar et al., 2019): железо, кровь, витамины, щитовидка
@@ -452,10 +463,37 @@ export function HealthSection() {
         </div>
       </div>
 
+      {/* Цикл: по умолчанию выключен; тренеру — отдельным тумблером, тоже выключенным */}
       <div className="ds-list">
         <label className="ds-li me-row">
           <div className="ds-m">
-            <b>Показывать тренеру</b>
+            <b>Отмечать цикл</b>
+            <span>
+              {current.cycle.enabled
+                ? "даты месячных — без симптомов и диагнозов"
+                : "выключено"}
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            className="me-switch"
+            checked={current.cycle.enabled}
+            onChange={(event) =>
+              void call("/api/auth/health/cycle/settings", "PUT", {
+                enabled: event.target.checked,
+              })
+            }
+          />
+        </label>
+        {current.cycle.enabled ? (
+          <CycleBody cycle={current.cycle} call={call} />
+        ) : null}
+      </div>
+
+      <div className="ds-list">
+        <label className="ds-li me-row">
+          <div className="ds-m">
+            <b>Анализы и добавки — тренеру</b>
             <span>одногруппники не видят никогда</span>
           </div>
           <input
@@ -487,5 +525,167 @@ export function HealthSection() {
         </button>
       </div>
     </div>
+  );
+}
+
+function CycleBody({
+  cycle,
+  call,
+}: {
+  cycle: Cycle;
+  call: (url: string, method: string, body?: unknown) => Promise<boolean>;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [picking, setPicking] = useState(false);
+  const last = cycle.periods[0];
+  const startedToday = last?.started_on === today;
+  return (
+    <>
+      <div className="ds-li cy2-now">
+        <div className="ds-m">
+          <b>
+            {cycle.day
+              ? `День цикла ${cycle.day}`
+              : "Отметьте первый день месячных"}
+          </b>
+          <span>
+            {cycle.avg_length
+              ? `в среднем ${cycle.avg_length} дней`
+              : cycle.periods.length
+                ? "средняя длина появится после двух отметок"
+                : "приложение посчитает длину цикла само"}
+            {cycle.next_in_days !== null && cycle.next_in_days > 0
+              ? ` · следующие примерно через ${cycle.next_in_days} дн.`
+              : ""}
+          </span>
+        </div>
+      </div>
+      {cycle.alert ? (
+        <p className="hl-stale">
+          Месячных нет больше 3 месяцев. Это стоит обсудить с врачом — так
+          бывает при нехватке энергии на нагрузку (RED-S). Мы ничего не
+          диагностируем.
+        </p>
+      ) : null}
+      {picking ? (
+        <div className="hl-form">
+          <label className="hl-date">
+            <span>первый день</span>
+            <input
+              type="date"
+              value={date}
+              max={today}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </label>
+          <div className="bd-actions">
+            <button
+              type="button"
+              className="ds-btn ds-btn-1"
+              onClick={async () => {
+                if (
+                  await call("/api/auth/health/cycle", "POST", {
+                    started_on: date,
+                  })
+                )
+                  setPicking(false);
+              }}
+            >
+              Отметить
+            </button>
+            <button
+              type="button"
+              className="ds-btn ds-btn-3"
+              onClick={() => setPicking(false)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="cy2-acts">
+          {!startedToday ? (
+            <button
+              type="button"
+              className="ds-btn ds-btn-2"
+              onClick={() =>
+                void call("/api/auth/health/cycle", "POST", {
+                  started_on: today,
+                })
+              }
+            >
+              Начались сегодня
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="ds-btn ds-btn-3"
+            onClick={() => setPicking(true)}
+          >
+            Другая дата
+          </button>
+        </div>
+      )}
+      {cycle.periods.slice(0, 6).map((period, index) => {
+        const next = cycle.periods[index - 1];
+        const length = next
+          ? Math.round(
+              (Date.parse(next.started_on) - Date.parse(period.started_on)) /
+                86_400_000,
+            )
+          : null;
+        return (
+          <div key={period.id} className="ds-li hl-old">
+            <div className="ds-m">
+              <b>{labDate(period.started_on)}</b>
+              <span>{length ? `цикл ${length} дней` : "текущий цикл"}</span>
+            </div>
+            <button
+              type="button"
+              className="hl-x"
+              aria-label={`Удалить отметку ${labDate(period.started_on)}`}
+              onClick={() =>
+                void call(`/api/auth/health/cycle/${period.id}`, "DELETE")
+              }
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+      <label className="ds-li me-row">
+        <div className="ds-m">
+          <b>Гормональная контрацепция</b>
+          <span>с ней цикл и пропуски считаются иначе</span>
+        </div>
+        <input
+          type="checkbox"
+          className="me-switch"
+          checked={cycle.hormonal}
+          onChange={(event) =>
+            void call("/api/auth/health/cycle/settings", "PUT", {
+              hormonal: event.target.checked,
+            })
+          }
+        />
+      </label>
+      <label className="ds-li me-row">
+        <div className="ds-m">
+          <b>Показывать тренеру</b>
+          <span>тренер увидит только день цикла и сигнал о пропуске</span>
+        </div>
+        <input
+          type="checkbox"
+          className="me-switch"
+          checked={cycle.share_coach}
+          onChange={(event) =>
+            void call("/api/auth/health/cycle/settings", "PUT", {
+              share_coach: event.target.checked,
+            })
+          }
+        />
+      </label>
+    </>
   );
 }

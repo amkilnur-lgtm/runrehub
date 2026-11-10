@@ -4618,3 +4618,5 @@ button.ds-li.hl-revoke { color: var(--danger-ink); font-weight: 700; font-size: 
 .hl-old .ds-m b { color: var(--ink-muted); }
 .hl-x { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; font-size: 18px; color: var(--ink-muted); cursor: pointer; }
 button.ds-li.hl-add { font-weight: 800; }
+.cy2-acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 16px 12px; }
+.me-row .ds-m b, .me-row .ds-m span { white-space: normal; }

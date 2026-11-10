@@ -190,9 +190,15 @@ export async function trainerRoutes(app: FastifyInstance) {
       [athleteId, request.user.id]
     );
     if (!rows[0]) return reply.code(404).send({ message: "Спортсмен не найден" });
-    if (!rows[0].health_consent_at || !rows[0].health_share_coach) return { shared: false };
+    if (!rows[0].health_consent_at) return { shared: false };
     const health = await getHealth(athleteId);
-    return { shared: true, labs: health.labs, supplements: health.supplements.filter((item) => !item.stopped_on) };
+    // цикл — отдельным разрешением, даже если анализы тренеру закрыты
+    const cycle =
+      health.cycle.enabled && health.cycle.share_coach
+        ? { day: health.cycle.day, avg_length: health.cycle.avg_length, next_in_days: health.cycle.next_in_days, alert: health.cycle.alert }
+        : null;
+    if (!rows[0].health_share_coach) return cycle ? { shared: true, labs: [], supplements: [], cycle } : { shared: false };
+    return { shared: true, labs: health.labs, supplements: health.supplements.filter((item) => !item.stopped_on), cycle };
   });
 
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
