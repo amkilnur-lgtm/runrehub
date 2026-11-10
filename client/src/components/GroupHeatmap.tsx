@@ -135,12 +135,13 @@ export function GroupHeatmap() {
           ))}
           <span>{legendTop}</span>
         </div>
+        {/* период: подпись прямо говорит, что меняется — колонки по неделям, по 4 недели или по месяцам */}
         <label className="gh-period">
-          <span className="sr-only">Период</span>
+          <span>Колонки</span>
           <select value={level} onChange={(event) => setLevel(event.target.value as Level)}>
-            <option value="weeks">{isPhone ? "5 недель" : "10 недель"}</option>
+            <option value="weeks">недели</option>
             <option value="blocks">по 4 недели</option>
-            <option value="months">сезон</option>
+            <option value="months">месяцы</option>
           </select>
         </label>
       </div>

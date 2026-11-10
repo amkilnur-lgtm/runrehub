@@ -48,7 +48,8 @@
   --hrz-1: #4f86d9; --hrz-2: #2f9e5b; --hrz-3: #e8a317; --hrz-4: #d9442f;
   --hrz-1-bg: #eaf1fb; --hrz-2-bg: #ecf6ef; --hrz-3-bg: #fdf4e0; --hrz-4-bg: #fcebe8;
   /* Тепловая карта: объём · набор · интенсивность (у первой ступени — рамка) */
-  --vol-1: #dde5ff; --vol-2: #b8c8fb; --vol-3: #7e98f2; --vol-4: #3b5ce0; --vol-5: #1a2f8a;
+  /* объём — оттенок акцента (OKLCH 259–266°), светлые ступени чуть к голубому, чтобы не уходили в сиреневый */
+  --vol-1: #dbebff; --vol-2: #b4d2ff; --vol-3: #7da9ff; --vol-4: #3f6de5; --vol-5: #1f3fad;
   --ele-1: #d7efe9; --ele-2: #a6dccf; --ele-3: #63bfa9; --ele-4: #2b8f7a; --ele-5: #145c4f;
   --int-1: #fde5d3; --int-2: #f9bf94; --int-3: #f0904f; --int-4: #d9602a; --int-5: #a8361c;
   --cell-ink-light: #1a2033;  --cell-ink-dark: #ffffff;  --cell-hairline: #c9d0de;
@@ -116,7 +117,7 @@
   --chart-grid-glow: rgb(255 255 255 / 0.045);
   --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
   --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
-  --vol-1: #36498c; --vol-2: #4862bb; --vol-3: #617fe2; --vol-4: #8ca4f3; --vol-5: #c2d0fb;
+  --vol-1: #253a6c; --vol-2: #3153a0; --vol-3: #4874d8; --vol-4: #77a4f6; --vol-5: #b6d2ff;
   --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
   --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
   --cell-ink-light: #ffffff;  --cell-ink-dark: #0d0f17;  --cell-hairline: transparent;
@@ -164,7 +165,7 @@
     --chart-grid-glow: rgb(255 255 255 / 0.045);
     --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
     --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
-    --vol-1: #36498c; --vol-2: #4862bb; --vol-3: #617fe2; --vol-4: #8ca4f3; --vol-5: #c2d0fb;
+    --vol-1: #253a6c; --vol-2: #3153a0; --vol-3: #4874d8; --vol-4: #77a4f6; --vol-5: #b6d2ff;
     --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
     --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
     --cell-ink-light: #ffffff;  --cell-ink-dark: #0d0f17;  --cell-hairline: transparent;
@@ -4635,3 +4636,5 @@ button.ds-li.hl-add { font-weight: 800; }
 .rv-pace { fill: none; stroke: var(--chart-pace); stroke-width: 2; stroke-linejoin: round; }
 .rv-hrl { fill: none; stroke: var(--chart-hr); stroke-width: 2; stroke-linejoin: round; }
 .rv-bar.s1 { fill: var(--vol-5); } .rv-bar.s2 { fill: var(--accent-hover, #1a3bc0); }
+.gh-period { display: flex; align-items: center; gap: 2px; } .gh-period span { font-size: 12.5px; color: var(--ink-muted); font-weight: 700; }
+.gh-period select { width: auto; max-width: 140px; }
