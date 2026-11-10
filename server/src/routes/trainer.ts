@@ -206,7 +206,8 @@ export async function trainerRoutes(app: FastifyInstance) {
     const [pending, replied] = await Promise.all([
       pool.query(
         `
-          select w.id, w.start_date
+          select w.id, w.start_date,
+                 exists (select 1 from workout_feelings f where f.workout_id = w.id and f.pain = 'light') as has_pain
           from workouts w
           join users u on u.id = w.user_id
           where u.role = 'athlete' and u.coach_id = $1
@@ -234,7 +235,8 @@ export async function trainerRoutes(app: FastifyInstance) {
     ]);
     const repliedIds = replied.rows.map((row) => Number(row.id));
     const pendingIds = pending.rows
-      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+      // пробежки с болью — первыми (отчёт «Страница тренера и клуба»), дальше от старых к новым
+      .sort((a, b) => Number(b.has_pain) - Number(a.has_pain) || new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
       .map((row) => Number(row.id))
       .filter((id) => !repliedIds.includes(id));
     // ответы спортсменов — первыми: на них ждут ответа

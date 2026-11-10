@@ -4620,3 +4620,18 @@ button.ds-li.hl-revoke { color: var(--danger-ink); font-weight: 700; font-size: 
 button.ds-li.hl-add { font-weight: 800; }
 .cy2-acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 16px 12px; }
 .me-row .ds-m b, .me-row .ds-m span { white-space: normal; }
+
+/* Разбор: главный график */
+.rv { display: flex; flex-direction: column; gap: 8px; }
+.rv:not(:has(svg)) { display: none; }
+.rv-concl { margin: 0; font-size: 15px; line-height: 1.45; font-weight: 600; }
+.rv-note { margin: 0; font-size: 12.5px; color: var(--ink-muted); font-weight: 600; }
+.rv-chart { width: 100%; height: auto; display: block; font-variant-numeric: tabular-nums; }
+.rv-bar { fill: var(--chart-pace); }
+.rv-lbl { font-size: 11.5px; font-weight: 800; fill: var(--ink); }
+.rv-hr { font-size: 10.5px; font-weight: 800; fill: #fff; }
+.rv-cap { font-size: 11px; font-weight: 600; fill: var(--ink-muted); }
+.rv-axis { stroke: var(--border); }
+.rv-pace { fill: none; stroke: var(--chart-pace); stroke-width: 2; stroke-linejoin: round; }
+.rv-hrl { fill: none; stroke: var(--chart-hr); stroke-width: 2; stroke-linejoin: round; }
+.rv-bar.s1 { fill: var(--vol-5); } .rv-bar.s2 { fill: var(--accent-hover, #1a3bc0); }
