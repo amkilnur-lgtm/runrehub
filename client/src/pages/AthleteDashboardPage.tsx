@@ -98,13 +98,13 @@ function LatestRunBlock({ workout }: { workout: LatestWorkout }) {
             <span>пульс</span>
           </div>
         </div>
+        {/* последнее сообщение тренера одной строкой — без синей плашки */}
         {workout.coach_note ? (
-          <div className="ds-coach" style={{ marginTop: 14 }}>
-            <UserAvatar fullName={workout.coach_name ?? "Тренер"} avatarUrl={workout.coach_avatar_url} className="avatar-sm" ariaHidden />
-            <div>
-              <b>{workout.coach_name ?? "Тренер"}</b>
-              <p>{workout.coach_note}</p>
-            </div>
+          <div className="home-coach">
+            <UserAvatar fullName={workout.coach_name ?? "Тренер"} avatarUrl={workout.coach_avatar_url} className="chat-av" ariaHidden />
+            <p>
+              <b>Тренер:</b> {workout.coach_note}
+            </p>
           </div>
         ) : (
           <p className="ds-pending" style={{ marginTop: 14 }}>

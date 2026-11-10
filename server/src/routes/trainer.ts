@@ -7,6 +7,8 @@ import { birthdaySchema } from "./auth.js";
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { buildStoryCardPng } from "../lib/telegram-notifications.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
+import { config } from "../config.js";
 import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
 import { getWorkoutFeeling } from "../lib/workout-feeling.js";
@@ -118,6 +120,23 @@ type TrainerDashboardStatsRow = {
   all_time_workout_count: number | string | null;
 };
 
+async function notifyAthleteAboutCoachMessage(workoutId: number, text: string) {
+  if (!isTelegramConfigured()) return;
+  const { rows } = await pool.query(
+    `select w.name, a.telegram_chat_id, a.telegram_notifications_enabled, c.full_name as coach_name
+     from workouts w join users a on a.id = w.user_id join users c on c.id = a.coach_id where w.id = $1`,
+    [workoutId]
+  );
+  const row = rows[0];
+  if (!row?.telegram_chat_id || row.telegram_notifications_enabled === false) return;
+  const quote = text.length > 300 ? `${text.slice(0, 300)}…` : text;
+  const url = `${config.APP_URL.replace(/\/$/, "")}/athlete/workouts/${workoutId}`;
+  await sendTelegramMessage(
+    row.telegram_chat_id,
+    `💬 <b>${escapeTelegramHtml(row.coach_name ?? "Тренер")}</b> — о пробежке «${escapeTelegramHtml(row.name)}»:\n«${escapeTelegramHtml(quote)}»\n<a href="${url}">Открыть</a>`
+  );
+}
+
 export async function trainerRoutes(app: FastifyInstance) {
   // Картинка 1080×1920 для сторис (кнопка «Поделиться»). Рендер тяжёлый — ограничиваем частоту
   app.get(
@@ -228,7 +247,6 @@ export async function trainerRoutes(app: FastifyInstance) {
           where u.role = 'athlete' and u.coach_id = $1
             and last.author_id = w.user_id
             and last.created_at >= now() - interval '14 days'
-            and last.created_at > coalesce(w.coach_comment_updated_at, '-infinity'::timestamptz)
         `,
         [request.user.id]
       )
@@ -750,32 +768,20 @@ export async function trainerRoutes(app: FastifyInstance) {
     return { ok: true, name: result.rows[0].name };
   });
 
+  // старый «комментарий тренера» — теперь просто сообщение тренера в личную переписку
   app.put("/api/trainer/workouts/:id/comment", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["trainer"]);
-    const params = request.params as { id: string };
+    const workoutId = Number((request.params as { id: string }).id);
     const body = request.body as { coachComment?: unknown };
-    const workoutId = Number(params.id);
-    const coachComment =
-      typeof body?.coachComment === "string" ? body.coachComment.trim().slice(0, 4000) : "";
-
-    const result = await pool.query(
-      `
-        update workouts w
-        set coach_comment = $3, coach_comment_updated_at = now()
-        from users u
-        where w.id = $1
-          and w.user_id = u.id
-          and u.coach_id = $2
-        returning w.coach_comment
-      `,
-      [workoutId, request.user.id, coachComment || null]
-    );
-
-    if (!result.rows[0]) {
+    const text = typeof body?.coachComment === "string" ? body.coachComment.trim().slice(0, 1000) : "";
+    if (!(await trainerOwnsWorkout(request.user.id, workoutId))) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
-
-    return { ok: true, coachComment: result.rows[0].coach_comment ?? null };
+    if (text) {
+      await addWorkoutComment(workoutId, request.user.id, text, "coach");
+      void notifyAthleteAboutCoachMessage(workoutId, text).catch((error) => request.log.warn({ err: error }, "athlete notification failed"));
+    }
+    return { ok: true, coachComment: null };
   });
 
   app.post("/api/trainer/workouts/:id/gps-fix/preview", { preHandler: requireAuth }, async (request, reply) => {
@@ -1337,6 +1343,9 @@ export async function trainerRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
     await addWorkoutComment(workoutId, request.user.id, body.body, body.channel);
+    if (body.channel === "coach") {
+      void notifyAthleteAboutCoachMessage(workoutId, body.body).catch((error) => request.log.warn({ err: error }, "athlete notification failed"));
+    }
     return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, true, body.channel) };
   });
 

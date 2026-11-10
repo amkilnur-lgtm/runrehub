@@ -4641,3 +4641,33 @@ button.ds-li.hl-add { font-weight: 800; }
 /* самочувствие у тренера — как выбранный ответ у спортсмена, только без нажатия; тревожные — оранжевым */
 .feel-tag { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 14px; }
 .feel-tag.is-warn { background: var(--warn); color: #fff; }
+.gh-metric button { padding: 0 6px; font-size: 13.5px; }
+.gh-metric[aria-label="Что в клетке"] { grid-auto-flow: row; grid-template-columns: 0.8fr 1fr 1.5fr; }
+
+/* Переписка с тренером — облачка как в мессенджере */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.chat-head b { font-size: 16px; font-weight: 800; }
+.chat-head span { font-size: 13px; color: var(--ink-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-empty { margin: 0; font-size: 14.5px; color: var(--ink-muted); line-height: 1.45; }
+.chat-list { display: flex; flex-direction: column; gap: 6px; }
+.chat-day { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-muted); margin: 4px 0; }
+.chat-row { display: flex; gap: 8px; align-items: flex-end; }
+.chat-row.is-me { justify-content: flex-end; }
+.chat-row .chat-av { width: 28px; height: 28px; font-size: 10px; flex: none; }
+.chat-bub { max-width: 80%; border: 0; font: inherit; text-align: left; cursor: default; padding: 8px 12px 6px; border-radius: 18px 18px 18px 6px; background: var(--surface-2); color: var(--ink); display: flex; flex-direction: column; }
+.is-me .chat-bub { border-radius: 18px 18px 6px 18px; background: var(--accent); color: #fff; }
+.chat-who { font-size: 12.5px; font-weight: 800; color: var(--accent); margin-bottom: 1px; }
+.chat-text { font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-bub small { align-self: flex-end; font-size: 11px; opacity: .65; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.chat-act { display: flex; padding-left: 36px; } .chat-act.is-me { justify-content: flex-end; padding-left: 0; }
+.chat-act button { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--danger-ink); padding: 4px 6px; cursor: pointer; }
+.chat-compose { display: flex; gap: 8px; align-items: flex-end; }
+.chat-compose textarea { flex: 1; min-height: 44px; max-height: 132px; resize: none; border: 0; border-radius: 22px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.4; padding: 11px 16px; }
+.chat-compose textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.chat-send { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; cursor: pointer; }
+.chat-send:disabled { opacity: .4; cursor: default; }
+.home-coach { display: flex; gap: 10px; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.home-coach .chat-av { width: 28px; height: 28px; font-size: 10px; flex: none; }
+.home-coach p { margin: 0; font-size: 14.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.home-coach p b { color: var(--ink); }

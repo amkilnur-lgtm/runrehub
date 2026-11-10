@@ -8,6 +8,7 @@ import { ResultForm } from "../components/Results";
 import { ShareStoryButton } from "../components/ShareStoryButton";
 import { StreamChart } from "../components/StreamChart";
 import { useToast } from "../components/ToastProvider";
+import { CoachChat } from "../components/CoachChat";
 import { WorkoutComments } from "../components/WorkoutComments";
 import { WorkoutFeeling } from "../components/WorkoutFeeling";
 import { prepareHeartRateChart } from "../chart/heartrate-chart";
@@ -942,57 +943,18 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         </div>
       </div>
 
-      <section className="ds-block ds-pad workout-coach" aria-label="Тренер">
-        {/* Разбор тренера — приватный: одногруппникам не показываем */}
-        {mode === "trainer" ? (
-          <div className="workout-coach-edit">
-            <b style={{ fontSize: 16 }}>Комментарий тренера</b>
-            <textarea
-              value={coachComment}
-              onChange={(event) => setCoachComment(event.target.value)}
-              placeholder="Что получилось, что поправить в следующий раз"
-              rows={4}
-            />
-            <div className="workout-coach-actions">
-              <button type="button" className="ds-btn ds-btn-1" disabled={isSavingComment} onClick={handleSaveComment}>
-                {isSavingComment ? "Сохраняем..." : "Сохранить"}
-              </button>
-              {commentStatus ? <span className="ds-sub" style={{ margin: 0 }}>{commentStatus}</span> : null}
-            </div>
-          </div>
-        ) : canEdit ? (
-          data.workout.coach_comment?.trim() ? (
-            <div className="ds-coach">
-              <span className="workout-coach-ca" aria-hidden="true">
-                Т
-              </span>
-              <div>
-                <b>Тренер</b>
-                <p>{data.workout.coach_comment.trim()}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="ds-pending">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            Тренер ещё не прокомментировал
-          </p>
-          )
-        ) : null}
-        {/* переписка спортсмена и тренера — личная, одногруппники её не видят */}
-        {mode === "trainer" || canEdit ? (
-          <div className="workout-discussion">
-            <WorkoutComments
-              workoutId={data.workout.id}
-              viewer={mode}
-              collapsed
-              channel="coach"
-              emptyLabel={
-                mode === "trainer" ? "Написать спортсмену" : data.workout.coach_comment?.trim() ? "Ответить" : "Написать тренеру"
-              }
-            />
-          </div>
-        ) : null}
-      </section>
+      {/* одна переписка спортсмена и тренера (комментарий тренера — его сообщение); одногруппники не видят */}
+      {mode === "trainer" || canEdit ? (
+        <section className="ds-block ds-pad workout-coach" aria-label="Переписка с тренером">
+          <CoachChat
+            workoutId={data.workout.id}
+            viewer={mode}
+            title={mode === "trainer" ? (data.workout.athlete_name ?? "Спортсмен").split(" ")[0]! : "Тренер"}
+            placeholder={mode === "trainer" ? "Сообщение спортсмену…" : "Сообщение тренеру…"}
+            emptyText={mode === "trainer" ? undefined : "Тренер посмотрит пробежку и напишет здесь."}
+          />
+        </section>
+      ) : null}
 
 
       {mode === "trainer" || canEdit ? (

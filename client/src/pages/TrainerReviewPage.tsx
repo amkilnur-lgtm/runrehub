@@ -366,8 +366,8 @@ export function TrainerReviewPage() {
           <label className="review-comment">
             <span>
               {athleteReply
-                ? "Ваш ответ — в обсуждение пробежки"
-                : "Комментарий для спортсмена"}
+                ? "Ваш ответ"
+                : "Сообщение спортсмену"}
             </span>
             <textarea
               value={comment}
