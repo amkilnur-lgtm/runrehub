@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { GroupHeatmap } from "../components/GroupHeatmap";
-import { formatGoalTime, formatRaceTime } from "../components/Results";
+import { formatGoalTime } from "../components/Results";
 import { UserAvatar } from "../components/UserAvatar";
 import { useApi } from "../hooks/useApi";
 import { formatAgo, formatKm, pluralRu } from "../lib";

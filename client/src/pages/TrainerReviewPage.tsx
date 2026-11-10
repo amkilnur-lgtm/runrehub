@@ -29,13 +29,18 @@ export function TrainerReviewPage() {
   const showToast = useToast();
   // очередь фиксируем на время разбора: отправленные уходят, порядок не прыгает
   const [queue, setQueue] = useState<number[] | null>(null);
+  // ответы спортсменов в обсуждении: на них тренер отвечает в то же обсуждение
+  const [replies, setReplies] = useState<Map<number, string>>(new Map());
   const [index, setIndex] = useState(0);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    api<{ workoutIds: number[] }>("/api/trainer/review-queue")
-      .then((res) => setQueue(res.workoutIds))
+    api<{ workoutIds: number[]; replies: { workoutId: number; body: string }[] }>("/api/trainer/review-queue")
+      .then((res) => {
+        setReplies(new Map(res.replies.map((reply) => [reply.workoutId, reply.body])));
+        setQueue(res.workoutIds);
+      })
       .catch(() => setQueue([]));
   }, []);
 
@@ -43,15 +48,22 @@ export function TrainerReviewPage() {
   const { data } = useApi<WorkoutData & { feeling?: WorkoutData["feeling"] }>(currentId ? `/api/trainer/workouts/${currentId}` : null);
   const workout = data && data.workout.id === currentId ? data : null;
 
+  const athleteReply = currentId ? replies.get(currentId) ?? null : null;
+
   useEffect(() => {
-    setComment(workout?.workout.coach_comment ?? "");
+    setComment(athleteReply ? "" : workout?.workout.coach_comment ?? "");
   }, [workout?.workout.id]);
 
   async function send() {
     if (!currentId || !comment.trim() || sending) return;
     setSending(true);
     try {
-      await api(`/api/trainer/workouts/${currentId}/comment`, { method: "PUT", body: JSON.stringify({ coachComment: comment.trim() }) });
+      if (athleteReply) {
+        // ответ на сообщение спортсмена — в обсуждение пробежки
+        await api(`/api/trainer/workouts/${currentId}/comments`, { method: "POST", body: JSON.stringify({ body: comment.trim() }) });
+      } else {
+        await api(`/api/trainer/workouts/${currentId}/comment`, { method: "PUT", body: JSON.stringify({ coachComment: comment.trim() }) });
+      }
       forgetApiCache("/api/trainer");
       setIndex((value) => value + 1);
     } catch (err) {
@@ -138,22 +150,24 @@ export function TrainerReviewPage() {
             </div>
           </div>
 
-          <div className="ds-metrics workout-metrics">
-            <div className="ds-metric">
-              <b>{formatKm(workout.workout.distance_meters)}</b>
-              <span>км</span>
+          <div className="workout-stats">
+            <div className="ds-big">
+              {formatKm(workout.workout.distance_meters, 2)}
+              <small>км</small>
             </div>
-            <div className="ds-metric">
-              <b>{formatDuration(Math.round(workout.workout.moving_time_seconds))}</b>
-              <span>время</span>
-            </div>
-            <div className="ds-metric">
-              <b>{formatPace(workout.workout.average_speed).replace("/км", "")}</b>
-              <span>темп</span>
-            </div>
-            <div className="ds-metric">
-              <b>{workout.workout.average_heartrate ? Math.round(workout.workout.average_heartrate) : "—"}</b>
-              <span>пульс</span>
+            <div className="workout-stats-row">
+              <div>
+                <span>время</span>
+                <b>{formatDuration(Math.round(workout.workout.moving_time_seconds))}</b>
+              </div>
+              <div>
+                <span>темп /км</span>
+                <b>{formatPace(workout.workout.average_speed).replace("/км", "")}</b>
+              </div>
+              <div>
+                <span>пульс</span>
+                <b>{workout.workout.average_heartrate ? Math.round(workout.workout.average_heartrate) : "—"}</b>
+              </div>
             </div>
           </div>
 
@@ -168,6 +182,16 @@ export function TrainerReviewPage() {
                 {feeling.pain === "light" ? <span className="ds-pill ds-pill-warn">Лёгкая боль</span> : null}
                 {feeling.pain === "none" ? <span className="ds-pill ds-pill-soft">Ничего не болит</span> : null}
               </div>
+            </section>
+          ) : null}
+
+          {athleteReply ? (
+            <section className="ds-block ds-pad review-reply" aria-label="Сообщение спортсмена">
+              <span className="ds-pill ds-pill-accent">{firstName} ответил(а)</span>
+              <p>«{athleteReply}»</p>
+              {workout.workout.coach_comment?.trim() ? (
+                <p className="review-prev">Ваш комментарий: {workout.workout.coach_comment.trim()}</p>
+              ) : null}
             </section>
           ) : null}
 
@@ -216,7 +240,7 @@ export function TrainerReviewPage() {
           ) : null}
 
           <label className="review-comment">
-            <span>Комментарий для спортсмена</span>
+            <span>{athleteReply ? "Ваш ответ — в обсуждение пробежки" : "Комментарий для спортсмена"}</span>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}

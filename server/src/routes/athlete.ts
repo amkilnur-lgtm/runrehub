@@ -8,6 +8,8 @@ import { signStoryLink } from "../lib/story-links.js";
 import { getFitnessSummaries } from "../lib/fitness.js";
 import { getWorkoutFeeling, saveWorkoutFeeling, workoutFeelingSchema } from "../lib/workout-feeling.js";
 import { pool } from "../lib/db.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
+import { config } from "../config.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
   downsampleRoute,
@@ -177,6 +179,31 @@ async function getAthleteHighlights(userId: number) {
         }
       : null
   };
+}
+
+async function notifyCoachAboutComment(workoutId: number, authorId: number, body: string) {
+  if (!isTelegramConfigured()) return;
+  const { rows } = await pool.query(
+    `
+      select w.name, coalesce(wc.corrected_distance_meters, w.distance_meters) as distance_meters,
+             a.full_name, c.telegram_chat_id, c.telegram_notifications_enabled
+      from workouts w
+      join users a on a.id = w.user_id
+      join users c on c.id = a.coach_id
+      left join workout_corrections wc on wc.workout_id = w.id
+      where w.id = $1 and w.user_id = $2
+    `,
+    [workoutId, authorId]
+  );
+  const row = rows[0];
+  if (!row?.telegram_chat_id || !row.telegram_notifications_enabled) return;
+  const km = (Number(row.distance_meters) / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+  const quote = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+  const url = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${workoutId}`;
+  const text =
+    `💬 <b>${escapeTelegramHtml(row.full_name)}</b> написал(а) к пробежке «${escapeTelegramHtml(row.name)}» · ${km} км\n` +
+    `«${escapeTelegramHtml(quote)}»\n<a href="${url}">Открыть пробежку</a>`;
+  await sendTelegramMessage(row.telegram_chat_id, text);
 }
 
 export async function athleteRoutes(app: FastifyInstance) {
@@ -496,6 +523,10 @@ export async function athleteRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
     await addWorkoutComment(workoutId, request.user.id, body.body);
+    // спортсмен написал в обсуждение своей пробежки — сообщаем тренеру в Telegram
+    void notifyCoachAboutComment(workoutId, request.user.id, body.body).catch((error) =>
+      request.log.warn({ err: error }, "comment notification failed")
+    );
     return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, false) };
   });
 

@@ -273,13 +273,13 @@ export function ResultsPanel({
                   aria-label={`Добавить результат на ${best.label}`}
                 >
                   <span className="pb-d">{best.label}</span>
-                  <span className="pb-t">ещё нет</span>
-                  <span className="pb-m pb-add">+ добавить</span>
+                  <span className="pb-none">ещё нет</span>
+                  <span className="pb-add">+ Добавить</span>
                 </button>
               ) : (
                 <div key={best.distanceMeters} className="pb-tile2 is-empty">
                   <span className="pb-d">{best.label}</span>
-                  <span className="pb-t">пока нет</span>
+                  <span className="pb-none">пока нет</span>
                 </div>
               );
             }
@@ -300,8 +300,8 @@ export function ResultsPanel({
                   {day} {month} · {result.name}
                 </span>
                 {fresh ? (
-                  <span className="pb-new">
-                    новый{best.improvementSeconds ? `, быстрее на ${formatRaceTime(best.improvementSeconds)}` : ""}
+                  <span className="pb-fresh">
+                    {best.improvementSeconds ? `быстрее на ${formatRaceTime(best.improvementSeconds)}` : "новый рекорд"}
                   </span>
                 ) : null}
               </button>
@@ -311,10 +311,7 @@ export function ResultsPanel({
       </div>
 
       {seasons.map(({ year, rows }, index) => {
-        const records = rows.filter((row) => row.is_record).length;
-        const summary = `${rows.length} ${pluralRu(rows.length, "старт", "старта", "стартов")}${
-          records ? ` · ${records} ${pluralRu(records, "рекорд", "рекорда", "рекордов")}` : ""
-        }`;
+        const summary = `${rows.length} ${pluralRu(rows.length, "старт", "старта", "стартов")}`;
         const open = index === 0 || openSeasons.has(year);
         if (!open) {
           const best = rows
@@ -341,7 +338,7 @@ export function ResultsPanel({
           <div key={year}>
             <div className="ds-grp">
               <span>Сезон {year}</span>
-              <b>{summary}</b>
+              <span>{summary}</span>
             </div>
             <div className="ds-list">
               {rows.map((result) => {
@@ -358,19 +355,12 @@ export function ResultsPanel({
                       </span>
                     </div>
                     <div className="ds-v">
-                      {result.is_record ? <span className="rec-dot" aria-label="рекорд" /> : null}
                       {formatRaceTime(result.official_time_seconds)}
                     </div>
                   </button>
                 );
               })}
             </div>
-            {records ? (
-              <p className="rec-legend">
-                <span className="rec-dot" aria-hidden="true" />
-                действующий личный рекорд
-              </p>
-            ) : null}
           </div>
         );
       })}

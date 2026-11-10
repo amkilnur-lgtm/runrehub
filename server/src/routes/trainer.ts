@@ -156,21 +156,49 @@ export async function trainerRoutes(app: FastifyInstance) {
 
   // Оба запроса независимы — запускаем параллельно через Promise.all
   // Очередь «Разбор»: пробежки этой недели без отзыва тренера, от старых к новым
+  // Очередь «Разбор»: пробежки этой недели без отзыва тренера, от старых к новым,
+  // и пробежки за 14 дней, где последнее слово в обсуждении за спортсменом
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
-    const { rows } = await pool.query(
-      `
-        select w.id
-        from workouts w
-        join users u on u.id = w.user_id
-        where u.role = 'athlete' and u.coach_id = $1
-          and w.start_date >= date_trunc('week', now())
-          and not ${HAS_COACH_FEEDBACK_SQL}
-        order by w.start_date asc, w.id asc
-      `,
-      [request.user.id]
-    );
-    return { workoutIds: rows.map((row) => Number(row.id)) };
+    const [pending, replied] = await Promise.all([
+      pool.query(
+        `
+          select w.id, w.start_date
+          from workouts w
+          join users u on u.id = w.user_id
+          where u.role = 'athlete' and u.coach_id = $1
+            and w.start_date >= date_trunc('week', now())
+            and not ${HAS_COACH_FEEDBACK_SQL}
+        `,
+        [request.user.id]
+      ),
+      pool.query(
+        `
+          select w.id, last.created_at, last.body
+          from workouts w
+          join users u on u.id = w.user_id
+          join lateral (
+            select c.author_id, c.created_at, c.body from workout_comments c
+            where c.workout_id = w.id order by c.created_at desc, c.id desc limit 1
+          ) last on true
+          where u.role = 'athlete' and u.coach_id = $1
+            and last.author_id = w.user_id
+            and last.created_at >= now() - interval '14 days'
+            and last.created_at > coalesce(w.coach_comment_updated_at, '-infinity'::timestamptz)
+        `,
+        [request.user.id]
+      )
+    ]);
+    const repliedIds = replied.rows.map((row) => Number(row.id));
+    const pendingIds = pending.rows
+      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+      .map((row) => Number(row.id))
+      .filter((id) => !repliedIds.includes(id));
+    // ответы спортсменов — первыми: на них ждут ответа
+    return {
+      workoutIds: [...repliedIds, ...pendingIds],
+      replies: replied.rows.map((row) => ({ workoutId: Number(row.id), body: String(row.body), created_at: row.created_at }))
+    };
   });
 
   app.get("/api/trainer/starts", { preHandler: requireAuth }, async (request) => {
@@ -688,7 +716,7 @@ export async function trainerRoutes(app: FastifyInstance) {
     const result = await pool.query(
       `
         update workouts w
-        set coach_comment = $3
+        set coach_comment = $3, coach_comment_updated_at = now()
         from users u
         where w.id = $1
           and w.user_id = u.id

@@ -899,22 +899,25 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
         ) : null}
       </div>
 
-      <div className="ds-metrics workout-metrics">
-        <div className="ds-metric">
-          <b>{formatKmShort(data.workout.distance_meters)}</b>
-          <span>км</span>
+      {/* главное число — дистанция, под ним время · темп · пульс (client/DESIGN.md: одно крупное число) */}
+      <div className="workout-stats">
+        <div className="ds-big">
+          {formatKmShort(data.workout.distance_meters)}
+          <small>км</small>
         </div>
-        <div className="ds-metric">
-          <b>{formatDuration(Math.round(data.workout.moving_time_seconds))}</b>
-          <span>время</span>
-        </div>
-        <div className="ds-metric">
-          <b>{formatPace(data.workout.average_speed).replace("/км", "")}</b>
-          <span>темп /км</span>
-        </div>
-        <div className="ds-metric">
-          <b>{data.workout.average_heartrate ? Math.round(data.workout.average_heartrate) : "—"}</b>
-          <span>пульс</span>
+        <div className="workout-stats-row">
+          <div>
+            <span>время</span>
+            <b>{formatDuration(Math.round(data.workout.moving_time_seconds))}</b>
+          </div>
+          <div>
+            <span>темп /км</span>
+            <b>{formatPace(data.workout.average_speed).replace("/км", "")}</b>
+          </div>
+          <div>
+            <span>пульс</span>
+            <b>{data.workout.average_heartrate ? Math.round(data.workout.average_heartrate) : "—"}</b>
+          </div>
         </div>
       </div>
 
@@ -948,11 +951,20 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               </div>
             </div>
           ) : (
-            <div className="ds-pending">Тренер посмотрит</div>
+            <p className="ds-pending">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            Тренер ещё не прокомментировал
+          </p>
           )
         ) : null}
         <div className="workout-discussion">
-          <WorkoutComments workoutId={data.workout.id} viewer={mode} collapsed />
+          <WorkoutComments
+            workoutId={data.workout.id}
+            viewer={mode}
+            collapsed
+            emptyLabel={data.workout.coach_comment?.trim() ? "Ответить" : "Написать комментарий"}
+            hint={mode === "trainer" ? "видят спортсмен и группа" : "видят тренер и группа"}
+          />
         </div>
       </section>
 

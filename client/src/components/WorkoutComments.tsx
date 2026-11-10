@@ -24,9 +24,13 @@ type WorkoutCommentsProps = {
   onCountChange?: (count: number) => void;
   // поле ввода скрыто за текстовой кнопкой «Ответить» (экран тренировки, client/DESIGN.md)
   collapsed?: boolean;
+  // подпись кнопки, пока в обсуждении пусто («Написать тренеру»); иначе — «Ответить»
+  emptyLabel?: string;
+  // кто увидит сообщение — обсуждение общее, не личное
+  hint?: string;
 };
 
-export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false }: WorkoutCommentsProps) {
+export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false, emptyLabel = "Ответить", hint }: WorkoutCommentsProps) {
   const [composerOpen, setComposerOpen] = useState(!collapsed);
   const showToast = useToast();
   const base = viewer === "trainer" ? "/api/trainer" : "/api/athlete";
@@ -132,9 +136,11 @@ export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = 
       )}
       {!composerOpen ? (
         <button type="button" className="ds-btn ds-btn-3 wc-reply" onClick={() => setComposerOpen(true)}>
-          Ответить
+          {comments && comments.length ? "Ответить" : emptyLabel}
         </button>
-      ) : (
+      ) : null}
+      {hint ? <span className="wc-hint">{hint}</span> : null}
+      {composerOpen ? (
       <div className="wc-compose">
         <textarea
           value={text}
@@ -159,7 +165,7 @@ export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = 
           {sending ? "…" : "Отправить"}
         </button>
       </div>
-      )}
+      ) : null}
     </div>
   );
 }
