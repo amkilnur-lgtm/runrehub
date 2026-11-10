@@ -11,6 +11,8 @@ type TelegramWebApp = {
   shareToStory?: (mediaUrl: string, params?: { text?: string }) => void;
   BackButton?: { show: () => void; hide: () => void; onClick: (cb: () => void) => void; offClick: (cb: () => void) => void };
   HapticFeedback?: { impactOccurred: (style: "light" | "medium") => void };
+  // Bot API 7.7+: свайп вниз по странице больше не сворачивает мини-апп
+  disableVerticalSwipes?: () => void;
 };
 
 export function getTelegramWebApp(): TelegramWebApp | null {
@@ -48,6 +50,9 @@ if (isTelegramMiniApp) {
     const webApp = getTelegramWebApp();
     webApp?.ready();
     webApp?.expand();
+    // иначе свайп вниз у верха страницы тянет и закрывает мини-апп вместо прокрутки;
+    // закрыть по-прежнему можно свайпом за шапку Telegram или кнопкой «Закрыть»
+    if (webApp?.isVersionAtLeast?.("7.7")) webApp.disableVerticalSwipes?.();
   };
   document.head.appendChild(script);
 }

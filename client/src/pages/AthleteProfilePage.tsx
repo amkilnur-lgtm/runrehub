@@ -416,7 +416,7 @@ export function AthleteProfilePage() {
                   <span>
                     {formatPace(run.average_speed).replace("/км", "").trim()}
                     {run.average_heartrate
-                      ? ` · ♥ ${Math.round(run.average_heartrate)}`
+                      ? ` · ${Math.round(run.average_heartrate)} уд/мин`
                       : ""}
                   </span>
                 </div>
