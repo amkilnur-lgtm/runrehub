@@ -185,7 +185,7 @@ function RepBars({
         <line x1={2} x2={W - 2} y1={base} y2={base} className="rv-axis" />
       </svg>
       <p className="rv-note">
-        {setIds.some((id) => byTime(id)) ? "Над столбиком — время отрезка (без GPS), " : "Столбик — темп отрезка, "}цифра внутри — пульс в конце.
+        {setIds.some((id) => byTime(id)) ? "Над столбиком — время отрезка, " : "Столбик — темп отрезка, "}цифра внутри — пульс в конце.
       </p>
     </>
   );
