@@ -7,9 +7,7 @@ import {
   buildXAxis,
   clamp,
   distanceResampleOptions,
-  quantile,
-  resampleByDistance,
-  smoothSeries
+  quantile
 } from "./chart-utils";
 import { downsample } from "./chart-utils";
 
@@ -26,9 +24,22 @@ export function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutDat
   const total = streams.distance[streams.distance.length - 1] ?? 0;
   const rawPoints: ChartPoint[] = [];
   const validHr: number[] = [];
-  const samples = streams.time?.length
-    ? resampleByDistance(streams.distance, streams.time, streams.heartrate, distanceResampleOptions(total, "hr"))
-    : [];
+  // пульс не сглаживаем окном: тренеру важен пик в конце отрезка. Берём максимум в каждом шаге
+  // дистанции — пики сохраняются, а стояние на месте (дистанция не растёт) схлопывается в одну точку.
+  const step = distanceResampleOptions(total, "hr").step;
+  const samples: { x: number; value: number }[] = [];
+  let bucketStart = -Infinity;
+  for (let index = 0; index < Math.min(streams.distance.length, streams.heartrate.length); index += 1) {
+    const d = streams.distance[index]!;
+    const hr = streams.heartrate[index]!;
+    if (!Number.isFinite(d) || !Number.isFinite(hr)) continue;
+    if (d - bucketStart >= step || !samples.length) {
+      samples.push({ x: d, value: hr });
+      bucketStart = d;
+    } else if (hr > samples[samples.length - 1]!.value) {
+      samples[samples.length - 1]!.value = hr;
+    }
+  }
   for (const sample of samples) {
     if (!Number.isFinite(sample.value) || sample.value < 60 || sample.value > 230) continue;
     rawPoints.push({ x: sample.x, y: sample.value });
@@ -42,8 +53,9 @@ export function prepareHeartRateChart(streams: StreamSeries, workout: WorkoutDat
   const coreLowHr = quantile(validHr, 0.04);
   const coreHighHr = quantile(validHr, 0.97);
   const minHr = Math.max(60, Math.floor((coreLowHr - 4) / 5) * 5);
-  const maxHr = Math.ceil((Math.max(coreHighHr, (workout?.average_heartrate ?? coreHighHr) + 8) + 4) / 5) * 5;
-  const displaySeries = smoothSeries(rawPoints.map((point) => clamp(point.y, minHr, maxHr)), 3);
+  // верх шкалы — по настоящему максимуму, чтобы пик не срезался
+  const maxHr = Math.ceil((Math.max(coreHighHr, Math.max(...validHr), (workout?.average_heartrate ?? coreHighHr) + 8) + 3) / 5) * 5;
+  const displaySeries = rawPoints.map((point) => clamp(point.y, minHr, maxHr));
   const points = rawPoints.map((point, index) => ({
     x: point.x,
     y: displaySeries[index]!

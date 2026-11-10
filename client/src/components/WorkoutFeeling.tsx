@@ -99,7 +99,6 @@ export function WorkoutFeeling({
           </button>
         ))}
       </div>
-      <p className="feel-note">Видите только вы и тренер</p>
     </section>
   );
 }

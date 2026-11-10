@@ -970,7 +970,6 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
               emptyLabel={
                 mode === "trainer" ? "Написать спортсмену" : data.workout.coach_comment?.trim() ? "Ответить" : "Написать тренеру"
               }
-              hint={mode === "trainer" ? "видите только вы и спортсмен" : "видите только вы и тренер"}
             />
           </div>
         ) : null}
