@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { getClub } from "../lib/club.js";
+import { birthdaySchema } from "./auth.js";
 
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
@@ -57,8 +59,10 @@ const workoutTrimSchema = z.object({
 });
 
 const workoutCommentSchema = z.object({
-  body: z.string().trim().min(1).max(1000)
+  body: z.string().trim().min(1).max(1000),
+  channel: z.enum(["coach", "club"]).default("club")
 });
+const commentChannelQuery = z.object({ channel: z.enum(["coach", "club"]).default("club") });
 
 // Тренировка принадлежит атлету этого тренера
 async function trainerOwnsWorkout(trainerId: number, workoutId: number) {
@@ -158,6 +162,24 @@ export async function trainerRoutes(app: FastifyInstance) {
   // Очередь «Разбор»: пробежки этой недели без отзыва тренера, от старых к новым
   // Очередь «Разбор»: пробежки этой недели без отзыва тренера, от старых к новым,
   // и пробежки за 14 дней, где последнее слово в обсуждении за спортсменом
+  app.get("/api/trainer/club", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["trainer"]);
+    return getClub(request.user.id, request.user.id, true);
+  });
+
+  app.put("/api/trainer/athletes/:id/birthday", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    const body = birthdaySchema.parse(request.body);
+    const { rowCount } = await pool.query(
+      `update users set birthday_day = $3, birthday_month = $4, birthday_hidden = $5
+       where id = $1 and coach_id = $2 and role = 'athlete'`,
+      [athleteId, request.user.id, body.day, body.month, body.hidden]
+    );
+    if (!rowCount) return reply.code(404).send({ message: "Спортсмен не найден" });
+    return { ok: true, ...body };
+  });
+
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
     const [pending, replied] = await Promise.all([
@@ -179,7 +201,7 @@ export async function trainerRoutes(app: FastifyInstance) {
           join users u on u.id = w.user_id
           join lateral (
             select c.author_id, c.created_at, c.body from workout_comments c
-            where c.workout_id = w.id order by c.created_at desc, c.id desc limit 1
+            where c.workout_id = w.id and c.is_private order by c.created_at desc, c.id desc limit 1
           ) last on true
           where u.role = 'athlete' and u.coach_id = $1
             and last.author_id = w.user_id
@@ -1277,10 +1299,11 @@ export async function trainerRoutes(app: FastifyInstance) {
   app.get("/api/trainer/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["trainer"]);
     const workoutId = Number((request.params as { id: string }).id);
+    const { channel } = commentChannelQuery.parse(request.query);
     if (!(await trainerOwnsWorkout(request.user.id, workoutId))) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
-    return { comments: await listWorkoutComments(workoutId, request.user.id, true) };
+    return { comments: await listWorkoutComments(workoutId, request.user.id, true, channel) };
   });
 
   app.post("/api/trainer/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
@@ -1290,8 +1313,8 @@ export async function trainerRoutes(app: FastifyInstance) {
     if (!(await trainerOwnsWorkout(request.user.id, workoutId))) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
-    await addWorkoutComment(workoutId, request.user.id, body.body);
-    return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, true) };
+    await addWorkoutComment(workoutId, request.user.id, body.body, body.channel);
+    return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, true, body.channel) };
   });
 
   // Тренер модерирует: удаляет любой комментарий на тренировках своих атлетов

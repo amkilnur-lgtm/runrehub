@@ -30,9 +30,11 @@ type WorkoutCommentsProps = {
   hint?: string;
   // готовый текст (поздравление со страницы одногруппника) — поле открыто сразу
   initialText?: string;
+  // «coach» — личная переписка спортсмена и тренера, «club» — общие комментарии группы
+  channel?: "coach" | "club";
 };
 
-export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false, emptyLabel = "Ответить", hint, initialText }: WorkoutCommentsProps) {
+export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false, emptyLabel = "Ответить", hint, initialText, channel = "club" }: WorkoutCommentsProps) {
   const [composerOpen, setComposerOpen] = useState(!collapsed || Boolean(initialText));
   const showToast = useToast();
   const base = viewer === "trainer" ? "/api/trainer" : "/api/athlete";
@@ -42,7 +44,7 @@ export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = 
 
   useEffect(() => {
     let cancelled = false;
-    api<{ comments: WorkoutCommentItem[] }>(`${base}/workouts/${workoutId}/comments`)
+    api<{ comments: WorkoutCommentItem[] }>(`${base}/workouts/${workoutId}/comments?channel=${channel}`)
       .then((data) => {
         if (!cancelled) {
           setComments(data.comments);
@@ -70,7 +72,7 @@ export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = 
     try {
       const res = await api<{ ok: true; comments: WorkoutCommentItem[] }>(
         `${base}/workouts/${workoutId}/comments`,
-        { method: "POST", body: JSON.stringify({ body }) }
+        { method: "POST", body: JSON.stringify({ body, channel }) }
       );
       setComments(res.comments);
       onCountChange?.(res.comments.length);

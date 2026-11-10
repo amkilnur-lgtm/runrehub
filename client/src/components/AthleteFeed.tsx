@@ -28,9 +28,11 @@ type AthleteFeedProps = {
   // другой источник ленты, например пробежки одного одногруппника
   endpoint?: string;
   emptyText?: string;
+  // «Клуб» по исследованию — без «Топ-3»: рейтинг объёмов давит на любителей
+  hideLeaders?: boolean;
 };
 
-export function AthleteFeed({ viewer = "athlete", endpoint, emptyText }: AthleteFeedProps) {
+export function AthleteFeed({ viewer = "athlete", endpoint, emptyText, hideLeaders = false }: AthleteFeedProps) {
   const feedEndpoint = endpoint ?? `/api/${viewer}/feed`;
   const { data, loading, error } = useApi<FeedData>(feedEndpoint);
   const [extra, setExtra] = useState<FeedItem[]>([]);
@@ -94,7 +96,7 @@ export function AthleteFeed({ viewer = "athlete", endpoint, emptyText }: Athlete
   const leaders = data.leaders ?? [];
   const shownLeaders = leaderboardOpen && leaderboard !== null ? leaderboard : leaders;
   const leadersBlock =
-    leaders.length > 0 ? (
+    !hideLeaders && leaders.length > 0 ? (
       <section className="card feed-leaders-card">
         <div className="trainer-dashboard-heading">
           <span className="muted trainer-dashboard-eyebrow">

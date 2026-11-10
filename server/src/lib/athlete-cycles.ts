@@ -140,9 +140,14 @@ export async function getAthleteState(athleteId: number) {
         tsb: Math.round(point.tsb * 10) / 10
       }))
     : [];
+  const bd = await pool.query(`select birthday_day, birthday_month, birthday_hidden from users where id = $1`, [athleteId]);
+  const birthday = bd.rows[0]?.birthday_day
+    ? { day: Number(bd.rows[0].birthday_day), month: Number(bd.rows[0].birthday_month), hidden: Boolean(bd.rows[0].birthday_hidden) }
+    : null;
   return {
     fitness,
     fitness_series,
+    birthday,
     next_start_days: next.rows[0] ? Number(next.rows[0].days_left) : null,
     feelings: { hard: Number(rows[0]?.hard ?? 0), pain: Number(rows[0]?.pain ?? 0), marked: Number(rows[0]?.marked ?? 0) }
   };

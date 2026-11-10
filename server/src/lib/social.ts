@@ -306,10 +306,15 @@ export type WorkoutComment = {
 };
 
 // canModerate — тренер удаляет любые комментарии на тренировках своих атлетов
+// channel: «coach» — личная переписка спортсмена и тренера (вызывающий проверяет, что зритель — один из них),
+// «club» — общие комментарии группы
+export type CommentChannel = "coach" | "club";
+
 export async function listWorkoutComments(
   workoutId: number,
   viewerId: number,
-  canModerate: boolean
+  canModerate: boolean,
+  channel: CommentChannel = "club"
 ): Promise<WorkoutComment[]> {
   const { rows } = await pool.query(
     `
@@ -319,10 +324,10 @@ export async function listWorkoutComments(
         u.avatar_url as author_avatar_url, (u.role = 'trainer') as author_is_trainer
       from workout_comments c
       join users u on u.id = c.author_id
-      where c.workout_id = $1
+      where c.workout_id = $1 and c.is_private = $2
       order by c.created_at asc, c.id asc
     `,
-    [workoutId]
+    [workoutId, channel === "coach"]
   );
   return rows.map((r) => ({
     id: r.id as number,
@@ -338,10 +343,10 @@ export async function listWorkoutComments(
   }));
 }
 
-export async function addWorkoutComment(workoutId: number, authorId: number, body: string) {
+export async function addWorkoutComment(workoutId: number, authorId: number, body: string, channel: CommentChannel = "club") {
   const { rows } = await pool.query(
-    `insert into workout_comments (workout_id, author_id, body) values ($1, $2, $3) returning id`,
-    [workoutId, authorId, body]
+    `insert into workout_comments (workout_id, author_id, body, is_private) values ($1, $2, $3, $4) returning id`,
+    [workoutId, authorId, body, channel === "coach"]
   );
   return rows[0]?.id as number;
 }
@@ -428,7 +433,7 @@ async function queryFeed(viewerId: number, groupClause: string, cursor: WorkoutC
         coalesce(wc.corrected_average_heartrate, w.average_heartrate)::float8 as average_heartrate,
         (select count(*) from workout_likes wl where wl.workout_id = w.id)::int as like_count,
         exists(select 1 from workout_likes wl where wl.workout_id = w.id and wl.user_id = $1) as liked_by_me,
-        (select count(*) from workout_comments cm where cm.workout_id = w.id)::int as comment_count
+        (select count(*) from workout_comments cm where cm.workout_id = w.id and not cm.is_private)::int as comment_count
       from workouts w
       join users a on a.id = w.user_id
       join users me on me.id = $1

@@ -1,3 +1,4 @@
+import { notifyCoachesAboutBirthdays } from "./lib/club.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -248,6 +249,7 @@ setInterval(() => {
   void enqueueWeeklyTelegramReports(new Date(), app.log)
     .then(() => enqueueMonthlyTelegramReports(new Date(), app.log))
     .then(() => processPendingTelegramNotifications(app.log))
+    .then(() => notifyCoachesAboutBirthdays())
     .catch((error) => {
       app.log.error({ err: error }, "telegram notification worker tick failed");
     });

@@ -959,17 +959,23 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           </p>
           )
         ) : null}
-        <div className="workout-discussion">
-          <WorkoutComments
-            workoutId={data.workout.id}
-            viewer={mode}
-            collapsed
-            emptyLabel={data.workout.coach_comment?.trim() ? "Ответить" : "Написать комментарий"}
-            hint={mode === "trainer" ? "видят спортсмен и группа" : "видят тренер и группа"}
-            initialText={sayText}
-          />
-        </div>
+        {/* переписка спортсмена и тренера — личная, одногруппники её не видят */}
+        {mode === "trainer" || canEdit ? (
+          <div className="workout-discussion">
+            <WorkoutComments
+              workoutId={data.workout.id}
+              viewer={mode}
+              collapsed
+              channel="coach"
+              emptyLabel={
+                mode === "trainer" ? "Написать спортсмену" : data.workout.coach_comment?.trim() ? "Ответить" : "Написать тренеру"
+              }
+              hint={mode === "trainer" ? "видите только вы и спортсмен" : "видите только вы и тренер"}
+            />
+          </div>
+        ) : null}
       </section>
+
 
       {mode === "trainer" || canEdit ? (
         <WorkoutFeeling workoutId={data.workout.id} feeling={data.feeling} editable={mode === "athlete" && canEdit} />
@@ -1076,6 +1082,20 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             { from: 162, to: 240, color: "var(--hrz-4-bg)" }
           ]}
           footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
+        />
+      </section>
+
+      {/* общие комментарии клуба: поздравления, поддержка одногруппников */}
+      <section className="ds-block ds-pad workout-club" aria-label="Комментарии клуба">
+        <b className="workout-club-t">Комментарии клуба</b>
+        <WorkoutComments
+          workoutId={data.workout.id}
+          viewer={mode}
+          collapsed
+          channel="club"
+          emptyLabel="Написать комментарий"
+          hint="видят все в клубе"
+          initialText={sayText}
         />
       </section>
 

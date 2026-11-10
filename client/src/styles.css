@@ -4467,3 +4467,36 @@ button.ds-li.fit-row:disabled { cursor: default; }
 .mate-lh { display: block; padding: 14px 16px 4px; font-size: 15px; font-weight: 800; }
 .mate .ds-list .ds-li { padding-top: 12px; padding-bottom: 12px; }
 .cy-toggle span { font-size: 12.5px; }
+.workout-club { display: flex; flex-direction: column; gap: 8px; }
+.workout-club-t { font-size: 15px; font-weight: 800; }
+.workout-coach:empty { display: none; }
+
+/* Клуб: день рождения, состав */
+.club-today { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.club-today b { display: block; font-size: 16px; font-weight: 800; }
+.club-today-row > div > span, .club-today > span { display: block; font-size: 13.5px; color: var(--ink-muted); font-weight: 600; margin-top: 2px; }
+.club-today-row { display: flex; gap: 12px; align-items: center; }
+.ds-li .club-av, .club-today .club-av { width: 40px; height: 40px; flex: none; font-size: 14px; }
+.club-dd { width: 40px; text-align: center; flex: none; }
+.club-dd b { display: block; font-size: 19px; font-weight: 800; line-height: 1; }
+.club-dd span { font-size: 11.5px; color: var(--ink-muted); font-weight: 700; }
+.club-me { color: var(--ink-muted); font-weight: 600; font-size: 13px; }
+.club-chev { flex: none; width: 8px; height: 8px; border-right: 2px solid var(--ink-muted); border-bottom: 2px solid var(--ink-muted); transform: rotate(-45deg); margin-right: 4px; }
+.club-ask { display: flex; flex-direction: column; gap: 2px; width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
+.club-ask b { color: var(--accent); font-size: 15px; }
+.club-ask span { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+/* Окно дня рождения */
+.bd-backdrop { position: fixed; inset: 0; z-index: 60; background: rgb(10 14 28 / .45); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+@media (min-width: 640px) { .bd-backdrop { align-items: center; } }
+.bd-sheet { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
+.bd-title { font-size: 18px; font-weight: 800; }
+.bd-row { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.bd-row label { display: flex; flex-direction: column; gap: 4px; }
+.bd-row span { font-size: 12.5px; color: var(--ink-muted); font-weight: 700; }
+.bd-row select { height: 44px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; padding: 0 10px; }
+.bd-check { display: flex; gap: 10px; align-items: center; font-weight: 700; min-height: 44px; }
+.bd-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.bd-note { margin: -6px 0 0; font-size: 13px; color: var(--ink-muted); line-height: 1.45; }
+.bd-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.bd-clear { margin-left: auto; color: var(--danger-ink); }
+.athlete-bd { display: inline-block; margin-top: 4px; padding: 4px 0; background: none; border: 0; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--accent); cursor: pointer; }

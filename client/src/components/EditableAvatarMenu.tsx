@@ -5,6 +5,7 @@ import { User } from "../types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
+import { BirthdayDialog } from "./BirthdayDialog";
 import { UserAvatar } from "./UserAvatar";
 
 type EditableAvatarMenuProps = {
@@ -17,6 +18,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
   const { fullName, avatarUrl, className } = props;
   const { setUser } = useAuth();
   const showToast = useToast();
+  const [birthdayOpen, setBirthdayOpen] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isAvatarBusy, setIsAvatarBusy] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(avatarUrl ?? null);
@@ -145,6 +147,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
           onConfirm={handleCropConfirm}
         />
       ) : null}
+      {birthdayOpen ? <BirthdayDialog endpoint="/api/auth/birthday" onClose={() => setBirthdayOpen(false)} /> : null}
       {isAvatarMenuOpen ? (
         <div className="avatar-menu-popover">
           <button
@@ -154,6 +157,16 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
             onClick={handleAvatarPickClick}
           >
             {currentAvatarUrl ? "Изменить фото" : "Загрузить фото"}
+          </button>
+          <button
+            type="button"
+            className="avatar-menu-item"
+            onClick={() => {
+              setIsAvatarMenuOpen(false);
+              setBirthdayOpen(true);
+            }}
+          >
+            День рождения
           </button>
           {currentAvatarUrl ? (
             <button

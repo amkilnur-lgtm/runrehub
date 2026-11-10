@@ -14,6 +14,7 @@ import {
   ResultsPanel,
 } from "../components/Results";
 import { useToast } from "../components/ToastProvider";
+import { BirthdayDialog } from "../components/BirthdayDialog";
 import { UserAvatar } from "../components/UserAvatar";
 import { forgetApiCache, useApi } from "../hooks/useApi";
 import {
@@ -68,6 +69,7 @@ type State = {
   note: string;
   next_start_days: number | null;
   fitness_series: { date: string; ctl: number; atl: number; tsb: number }[];
+  birthday: { day: number; month: number; hidden: boolean } | null;
 };
 type Profile = {
   athlete: { id: number; full_name: string; avatar_url: string | null };
@@ -80,6 +82,21 @@ type Profile = {
     has_feedback?: boolean;
   }[];
 };
+
+const MONTHS_GEN = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
 
 const LEVELS: { value: CycleLevel; label: string }[] = [
   { value: "week", label: "Неделя" },
@@ -830,12 +847,13 @@ export function TrainerAthletePage() {
   const { data: profile, error } = useApi<Profile>(
     `/api/trainer/athletes/${athleteId}`,
   );
-  const { data: state } = useApi<State>(
+  const { data: state, refresh: refreshState } = useApi<State>(
     `/api/trainer/athletes/${athleteId}/state`,
   );
   const [showAll, setShowAll] = useState(false);
   // какая строка «Состояния» раскрыта с графиком
   const [fitOpen, setFitOpen] = useState<"tsb" | "ctl" | null>(null);
+  const [birthdayOpen, setBirthdayOpen] = useState(false);
 
   if (error) {
     return (
@@ -926,8 +944,28 @@ export function TrainerAthletePage() {
               ? `последняя пробежка ${formatAgo(latest.start_date)}`
               : "пробежек пока нет"}
           </p>
+          {state ? (
+            <button
+              type="button"
+              className="athlete-bd"
+              onClick={() => setBirthdayOpen(true)}
+            >
+              {state.birthday
+                ? `день рождения ${state.birthday.day} ${MONTHS_GEN[state.birthday.month - 1]}${state.birthday.hidden ? " · скрыт от клуба" : ""}`
+                : "+ день рождения"}
+            </button>
+          ) : null}
         </div>
       </div>
+      {birthdayOpen ? (
+        <BirthdayDialog
+          endpoint={`/api/trainer/athletes/${athleteId}/birthday`}
+          initial={state?.birthday ?? { day: null, month: null, hidden: false }}
+          title={`День рождения · ${profile.athlete.full_name}`}
+          onClose={() => setBirthdayOpen(false)}
+          onSaved={() => refreshState()}
+        />
+      ) : null}
 
       <div>
         <div className="ds-grp">

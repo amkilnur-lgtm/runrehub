@@ -26,6 +26,17 @@ function verifiedTelegramUser(initData: string | undefined) {
   return verifyTelegramInitData(initData, config.TELEGRAM_BOT_TOKEN);
 }
 
+export const birthdaySchema = z
+  .object({
+    day: z.number().int().min(1).max(31).nullable(),
+    month: z.number().int().min(1).max(12).nullable(),
+    hidden: z.boolean().default(false)
+  })
+  .refine((value) => (value.day === null) === (value.month === null), { message: "Укажите день и месяц" })
+  .refine((value) => value.day === null || value.day <= new Date(2024, value.month!, 0).getDate(), {
+    message: "Такой даты нет"
+  });
+
 const avatarUploadSchema = z.object({
   imageDataUrl: z.string().min(1)
 });
@@ -103,6 +114,29 @@ export async function authRoutes(app: FastifyInstance) {
       return { user };
     }
   );
+
+  // День рождения — только день и месяц; hidden — не показывать клубу (тренер видит всегда)
+  app.get("/api/auth/birthday", { preHandler: requireAuth }, async (request) => {
+    const { rows } = await pool.query(
+      `select birthday_day, birthday_month, birthday_hidden from users where id = $1`,
+      [request.user.id]
+    );
+    const row = rows[0];
+    return {
+      day: row?.birthday_day ?? null,
+      month: row?.birthday_month ?? null,
+      hidden: Boolean(row?.birthday_hidden)
+    };
+  });
+
+  app.put("/api/auth/birthday", { preHandler: requireAuth }, async (request) => {
+    const body = birthdaySchema.parse(request.body);
+    await pool.query(
+      `update users set birthday_day = $2, birthday_month = $3, birthday_hidden = $4 where id = $1`,
+      [request.user.id, body.day, body.month, body.hidden]
+    );
+    return { ok: true, ...body };
+  });
 
   app.post("/api/auth/logout", async (_request, reply) => {
     clearAuthCookie(reply);

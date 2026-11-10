@@ -60,7 +60,7 @@ export function TrainerReviewPage() {
     try {
       if (athleteReply) {
         // ответ на сообщение спортсмена — в обсуждение пробежки
-        await api(`/api/trainer/workouts/${currentId}/comments`, { method: "POST", body: JSON.stringify({ body: comment.trim() }) });
+        await api(`/api/trainer/workouts/${currentId}/comments`, { method: "POST", body: JSON.stringify({ body: comment.trim(), channel: "coach" }) });
       } else {
         await api(`/api/trainer/workouts/${currentId}/comment`, { method: "PUT", body: JSON.stringify({ coachComment: comment.trim() }) });
       }

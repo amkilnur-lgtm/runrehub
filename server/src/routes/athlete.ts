@@ -11,6 +11,7 @@ import { pool } from "../lib/db.js";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
 import { config } from "../config.js";
 import { getTeammateProfile } from "../lib/teammate-profile.js";
+import { getClub } from "../lib/club.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
   downsampleRoute,
@@ -41,8 +42,10 @@ const workoutRenameSchema = z.object({
 });
 
 const workoutCommentSchema = z.object({
-  body: z.string().trim().min(1).max(1000)
+  body: z.string().trim().min(1).max(1000),
+  channel: z.enum(["coach", "club"]).default("club")
 });
+const commentChannelQuery = z.object({ channel: z.enum(["coach", "club"]).default("club") });
 
 const WORKOUTS_PAGE_SIZE = 10;
 
@@ -180,6 +183,11 @@ async function getAthleteHighlights(userId: number) {
         }
       : null
   };
+}
+
+async function isOwnWorkout(userId: number, workoutId: number) {
+  const { rowCount } = await pool.query(`select 1 from workouts where id = $1 and user_id = $2`, [workoutId, userId]);
+  return Boolean(rowCount);
 }
 
 async function notifyCoachAboutComment(workoutId: number, authorId: number, body: string) {
@@ -437,6 +445,14 @@ export async function athleteRoutes(app: FastifyInstance) {
     return overview;
   });
 
+  app.get("/api/athlete/club", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const { rows } = await pool.query(`select coach_id from users where id = $1`, [request.user.id]);
+    const coachId = rows[0]?.coach_id;
+    if (!coachId) return reply.code(404).send({ message: "Вы пока не в группе" });
+    return getClub(request.user.id, Number(coachId), false);
+  });
+
   app.get("/api/athlete/athletes/:id/profile", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["athlete"]);
     const athleteId = Number((request.params as { id: string }).id);
@@ -521,10 +537,13 @@ export async function athleteRoutes(app: FastifyInstance) {
   app.get("/api/athlete/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["athlete"]);
     const workoutId = Number((request.params as { id: string }).id);
+    const { channel } = commentChannelQuery.parse(request.query);
     if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
-    return { comments: await listWorkoutComments(workoutId, request.user.id, false) };
+    // личную переписку с тренером видит только хозяин пробежки
+    if (channel === "coach" && !(await isOwnWorkout(request.user.id, workoutId))) return { comments: [] };
+    return { comments: await listWorkoutComments(workoutId, request.user.id, false, channel) };
   });
 
   app.post("/api/athlete/workouts/:id/comments", { preHandler: requireAuth }, async (request, reply) => {
@@ -534,12 +553,17 @@ export async function athleteRoutes(app: FastifyInstance) {
     if (!(await isWorkoutInGroup(request.user.id, workoutId))) {
       return reply.code(404).send({ message: "Тренировка не найдена" });
     }
-    await addWorkoutComment(workoutId, request.user.id, body.body);
-    // спортсмен написал в обсуждение своей пробежки — сообщаем тренеру в Telegram
-    void notifyCoachAboutComment(workoutId, request.user.id, body.body).catch((error) =>
-      request.log.warn({ err: error }, "comment notification failed")
-    );
-    return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, false) };
+    if (body.channel === "coach" && !(await isOwnWorkout(request.user.id, workoutId))) {
+      return reply.code(403).send({ message: "Писать тренеру можно только под своей пробежкой" });
+    }
+    await addWorkoutComment(workoutId, request.user.id, body.body, body.channel);
+    // спортсмен написал тренеру под своей пробежкой — сообщаем тренеру в Telegram
+    if (body.channel === "coach") {
+      void notifyCoachAboutComment(workoutId, request.user.id, body.body).catch((error) =>
+        request.log.warn({ err: error }, "comment notification failed")
+      );
+    }
+    return { ok: true, comments: await listWorkoutComments(workoutId, request.user.id, false, body.channel) };
   });
 
   app.delete("/api/athlete/comments/:id", { preHandler: requireAuth }, async (request, reply) => {
