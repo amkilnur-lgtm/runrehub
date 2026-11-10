@@ -44,10 +44,39 @@ function RepBars({
 }) {
   // серия отрезка (6×400 и 1000 м — разные серии): разброс и цвет считаем внутри серии
   const setOf = new Map<number, number>();
-  structure?.segments.forEach((segment) => segment.lap_ids.forEach((id) => setOf.set(id, segment.set_index)));
+  structure?.segments.forEach((segment) =>
+    segment.lap_ids.forEach((id) => setOf.set(id, segment.set_index)),
+  );
   const reps = laps
-    .map((lap) => ({ pace: lap.average_speed ? 1000 / lap.average_speed : null, hr: endHeartRate(lap, streams), set: setOf.get(lap.id) ?? 0 }))
-    .filter((rep): rep is { pace: number; hr: number | null; set: number } => rep.pace !== null && rep.pace > 120 && rep.pace < 900);
+    .map((lap) => ({
+      pace: lap.average_speed ? 1000 / lap.average_speed : null,
+      hr: endHeartRate(lap, streams),
+      set: setOf.get(lap.id) ?? 0,
+      seconds: lap.average_speed
+        ? Math.min(
+            lap.distance_meters / lap.average_speed,
+            lap.elapsed_time_seconds,
+          )
+        : lap.elapsed_time_seconds,
+    }))
+    .filter(
+      (
+        rep,
+      ): rep is {
+        pace: number;
+        hr: number | null;
+        set: number;
+        seconds: number;
+      } => rep.pace !== null && rep.pace > 120 && rep.pace < 900,
+    );
+  const byTime = (setIndex: number) =>
+    Boolean(structure?.sets[setIndex]?.by_time);
+  const dur = (seconds: number) => {
+    const t = Math.round(seconds);
+    return t < 60
+      ? `${t} с`
+      : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  };
   if (reps.length < 2) return null;
   const fast = Math.min(...reps.map((rep) => rep.pace));
   const slow = Math.max(...reps.map((rep) => rep.pace));
@@ -58,21 +87,37 @@ function RepBars({
   const setIds = [...new Set(reps.map((rep) => rep.set))];
   const sets = setIds.map((id) => {
     const items = reps.filter((rep) => rep.set === id);
-    const label = structure?.sets[id]?.label || (items.length > 1 ? `${items.length} отрезков` : "отрезок");
+    const label =
+      structure?.sets[id]?.label ||
+      (items.length > 1 ? `${items.length} отрезков` : "отрезок");
     const lo = Math.min(...items.map((rep) => rep.pace));
     const hi = Math.max(...items.map((rep) => rep.pace));
     return { id, items, label, lo, hi };
   });
   const main = sets.slice().sort((a, b) => b.items.length - a.items.length)[0]!;
-  const setText = (set: (typeof sets)[number]) =>
+  const setText = (set: (typeof sets)[number]) => {
+    if (byTime(set.id)) {
+      const lo = Math.min(...set.items.map((rep) => rep.seconds));
+      const hi = Math.max(...set.items.map((rep) => rep.seconds));
+      return set.items.length < 2
+        ? `${set.label}`
+        : `${set.label}: ${dur(lo)}–${dur(hi)}`;
+    }
+    return setTextPace(set);
+  };
+  const setTextPace = (set: (typeof sets)[number]) =>
     set.items.length < 2
       ? `${set.label} — ${pace(set.lo)} /км`
       : `${set.label}: ${pace(set.lo)}–${pace(set.hi)} /км${set.hi - set.lo <= 8 ? ", ровно" : `, разброс ${Math.round(set.hi - set.lo)} с`}`;
-  const mainHr = main.items.map((rep) => rep.hr).filter((value): value is number => value !== null);
+  const mainHr = main.items
+    .map((rep) => rep.hr)
+    .filter((value): value is number => value !== null);
   const conclusion =
     (sets.length > 1 ? sets.map(setText).join(". ") : setText(main)) +
     "." +
-    (mainHr.length >= 2 ? ` Пульс в конце${sets.length > 1 ? ` (${main.label})` : ""}: ${mainHr[0]} → ${mainHr[mainHr.length - 1]}.` : "");
+    (mainHr.length >= 2
+      ? ` Пульс в конце${sets.length > 1 ? ` (${main.label})` : ""}: ${mainHr[0]} → ${mainHr[mainHr.length - 1]}.`
+      : "");
   void hrs;
 
   const W = 320;
@@ -113,7 +158,7 @@ function RepBars({
                   textAnchor="middle"
                   className="rv-lbl"
                 >
-                  {pace(rep.pace)}
+                  {byTime(rep.set) ? dur(rep.seconds) : pace(rep.pace)}
                 </text>
               ) : null}
               {showLabels && rep.hr && h > 20 ? (
@@ -140,7 +185,7 @@ function RepBars({
         <line x1={2} x2={W - 2} y1={base} y2={base} className="rv-axis" />
       </svg>
       <p className="rv-note">
-        Столбик — темп отрезка, цифра внутри — пульс в конце.
+        {setIds.some((id) => byTime(id)) ? "Над столбиком — время отрезка (без GPS), " : "Столбик — темп отрезка, "}цифра внутри — пульс в конце.
       </p>
     </>
   );
@@ -292,7 +337,11 @@ export function ReviewChart({
   if (workLaps.length >= 2) {
     return (
       <section className="ds-block ds-pad rv" aria-label="Отрезки">
-        <RepBars laps={workLaps} streams={workout.streams} structure={workout.structure} />
+        <RepBars
+          laps={workLaps}
+          streams={workout.streams}
+          structure={workout.structure}
+        />
       </section>
     );
   }

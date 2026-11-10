@@ -1869,7 +1869,7 @@ export function applyWorkoutCorrectionToView(
       },
       laps,
       streams,
-      structure: detectWorkoutIntervals(laps, workout as { average_speed?: number | null })
+      structure: detectWorkoutIntervals(laps, workout as { average_speed?: number | null }, { noGps: !streams?.latlng?.length })
     };
   }
 
@@ -1897,9 +1897,11 @@ export function applyWorkoutCorrectionToView(
     },
     laps: correctedLaps,
     streams: correctedStreams,
-    structure: detectWorkoutIntervals(correctedLaps, {
-      average_speed: correction.corrected_average_speed
-    })
+    structure: detectWorkoutIntervals(
+      correctedLaps,
+      { average_speed: correction.corrected_average_speed },
+      { noGps: !(correctedStreams as ActivityStreams | null)?.latlng?.length }
+    )
   };
 }
 

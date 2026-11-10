@@ -87,6 +87,8 @@ export type WorkoutStructure = {
     moving_time_seconds: number;
     average_heartrate: number | null;
     label: string;
+    // серия по времени (манеж без GPS): главное число отрезка — время, не темп
+    by_time?: boolean;
   }>;
   segments: Array<{
     set_index: number;

@@ -111,9 +111,27 @@ function paceOf(speed: number | null | undefined) {
   return speed && speed > 0 ? 1000 / speed : null;
 }
 
+// время движения круга: при стоянке внутри круга elapsed включает отдых
+export function lapMovingSeconds(lap: WorkoutData["laps"][number]) {
+  return lap.average_speed ? Math.min(lap.distance_meters / lap.average_speed, lap.elapsed_time_seconds) : lap.elapsed_time_seconds;
+}
+
+// круги серий «по времени»
+export function timedLaps(structure: WorkoutData["structure"]) {
+  const ids = new Set<number>();
+  structure?.segments.forEach((segment) => {
+    if (structure.sets[segment.set_index]?.by_time) segment.lap_ids.forEach((id) => ids.add(id));
+  });
+  return ids;
+}
+
 export function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps"], structure: WorkoutData["structure"]) {
   // несколько серий — по серии на каждую: «5×800 м — 4:12, 5×200 м — 3:29»
   // у серий без названия (GPS разбросал дистанцию) — просто число рабочих отрезков
+  // серии по времени (манеж без GPS) — без темпа: «3×4:11, 4×15 с»
+  if (structure && structure.sets.length && structure.sets.every((set) => set.by_time && set.label)) {
+    return structure.sets.map((set) => set.label).join(", ");
+  }
   if (structure && structure.sets.some((set) => !set.label)) {
     const count = workLaps.length;
     return `${count} ${pluralRu(count, "рабочий отрезок", "рабочих отрезка", "рабочих отрезков")}`;
@@ -257,6 +275,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
     () => new Set(data?.structure?.work_lap_ids ?? []),
     [data?.structure]
   );
+  const timedLapIds = useMemo(() => timedLaps(data?.structure ?? null), [data?.structure]);
 
   useEffect(() => {
     setCoachComment(data?.workout.coach_comment ?? "");
@@ -1029,11 +1048,18 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
                   {/* в «Рабочих» отрезки нумеруются подряд, как подписи над графиком */}
                   <td>{index + 1}</td>
                   <td>{formatLapDistanceKilometers(lap.distance_meters).replace(".", ",")}</td>
-                  <td>{formatLapTime(lap.elapsed_time_seconds)}</td>
+                  <td>
+                    {/* серия по времени (манеж без GPS) — выделяем время движения отрезка, а не темп */}
+                    {timedLapIds.has(lap.id) ? (
+                      <span className="lap-pace">{formatLapTime(lapMovingSeconds(lap))}</span>
+                    ) : (
+                      formatLapTime(lap.elapsed_time_seconds)
+                    )}
+                  </td>
                   <td>
                     {/* темп рабочего отрезка — плашкой цвета темпа, как полосы на графике */}
                     {/* без интервалов выделяем темп всех кругов, с интервалами — только рабочих */}
-                    {(!data.structure && lap.distance_meters >= 100) || workLapIds.has(lap.id) ? (
+                    {!timedLapIds.has(lap.id) && ((!data.structure && lap.distance_meters >= 100) || workLapIds.has(lap.id)) ? (
                       <span className="lap-pace">{formatPace(lap.average_speed).replace("/км", "")}</span>
                     ) : (
                       formatPace(lap.average_speed).replace("/км", "")

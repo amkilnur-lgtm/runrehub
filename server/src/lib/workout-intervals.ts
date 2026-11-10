@@ -27,6 +27,8 @@ export type WorkoutIntervalSet = {
   moving_time_seconds: number;
   average_heartrate: number | null;
   label: string;
+  // серия по времени: без GPS (манеж) или GPS разбросал дистанцию — главное число отрезка время, не темп
+  by_time: boolean;
 };
 
 export type WorkoutIntervalSegment = {
@@ -263,10 +265,22 @@ function isSoloWorkBlock(block: Block, averagePace: number, slowestRepeatPace: n
   );
 }
 
+// «15 с», «45 с», «4:10», «3 мин»
+function formatDurationLabel(seconds: number) {
+  const s = Math.round(seconds);
+  if (s < 60) return `${s} с`;
+  if (s % 60 <= 3 || s % 60 >= 57) return `${Math.round(s / 60)} мин`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export function detectWorkoutIntervals(
   laps: WorkoutIntervalLap[],
-  workout: { average_speed?: number | null } | null
+  workout: { average_speed?: number | null } | null,
+  options: { noGps?: boolean } = {}
 ): WorkoutStructure | null {
+  // без GPS (манеж) дистанция — с акселерометра: отрезки размечаем по времени, короткие ускорения тоже
+  const minRepSeconds = options.noGps ? 8 : P.MIN_REP_SECONDS;
+  const minTimedSeconds = options.noGps ? 8 : P.TIMED_MIN_SECONDS;
   const prepared = prepareLaps(laps ?? []);
   if (prepared.length < P.MIN_LAPS) {
     return null;
@@ -290,7 +304,7 @@ export function detectWorkoutIntervals(
   }
 
   const candidates = blocks.filter((block, index) => {
-    if (block.distance < P.MIN_REP_METERS || block.moving < P.MIN_REP_SECONDS) {
+    if (block.distance < (options.noGps ? 30 : P.MIN_REP_METERS) || block.moving < minRepSeconds) {
       return false;
     }
 
@@ -317,7 +331,7 @@ export function detectWorkoutIntervals(
   // Сначала серии по времени: повторы одной длительности, быстрее среднего темпа
   const timedSets: Block[][] = [];
   for (const block of [...candidates].sort((a, b) => a.moving - b.moving)) {
-    if (block.moving < P.TIMED_MIN_SECONDS || block.pace > averagePace * P.SET_PACE_VS_AVERAGE) {
+    if (block.moving < minTimedSeconds || block.pace > averagePace * P.SET_PACE_VS_AVERAGE) {
       continue;
     }
     const fit = timedSets.find((cluster) => {
@@ -567,13 +581,14 @@ export function detectWorkoutIntervals(
       pace_seconds_per_km: Math.round(setPace),
       moving_time_seconds: Math.round(median(cluster.map((item) => item.moving))),
       average_heartrate: setHeartRates.length ? Math.round(median(setHeartRates)) : null,
-      // серию, собранную по времени (GPS разбросал дистанцию), не называем: «5×3 мин»
-      // не похоже на то, что бежал спортсмен, а честной дистанции у неё нет
-      label: acceptedTimed.includes(cluster)
-        ? ""
-        : cluster.length > 1
-          ? `${cluster.length}×${formatDistanceLabel(setDistance)}`
-          : formatDistanceLabel(setDistance)
+      // серия по времени (манеж без GPS или GPS разбросал дистанцию) — называем длительностью: «4×15 с»
+      label:
+        options.noGps || acceptedTimed.includes(cluster)
+          ? `${cluster.length > 1 ? `${cluster.length}×` : ""}${formatDurationLabel(median(cluster.map((item) => item.moving)))}`
+          : cluster.length > 1
+            ? `${cluster.length}×${formatDistanceLabel(setDistance)}`
+            : formatDistanceLabel(setDistance),
+      by_time: Boolean(options.noGps) || acceptedTimed.includes(cluster)
     });
 
     for (const block of cluster) {

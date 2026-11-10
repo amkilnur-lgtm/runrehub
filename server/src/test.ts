@@ -853,4 +853,14 @@ await runTest("pace zones: Daniels threshold from a race and zone split", () => 
   assert.deepEqual(zones.slice(1), [0, 0, 0, 0]);
 });
 
+await runTest("interval detector: indoor run without GPS is labelled by rep time", () => {
+  // манеж 10.11.2026: 3 отрезка ~4 мин и 4 ускорения по 15 с, дистанция — с акселерометра
+  const rows = [[1006,355,353],[1000,423,350],[1003,326,325],[942,541,264],[20,122,1792],[901,253,281],[25,121,1000],[910,251,276],[26,208,1211],[100,18,179],[56,80,503],[77,15,196],[43,89,634],[80,16,199],[50,74,360],[69,14,204],[72,10,139]];
+  const laps = rows.map(([m, sec, pace], i) => ({ id: i + 1, distance_meters: m!, elapsed_time_seconds: sec!, average_speed: 1000 / pace!, average_heartrate: 140 }));
+  const structure = intervalsDetectorModule.detectWorkoutIntervals(laps, { average_speed: 3.06 }, { noGps: true });
+  assert.ok(structure);
+  assert.deepEqual(structure.sets.map((set) => set.label), ["3×4:11", "4×15 с"]);
+  assert.ok(structure.sets.every((set) => set.by_time));
+});
+
 console.log("All server tests passed.");
