@@ -357,35 +357,32 @@ function CyclesBlock({
                   : "по неделям, 26 недель"}
             </span>
           </div>
-          <div className="cy-m3">
+          {/* как в макете: подпись над числом, три колонки через разделители */}
+          <div className="workout-stats-row cy-stats">
             <div>
-              <b>
-                {formatKm(cycles.totals.distance_meters)}
-                <small>км</small>
-              </b>
+              <span>км</span>
+              <b>{formatKm(cycles.totals.distance_meters)}</b>
+            </div>
+            <div>
               <span>
                 {level === "season"
-                  ? `ср. ${formatKm(cycles.totals.distance_meters / cycles.bars.length)} км/нед`
-                  : `${cycles.totals.workout_count} ${pluralRu(cycles.totals.workout_count, "пробежка", "пробежки", "пробежек")}`}
+                  ? "км в неделю"
+                  : pluralRu(
+                      cycles.totals.workout_count,
+                      "пробежка",
+                      "пробежки",
+                      "пробежек",
+                    )}
               </span>
+              <b>
+                {level === "season"
+                  ? formatKm(cycles.totals.distance_meters / cycles.bars.length)
+                  : cycles.totals.workout_count}
+              </b>
             </div>
             <div>
-              {/* «1 м» читается как ошибка — мелкий набор не показываем */}
-              {cycles.totals.elevation_gain >= 10 ? (
-                <b>
-                  {Math.round(cycles.totals.elevation_gain).toLocaleString(
-                    "ru-RU",
-                  )}
-                  <small>м</small>
-                </b>
-              ) : (
-                <b>—</b>
-              )}
-              <span>набор</span>
-            </div>
-            <div>
-              <b>{hoursMinutes(cycles.totals.moving_time_seconds)}</b>
               <span>время</span>
+              <b>{hoursMinutes(cycles.totals.moving_time_seconds)}</b>
             </div>
           </div>
           {compareSentence(
@@ -604,36 +601,40 @@ function CyclesBlock({
   );
 }
 
-// Форма (42 дня) и усталость (7 дней) линиями, под ними свежесть по дням столбиками.
-// Пунктиры — границы «свежий» (+5) и «перегруз» (−30), как у зон свежести.
+// Форма (42 дня) и усталость (7 дней) линиями, под ними свежесть по дням столбиками —
+// как в утверждённом макете: шкала линий по их диапазону, столбики свежести цветом зоны
+// (зелёный — свежий, оранжевый — перегруз, серый — обычная работа).
 function FitnessChart({ series }: { series: State["fitness_series"] }) {
   if (series.length < 14)
     return <p className="ds-sub">Мало данных о нагрузке для графика.</p>;
-  const W = 320;
-  const top = 6;
-  const lineH = 96;
-  const tsbTop = lineH + top + 22;
-  const tsbH = 44;
+  const W = 328;
+  const top = 8;
+  const lineH = 100;
+  const tsbTop = top + lineH + 26;
+  const tsbH = 40;
   const n = series.length;
-  const x = (i: number) => 2 + (i * (W - 4)) / (n - 1);
-  const hi = Math.max(...series.map((p) => Math.max(p.ctl, p.atl)), 10) * 1.08;
-  const y = (v: number) => top + lineH - (v / hi) * lineH;
+  const x = (i: number) => 4 + (i * (W - 8)) / (n - 1);
+  const values = series.flatMap((p) => [p.ctl, p.atl]);
+  const span = Math.max(Math.max(...values) - Math.min(...values), 10);
+  const lo = Math.max(0, Math.min(...values) - span * 0.12);
+  const hi = Math.max(...values) + span * 0.08;
+  const y = (v: number) => top + lineH - ((v - lo) / (hi - lo)) * lineH;
   const line = (key: "ctl" | "atl") =>
     series
       .map(
         (p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`,
       )
       .join(" ");
-  const tsbMax = Math.max(35, ...series.map((p) => Math.abs(p.tsb)));
+  const tsbMax = Math.max(14, ...series.map((p) => Math.abs(p.tsb)));
   const mid = tsbTop + tsbH / 2;
   const ty = (v: number) => mid - (v / tsbMax) * (tsbH / 2);
   const last = series[n - 1]!;
-  const first = new Date(series[0]!.date);
-  const midDate = new Date(series[Math.floor(n / 2)]!.date);
   const label = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  const weekTicks = series
-    .map((p, i) => (i % 14 === 0 ? i : -1))
+  const ticks = series
+    .map((_, i) => (i % 14 === 0 ? i : -1))
     .filter((i) => i >= 0);
+  const tone = (tsb: number) =>
+    tsb > 5 ? "is-fresh" : tsb < -30 ? "is-over" : "";
   return (
     <svg
       className="fit-chart"
@@ -641,7 +642,7 @@ function FitnessChart({ series }: { series: State["fitness_series"] }) {
       role="img"
       aria-label={`Форма ${Math.round(last.ctl)}, усталость ${Math.round(last.atl)}, свежесть ${Math.round(last.tsb)} — за ${Math.round(n / 7)} недель`}
     >
-      {weekTicks.map((i) => (
+      {ticks.map((i) => (
         <line
           key={i}
           x1={x(i)}
@@ -653,48 +654,40 @@ function FitnessChart({ series }: { series: State["fitness_series"] }) {
       ))}
       <path d={line("atl")} className="fit-atl" />
       <path d={line("ctl")} className="fit-ctl" />
-      <circle cx={x(n - 1)} cy={y(last.atl)} r={3.5} className="fit-dot-atl" />
-      <circle cx={x(n - 1)} cy={y(last.ctl)} r={3.5} className="fit-dot-ctl" />
-      <text x={2} y={tsbTop - 6} className="fit-cap">
+      <circle cx={x(n - 1)} cy={y(last.ctl)} r={4} className="fit-dot-ctl" />
+      <circle cx={x(n - 1)} cy={y(last.atl)} r={4} className="fit-dot-atl" />
+      <text x={4} y={tsbTop - 6} className="fit-cap">
         свежесть по дням
       </text>
-      <line x1={2} x2={W - 2} y1={ty(5)} y2={ty(5)} className="fit-bound" />
-      <line x1={2} x2={W - 2} y1={ty(-30)} y2={ty(-30)} className="fit-bound" />
-      <text x={W - 2} y={ty(5) - 3} className="fit-cap" textAnchor="end">
-        свежий
-      </text>
-      <text x={W - 2} y={ty(-30) - 3} className="fit-cap" textAnchor="end">
-        перегруз
-      </text>
-      <line x1={2} x2={W - 2} y1={mid} y2={mid} className="fit-grid" />
+      <line x1={4} x2={W - 4} y1={mid} y2={mid} className="fit-grid" />
       {series.map((p, i) => {
-        const h = Math.abs(ty(p.tsb) - mid);
-        return h < 0.5 ? null : (
+        const h = Math.max(1, Math.abs(ty(p.tsb) - mid));
+        return (
           <rect
             key={p.date}
-            x={x(i) - 1.2}
-            width={2.4}
-            y={Math.min(ty(p.tsb), mid)}
+            x={x(i) - 1.3}
+            width={2.6}
+            y={p.tsb >= 0 ? mid - h : mid}
             height={h}
             rx={1}
-            className="fit-tsb"
+            className={`fit-tsb ${tone(p.tsb)}`}
           />
         );
       })}
-      <text x={2} y={tsbTop + tsbH + 14} className="fit-cap">
-        {label(first)}
+      <text x={4} y={tsbTop + tsbH + 15} className="fit-cap">
+        {label(new Date(series[0]!.date))}
       </text>
       <text
         x={W / 2}
-        y={tsbTop + tsbH + 14}
+        y={tsbTop + tsbH + 15}
         className="fit-cap"
         textAnchor="middle"
       >
-        {label(midDate)}
+        {label(new Date(series[Math.floor(n / 2)]!.date))}
       </text>
       <text
-        x={W - 2}
-        y={tsbTop + tsbH + 14}
+        x={W - 4}
+        y={tsbTop + tsbH + 15}
         className="fit-cap"
         textAnchor="end"
       >
@@ -719,7 +712,7 @@ function fitnessConclusion(
       : delta > 0
         ? `Форма растёт 3 недели: ${Math.round(before)} → ${Math.round(now)}`
         : `Форма снижается 3 недели: ${Math.round(before)} → ${Math.round(now)}`;
-  return `${trend}. Свежесть: ${FRESH[zone].text}.`;
+  return { trend: `${trend}.`, fresh: `Свежесть: ${FRESH[zone].text}.` };
 }
 
 function NotesBlock({
@@ -881,16 +874,24 @@ export function TrainerAthletePage() {
           форма {fitness ? Math.round(fitness.ctl) : ""}
         </span>
         <span>
-          <i style={{ background: "var(--chart-hr)" }} />
+          <i style={{ background: "var(--warn)" }} />
           усталость {fitness ? Math.round(fitness.atl) : ""}
         </span>
         <span>
-          <i className="sq" style={{ background: "var(--chart-form)" }} />
-          свежесть
+          <i className="sq" style={{ background: "var(--success)" }} />
+          свежий
+        </span>
+        <span>
+          <i className="sq" style={{ background: "var(--warn)" }} />
+          перегруз
         </span>
       </div>
       <FitnessChart series={series} />
-      {conclusion ? <p className="fit-concl">{conclusion}</p> : null}
+      {conclusion ? (
+        <p className="fit-concl">
+          {conclusion.trend} <span>{conclusion.fresh}</span>
+        </p>
+      ) : null}
     </div>
   );
 
@@ -933,7 +934,7 @@ export function TrainerAthletePage() {
           <span>Состояние</span>
           <span>видите только вы</span>
         </div>
-        <div className="ds-list">
+        <div className="ds-list fit-state">
           <div className="ds-li">
             <div className="ds-m">
               <b>Самочувствие</b>
@@ -966,7 +967,6 @@ export function TrainerAthletePage() {
               <span
                 style={{
                   color: fitness ? FRESH[fitness.zone].tone : undefined,
-                  fontWeight: fitness ? 700 : undefined,
                 }}
               >
                 {fitness ? FRESH[fitness.zone].text : "нет данных о нагрузке"}

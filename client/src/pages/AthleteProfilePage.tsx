@@ -349,55 +349,45 @@ export function AthleteProfilePage() {
       ) : null}
 
       {data.personalBests.some((best) => best.result) ? (
-        <div>
-          <div className="ds-grp">
-            <span>Личные рекорды</span>
-          </div>
-          <div className="pb-tiles">
-            {data.personalBests.map((best) =>
-              best.result ? (
+        <section className="ds-block ds-pad" aria-label="Личные рекорды">
+          <b className="mate-bt">Личные рекорды</b>
+          <div className="mate-pb">
+            {data.personalBests.map((best) => {
+              const fresh =
+                best.result && best.distanceMeters === data.freshBestDistance;
+              return (
                 <div
                   key={best.distanceMeters}
                   className={
-                    best.distanceMeters === data.freshBestDistance
-                      ? "pb-tile2 is-fresh"
-                      : "pb-tile2"
+                    fresh ? "is-fresh" : best.result ? undefined : "is-empty"
                   }
                 >
-                  <span className="pb-d">{best.label}</span>
-                  <span className="pb-t">
-                    {formatRaceTime(best.result.official_time_seconds)}
-                  </span>
-                  <span className="pb-m">
-                    {new Date(best.result.race_date).getDate()}{" "}
-                    {MONTHS[new Date(best.result.race_date).getMonth()]} ·{" "}
-                    {best.result.name}
-                  </span>
-                  {best.distanceMeters === data.freshBestDistance ? (
-                    <span className="pb-fresh">
+                  <span>{best.label}</span>
+                  <b>
+                    {best.result
+                      ? formatRaceTime(best.result.official_time_seconds)
+                      : "ещё нет"}
+                  </b>
+                  {fresh ? (
+                    <small>
                       {best.improvementSeconds
-                        ? `быстрее на ${formatRaceTime(best.improvementSeconds)}`
-                        : "новый рекорд"}
-                    </span>
+                        ? `−${formatRaceTime(best.improvementSeconds)}`
+                        : "новый"}{" "}
+                      · {new Date(best.result!.race_date).getDate()}{" "}
+                      {MONTHS[new Date(best.result!.race_date).getMonth()]}
+                    </small>
                   ) : null}
                 </div>
-              ) : (
-                <div key={best.distanceMeters} className="pb-tile2 is-empty">
-                  <span className="pb-d">{best.label}</span>
-                  <span className="pb-none">ещё нет</span>
-                </div>
-              ),
-            )}
+              );
+            })}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {hasRuns ? (
         <div>
-          <div className="ds-grp">
-            <span>Пробежки</span>
-          </div>
           <div className="ds-list">
+            <b className="mate-lh">Пробежки</b>
             {recent.map((run) => (
               <Link
                 key={run.id}
