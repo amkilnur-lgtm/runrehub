@@ -4671,3 +4671,8 @@ button.ds-li.hl-add { font-weight: 800; }
 .home-coach .chat-av { width: 28px; height: 28px; font-size: 10px; flex: none; }
 .home-coach p { margin: 0; font-size: 14.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .home-coach p b { color: var(--ink); }
+/* длинные достижения переносятся, а не раздвигают страницу шире экрана */
+.mate-reg { min-width: 0; max-width: 100%; }
+.mate-reg .ds-pill { white-space: normal; max-width: 100%; overflow-wrap: anywhere; text-align: left; line-height: 1.35; padding-top: 4px; padding-bottom: 4px; }
+.mate-head > div { min-width: 0; }
+.mate-reg .ds-pill { border-radius: 12px; }
