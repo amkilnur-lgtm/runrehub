@@ -254,7 +254,7 @@ export function TrainerReviewPage() {
               <div className="feel-row" style={{ marginTop: 0 }}>
                 {feeling.effort ? (
                   <span
-                    className={`ds-pill ${feeling.effort === "hard" ? "ds-pill-warn" : "ds-pill-soft"}`}
+                    className={`ds-pill ${feeling.effort === "hard" ? "ds-pill-warn" : "ds-pill-good"}`}
                   >
                     Ощущалось: {EFFORT_LABEL[feeling.effort]}
                   </span>
@@ -263,7 +263,7 @@ export function TrainerReviewPage() {
                   <span className="ds-pill ds-pill-warn">Лёгкая боль</span>
                 ) : null}
                 {feeling.pain === "none" ? (
-                  <span className="ds-pill ds-pill-soft">Ничего не болит</span>
+                  <span className="ds-pill ds-pill-good">Ничего не болит</span>
                 ) : null}
               </div>
             </section>

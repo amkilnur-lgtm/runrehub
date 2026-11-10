@@ -56,8 +56,9 @@ export function WorkoutFeeling({
         <b style={{ fontSize: 16 }}>Как ощущалось</b>
         {effort || pain ? (
           <div className="feel-row">
-            {effort ? <span className={`ds-pill ${value.effort === "hard" ? "ds-pill-warn" : "ds-pill-soft"}`}>{effort}</span> : null}
-            {pain ? <span className={`ds-pill ${value.pain === "light" ? "ds-pill-warn" : "ds-pill-soft"}`}>{pain}</span> : null}
+            {/* «легко / нормально / ничего не болит» — хорошие ответы, зелёным; серое читалось как «что-то не так» */}
+            {effort ? <span className={`ds-pill ${value.effort === "hard" ? "ds-pill-warn" : "ds-pill-good"}`}>{effort}</span> : null}
+            {pain ? <span className={`ds-pill ${value.pain === "light" ? "ds-pill-warn" : "ds-pill-good"}`}>{pain}</span> : null}
           </div>
         ) : (
           <p className="ds-sub">Спортсмен ещё не отметил</p>
