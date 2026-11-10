@@ -28,14 +28,16 @@ type WorkoutCommentsProps = {
   emptyLabel?: string;
   // кто увидит сообщение — обсуждение общее, не личное
   hint?: string;
+  // готовый текст (поздравление со страницы одногруппника) — поле открыто сразу
+  initialText?: string;
 };
 
-export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false, emptyLabel = "Ответить", hint }: WorkoutCommentsProps) {
-  const [composerOpen, setComposerOpen] = useState(!collapsed);
+export function WorkoutComments({ workoutId, viewer, onCountChange, collapsed = false, emptyLabel = "Ответить", hint, initialText }: WorkoutCommentsProps) {
+  const [composerOpen, setComposerOpen] = useState(!collapsed || Boolean(initialText));
   const showToast = useToast();
   const base = viewer === "trainer" ? "/api/trainer" : "/api/athlete";
   const [comments, setComments] = useState<WorkoutCommentItem[] | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {

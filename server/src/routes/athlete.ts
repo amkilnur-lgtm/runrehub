@@ -10,6 +10,7 @@ import { getWorkoutFeeling, saveWorkoutFeeling, workoutFeelingSchema } from "../
 import { pool } from "../lib/db.js";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
 import { config } from "../config.js";
+import { getTeammateProfile } from "../lib/teammate-profile.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
   downsampleRoute,
@@ -434,6 +435,17 @@ export async function athleteRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: "Спортсмен не найден" });
     }
     return overview;
+  });
+
+  app.get("/api/athlete/athletes/:id/profile", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["athlete"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!Number.isSafeInteger(athleteId) || !(await isAthleteInGroup(request.user.id, athleteId))) {
+      return reply.code(404).send({ message: "Спортсмен не найден" });
+    }
+    const profile = await getTeammateProfile(request.user.id, athleteId);
+    if (!profile) return reply.code(404).send({ message: "Спортсмен не найден" });
+    return profile;
   });
 
   app.get("/api/athlete/athletes/:id/feed", { preHandler: requireAuth }, async (request, reply) => {

@@ -16,6 +16,7 @@ import { TrainerStartsPage } from "./pages/TrainerStartsPage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
 import { AthleteProfilePage } from "./pages/AthleteProfilePage";
+import { AthleteProfileRunsPage } from "./pages/AthleteProfileRunsPage";
 import { AthleteRunsPage } from "./pages/AthleteRunsPage";
 import { AthleteStartsPage } from "./pages/AthleteStartsPage";
 import "@fontsource-variable/manrope";
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
               { path: "/athlete/starts", element: <AthleteStartsPage /> },
               { path: "/athlete/feed", element: <TrainerFeedPage viewer="athlete" /> },
               { path: "/athlete/athletes/:id", element: <AthleteProfilePage /> },
+              { path: "/athlete/athletes/:id/runs", element: <AthleteProfileRunsPage /> },
               { path: "/athlete/workouts/:id", element: <WorkoutPage mode="athlete" /> }
             ]
           },

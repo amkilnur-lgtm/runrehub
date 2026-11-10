@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
 import { isTelegramMiniApp } from "../telegram";
@@ -204,6 +204,8 @@ function WorkoutDetails({ workout }: { workout: WorkoutData["workout"] }) {
 
 export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
   const params = useParams();
+  const [searchParams] = useSearchParams();
+  const sayText = searchParams.get("say") ?? undefined;
   const navigate = useNavigate();
   const showToast = useToast();
   const prefix = mode === "trainer" ? "/api/trainer/workouts/" : "/api/athlete/workouts/";
@@ -964,6 +966,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             collapsed
             emptyLabel={data.workout.coach_comment?.trim() ? "Ответить" : "Написать комментарий"}
             hint={mode === "trainer" ? "видят спортсмен и группа" : "видят тренер и группа"}
+            initialText={sayText}
           />
         </div>
       </section>

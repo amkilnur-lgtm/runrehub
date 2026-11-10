@@ -131,8 +131,18 @@ export async function getAthleteState(athleteId: number) {
      where user_id = $1 and status = 'planned' and race_date >= current_date order by race_date limit 1`,
     [athleteId]
   );
+  // 12 недель по дням — для графика формы/усталости/свежести в карточке тренера
+  const fitness_series = fitness
+    ? series.slice(-84).map((point) => ({
+        date: point.date,
+        ctl: Math.round(point.ctl * 10) / 10,
+        atl: Math.round(point.atl * 10) / 10,
+        tsb: Math.round(point.tsb * 10) / 10
+      }))
+    : [];
   return {
     fitness,
+    fitness_series,
     next_start_days: next.rows[0] ? Number(next.rows[0].days_left) : null,
     feelings: { hard: Number(rows[0]?.hard ?? 0), pain: Number(rows[0]?.pain ?? 0), marked: Number(rows[0]?.marked ?? 0) }
   };
