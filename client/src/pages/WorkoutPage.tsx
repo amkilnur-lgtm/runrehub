@@ -76,7 +76,7 @@ const HR_ZONES = [
 
 type HrZoneShare = { label: string; percent: number };
 
-function heartRateZones(streams: WorkoutData["streams"]): HrZoneShare[] | null {
+export function heartRateZones(streams: WorkoutData["streams"]): HrZoneShare[] | null {
   const hr = streams?.heartrate ?? [];
   const time = streams?.time ?? [];
   const size = Math.min(hr.length, time.length);
@@ -111,7 +111,7 @@ function paceOf(speed: number | null | undefined) {
   return speed && speed > 0 ? 1000 / speed : null;
 }
 
-function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps"], structure: WorkoutData["structure"]) {
+export function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps"], structure: WorkoutData["structure"]) {
   // несколько серий — по серии на каждую: «5×800 м — 4:12, 5×200 м — 3:29»
   // у серий без названия (GPS разбросал дистанцию) — просто число рабочих отрезков
   if (structure && structure.sets.some((set) => !set.label)) {
@@ -134,7 +134,7 @@ function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutData["laps
   return `Темп по кругам: ${range} /км`;
 }
 
-function buildHrSummary(zones: HrZoneShare[]) {
+export function buildHrSummary(zones: HrZoneShare[]) {
   const above150 = zones[2]!.percent + zones[3]!.percent;
   const above162 = zones[3]!.percent;
   if (above162 >= 50) return `Больше половины времени — выше 162 (${above162}%)`;
@@ -145,7 +145,7 @@ function buildHrSummary(zones: HrZoneShare[]) {
   return zones[0]!.percent >= 60 ? "Спокойно: большую часть времени пульс до 130" : "В основном 130–150 — аэробная работа";
 }
 
-function HrZonesBar({ zones }: { zones: HrZoneShare[] }) {
+export function HrZonesBar({ zones }: { zones: HrZoneShare[] }) {
   return (
     <>
       <div className="ds-zbar" role="img" aria-label={`Время в зонах: ${zones.map((zone) => `${zone.label} — ${zone.percent}%`).join(", ")}`}>

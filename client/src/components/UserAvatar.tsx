@@ -17,6 +17,16 @@ function getInitials(fullName: string | null | undefined) {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
+// Без фото — инициалы на постоянном цвете по имени (как в макетах): человека проще узнать в списке.
+// Приглушённые тона, белый текст на всех — контраст от 4,5:1
+const AVATAR_TONES = ["#b8432f", "#0f6f78", "#6a3e9e", "#9a5b0c", "#2d4a86", "#2a7a3b", "#8a3a62", "#4a5470"];
+
+function toneFor(name: string | null | undefined) {
+  let hash = 0;
+  for (const char of name ?? "") hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return AVATAR_TONES[hash % AVATAR_TONES.length]!;
+}
+
 export function UserAvatar({
   fullName,
   avatarUrl,
@@ -37,7 +47,11 @@ export function UserAvatar({
   }, [avatarUrl]);
 
   return (
-    <span className={classes} aria-hidden={ariaHidden}>
+    <span
+      className={avatarUrl && imageVisible ? classes : `${classes} is-initials`}
+      aria-hidden={ariaHidden}
+      style={avatarUrl && imageVisible ? undefined : { background: toneFor(fullName), color: "#fff" }}
+    >
       {avatarUrl && imageVisible ? (
         <img
           className="user-avatar-image"

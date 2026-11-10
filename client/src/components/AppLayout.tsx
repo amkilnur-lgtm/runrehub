@@ -1,4 +1,7 @@
-import { NavLink, Outlet, ScrollRestoration, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from "react-router-dom";
+
+import { api } from "../api";
 
 import logoImage from "../assets/logo_red horizontal.png";
 import { useAuth } from "./AuthProvider";
@@ -6,7 +9,7 @@ import { EditableAvatarMenu } from "./EditableAvatarMenu";
 import { NavGestures } from "./NavGestures";
 import { ThemeToggle } from "./ThemeToggle";
 
-type NavItem = { to: string; label: string; end?: boolean; icon: React.ReactNode };
+type NavItem = { to: string; label: string; end?: boolean; icon: React.ReactNode; badgeKey?: "review" };
 
 function Icon({ d }: { d: React.ReactNode }) {
   return (
@@ -29,7 +32,7 @@ const ClubIcon = (
     }
   />
 );
-export const ReviewIcon = <Icon d={<path d="M4 5h16v11H9l-5 4V5z" />} />;
+const ReviewIcon = <Icon d={<path d="M4 5h16v11H9l-5 4V5z" />} />;
 
 // 4 вкладки на роль, подпись одним словом (client/DESIGN.md → «Информационная архитектура»)
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
@@ -39,9 +42,10 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { to: "/athlete/starts", label: "Старты", icon: StartsIcon },
     { to: "/athlete/feed", label: "Клуб", icon: ClubIcon }
   ],
-  // «Разбор» и «Старты» тренера появятся вместе с их экранами (ReviewIcon, StartsIcon)
   trainer: [
     { to: "/trainer", label: "Группа", end: true, icon: ClubIcon },
+    { to: "/trainer/review", label: "Разбор", icon: ReviewIcon, badgeKey: "review" },
+    { to: "/trainer/starts", label: "Старты", icon: StartsIcon },
     { to: "/trainer/feed", label: "Клуб", icon: RunsIcon }
   ]
 };
@@ -50,6 +54,15 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const nav = user ? NAV_BY_ROLE[user.role] ?? [] : [];
+  const location = useLocation();
+  // счётчик только у «Разбора»: пробежки этой недели без комментария
+  const [reviewCount, setReviewCount] = useState(0);
+  useEffect(() => {
+    if (user?.role !== "trainer") return;
+    api<{ workoutIds: number[] }>("/api/trainer/review-queue")
+      .then((res) => setReviewCount(res.workoutIds.length))
+      .catch(() => undefined);
+  }, [user?.role, location.pathname]);
 
   async function handleLogout() {
     await logout();
@@ -69,6 +82,11 @@ export function AppLayout() {
                 <NavLink key={item.to} to={item.to} end={item.end} className="app-nav-link">
                   <span className="app-nav-icon">{item.icon}</span>
                   {item.label}
+                  {item.badgeKey === "review" && reviewCount > 0 ? (
+                    <span className="app-nav-badge" aria-label={`ждут: ${reviewCount}`}>
+                      {reviewCount}
+                    </span>
+                  ) : null}
                 </NavLink>
               ))}
             </nav>

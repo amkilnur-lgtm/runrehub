@@ -23,6 +23,7 @@ const telegramAuthModule = await import("./lib/telegram-auth.js");
 const weeklyVolumeModule = await import("./lib/weekly-volume.js");
 const raceResultsModule = await import("./lib/race-results.js");
 const fitnessModule = await import("./lib/fitness.js");
+const paceZonesModule = await import("./lib/pace-zones.js");
 const { createHmac } = await import("node:crypto");
 
 // initData, подписанная так же, как это делает Telegram для Mini App
@@ -837,6 +838,19 @@ await runTest("fitness: form, fatigue and freshness like TrainingPeaks", () => {
   const spike = fitnessModule.summarizeFitness(fitnessModule.computeFitnessSeries(days([...Array(60).fill(30), ...Array(10).fill(150)])))!;
   assert.equal(spike.zone, "overload");
   assert.equal(fitnessModule.freshnessZone(-15), "productive");
+});
+
+await runTest("pace zones: Daniels threshold from a race and zone split", () => {
+  // 10 км за 39:19 → порог около 4:03 /км (часы спортсмена показывают 4:01)
+  const threshold = paceZonesModule.thresholdFromRace(10000, 39 * 60 + 19)!;
+  assert.ok(threshold >= 238 && threshold <= 248, `threshold ${threshold}`);
+  // ровный бег по 5:00 при пороге 4:00 (300/240 = 1,25) — весь в «Лёгком»
+  const distance = Array.from({ length: 601 }, (_, i) => i * (1000 / 300));
+  const time = Array.from({ length: 601 }, (_, i) => i);
+  const zones = paceZonesModule.paceZoneSecondsFromStream(distance, time, 240);
+  // последняя секунда не попадает в окно сглаживания — допускаем пару секунд
+  assert.ok(zones[0]! >= 595, `easy ${zones[0]}`);
+  assert.deepEqual(zones.slice(1), [0, 0, 0, 0]);
 });
 
 console.log("All server tests passed.");

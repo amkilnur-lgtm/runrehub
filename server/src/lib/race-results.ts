@@ -135,6 +135,23 @@ export async function getGroupUpcomingStarts(coachId: number, days = 30) {
   return rows.map(normalizeRow);
 }
 
+// Прошедшие старты группы за последние дни — для вкладки «Старты» тренера
+export async function getGroupRecentResults(coachId: number, days = 120) {
+  const { rows } = await pool.query(
+    `
+      select r.*, u.full_name as athlete_name, u.avatar_url as athlete_avatar_url
+      from race_results r
+      join users u on u.id = r.user_id
+      where u.coach_id = $1 and r.status = 'finished'
+        and r.race_date >= current_date - $2::int and r.race_date <= current_date
+      order by r.race_date desc, u.full_name asc
+      limit 40
+    `,
+    [coachId, days]
+  );
+  return rows.map(normalizeRow);
+}
+
 export async function insertRaceResult(athleteId: number, authorId: number, input: RaceResultInput) {
   const { rows } = await pool.query(
     `

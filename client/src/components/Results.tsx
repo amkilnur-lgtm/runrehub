@@ -115,7 +115,7 @@ function longDate(iso: string) {
 }
 
 // цель «1:30» вместо «1:30:00»; секунды — только если они заданы
-function formatGoalTime(seconds: number) {
+export function formatGoalTime(seconds: number) {
   return seconds >= 3600 && seconds % 60 === 0 ? formatRaceTime(seconds).slice(0, -3) : formatRaceTime(seconds);
 }
 
@@ -295,12 +295,13 @@ export function ResultsPanel({
               >
                 <span className="pb-d">{best.label}</span>
                 <span className="pb-t">{formatRaceTime(result.official_time_seconds)}</span>
+                {/* дата первой: длинное название обрезается, а дата видна всегда */}
                 <span className="pb-m">
-                  {result.name} · {day} {month}
+                  {day} {month} · {result.name}
                 </span>
                 {fresh ? (
                   <span className="pb-new">
-                    новый{best.improvementSeconds ? ` · −${formatRaceTime(best.improvementSeconds)}` : ""}
+                    новый{best.improvementSeconds ? `, быстрее на ${formatRaceTime(best.improvementSeconds)}` : ""}
                   </span>
                 ) : null}
               </button>

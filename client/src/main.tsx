@@ -11,6 +11,8 @@ import { AdminPage } from "./pages/AdminPage";
 import { TrainerDashboardPage } from "./pages/TrainerDashboardPage";
 import { TrainerAthletePage } from "./pages/TrainerAthletePage";
 import { TrainerFeedPage } from "./pages/TrainerFeedPage";
+import { TrainerReviewPage } from "./pages/TrainerReviewPage";
+import { TrainerStartsPage } from "./pages/TrainerStartsPage";
 import { WorkoutPage } from "./pages/WorkoutPage";
 import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
 import { AthleteProfilePage } from "./pages/AthleteProfilePage";
@@ -42,6 +44,8 @@ const router = createBrowserRouter([
             children: [
               { path: "/trainer", element: <TrainerDashboardPage /> },
               { path: "/trainer/feed", element: <TrainerFeedPage /> },
+              { path: "/trainer/review", element: <TrainerReviewPage /> },
+              { path: "/trainer/starts", element: <TrainerStartsPage /> },
               { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
               { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> }
             ]

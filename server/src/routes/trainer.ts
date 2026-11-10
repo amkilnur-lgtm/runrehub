@@ -7,8 +7,11 @@ import { buildStoryCardPng } from "../lib/telegram-notifications.js";
 import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
 import { getWorkoutFeeling } from "../lib/workout-feeling.js";
+import { getGroupHeatmap, type HeatmapLevel } from "../lib/group-heatmap.js";
+import { getAthleteCycles, getAthleteState, type CycleLevel } from "../lib/athlete-cycles.js";
+import { getThreshold } from "../lib/pace-zones.js";
 import { getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
-import { getGroupUpcomingStarts } from "../lib/race-results.js";
+import { getGroupRecentResults, getGroupUpcomingStarts } from "../lib/race-results.js";
 import {
   addWorkoutComment,
   getTrainerFeed,
@@ -152,6 +155,97 @@ export async function trainerRoutes(app: FastifyInstance) {
   });
 
   // Оба запроса независимы — запускаем параллельно через Promise.all
+  // Очередь «Разбор»: пробежки этой недели без отзыва тренера, от старых к новым
+  app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["trainer"]);
+    const { rows } = await pool.query(
+      `
+        select w.id
+        from workouts w
+        join users u on u.id = w.user_id
+        where u.role = 'athlete' and u.coach_id = $1
+          and w.start_date >= date_trunc('week', now())
+          and not ${HAS_COACH_FEEDBACK_SQL}
+        order by w.start_date asc, w.id asc
+      `,
+      [request.user.id]
+    );
+    return { workoutIds: rows.map((row) => Number(row.id)) };
+  });
+
+  app.get("/api/trainer/starts", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["trainer"]);
+    const [upcoming, recent] = await Promise.all([
+      getGroupUpcomingStarts(request.user.id, 180),
+      getGroupRecentResults(request.user.id)
+    ]);
+    return { upcoming, recent };
+  });
+
+  // Карточка спортсмена: циклы, состояние, заметки. Только спортсмен своей группы
+  async function ownsAthlete(coachId: number, athleteId: number) {
+    const { rows } = await pool.query(`select 1 from users where id = $1 and coach_id = $2 and role = 'athlete'`, [athleteId, coachId]);
+    return Boolean(rows[0]);
+  }
+
+  app.get("/api/trainer/athletes/:id/cycles", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await ownsAthlete(request.user.id, athleteId))) return reply.code(404).send({ message: "Спортсмен не найден" });
+    const level = String((request.query as { level?: string }).level ?? "week");
+    return getAthleteCycles(athleteId, (["week", "blocks", "season"] as string[]).includes(level) ? (level as CycleLevel) : "week");
+  });
+
+  app.get("/api/trainer/athletes/:id/state", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await ownsAthlete(request.user.id, athleteId))) return reply.code(404).send({ message: "Спортсмен не найден" });
+    const [state, note] = await Promise.all([
+      getAthleteState(athleteId),
+      pool.query(`select body, updated_at from coach_notes where athlete_id = $1 and coach_id = $2`, [athleteId, request.user.id])
+    ]);
+    return { ...state, note: note.rows[0]?.body ?? "", note_updated_at: note.rows[0]?.updated_at ?? null };
+  });
+
+  // Пороговый темп: сек/км или null — сбросить к оценке по старту
+  app.put("/api/trainer/athletes/:id/threshold", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await ownsAthlete(request.user.id, athleteId))) return reply.code(404).send({ message: "Спортсмен не найден" });
+    const { pace } = z.object({ pace: z.number().int().min(150).max(600).nullable() }).parse(request.body);
+    if (pace === null) {
+      await pool.query(`delete from athlete_thresholds where athlete_id = $1`, [athleteId]);
+    } else {
+      await pool.query(
+        `insert into athlete_thresholds (athlete_id, pace_seconds_per_km, updated_by) values ($1, $2, $3)
+         on conflict (athlete_id) do update set pace_seconds_per_km = excluded.pace_seconds_per_km,
+           updated_by = excluded.updated_by, updated_at = now()`,
+        [athleteId, pace, request.user.id]
+      );
+    }
+    return { ok: true, threshold: await getThreshold(athleteId) };
+  });
+
+  app.put("/api/trainer/athletes/:id/note", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await ownsAthlete(request.user.id, athleteId))) return reply.code(404).send({ message: "Спортсмен не найден" });
+    const body = z.object({ body: z.string().max(4000) }).parse(request.body).body.trim();
+    await pool.query(
+      `insert into coach_notes (athlete_id, coach_id, body) values ($1, $2, $3)
+       on conflict (athlete_id, coach_id) do update set body = excluded.body, updated_at = now()`,
+      [athleteId, request.user.id, body]
+    );
+    return { ok: true, note: body };
+  });
+
+  app.get("/api/trainer/group-heatmap", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["trainer"]);
+    const level = String((request.query as { level?: string }).level ?? "weeks");
+    const allowed: HeatmapLevel[] = ["days", "weeks", "blocks", "months"];
+    return getGroupHeatmap(request.user.id, (allowed as string[]).includes(level) ? (level as HeatmapLevel) : "weeks");
+  });
+
   app.get("/api/trainer/dashboard", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
 
