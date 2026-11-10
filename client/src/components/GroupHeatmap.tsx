@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useApi } from "../hooks/useApi";
-import { formatDuration, formatKm } from "../lib";
+import { formatKm } from "../lib";
 
-// Тепловая карта группы (client/DESIGN.md): в ячейке одна метрика — цифра и цвет,
-// подробности — по нажатию. Уровни: эта неделя по дням · недели · 4 недели · сезон.
-type Level = "days" | "weeks" | "blocks" | "months";
+// Тепловая карта группы — по исследованию «Страница тренера и клуба»:
+// сплошная таблица без плиток и штриховки; текущий период помечен один раз в шапке,
+// его числа серые без заливки (период ещё идёт — это не падение); единица в заголовке;
+// легенда одной строкой; имя со стрелкой ведёт к спортсмену, клетка — к спортсмену на этом уровне.
+type Level = "weeks" | "blocks" | "months";
 type Metric = "km" | "ele" | "int";
 
 type Cell = {
@@ -24,26 +26,19 @@ type HeatmapData = {
   athletes: {
     id: number;
     full_name: string;
+    member_since: string;
     cells: Cell[];
     freshness: { tsb: number; zone: "fresh" | "neutral" | "productive" | "overload" } | null;
   }[];
 };
 
-const LEVELS: { value: Level; label: string; short: string }[] = [
-  { value: "days", label: "Эта неделя", short: "Дни" },
-  { value: "weeks", label: "Недели", short: "Недели" },
-  { value: "blocks", label: "4 недели", short: "4 нед" },
-  { value: "months", label: "Сезон", short: "Сезон" }
-];
-const METRICS: { value: Metric; label: string; dot: string }[] = [
-  { value: "km", label: "Объём", dot: "var(--vol-3)" },
-  { value: "ele", label: "Набор", dot: "var(--ele-4)" },
-  { value: "int", label: "Интенсивность", dot: "var(--int-3)" }
+const METRICS: { value: Metric; label: string }[] = [
+  { value: "km", label: "Км" },
+  { value: "ele", label: "Набор" },
+  { value: "int", label: "Пульс 150+" }
 ];
 const MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const MONTH_NAMES = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
-const DAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-const ZONE_LABELS = ["до 130", "130–150", "150–162", "162+"];
 const FRESH_LABEL = { fresh: "свежий", neutral: "норма", productive: "↗ рост", overload: "перегруз" } as const;
 const FRESH_CLASS = { fresh: "ds-pill-good", neutral: "ds-pill-soft", productive: "ds-pill-soft", overload: "ds-pill-danger" } as const;
 
@@ -52,45 +47,38 @@ function intensityShare(cell: Cell) {
   return total > 0 ? Math.round(((cell.zone_seconds[2]! + cell.zone_seconds[3]!) / total) * 100) : null;
 }
 
-// шаг шкалы по метрике и уровню: день — до 20 км, неделя — до 60, набор — до 700 м
 function step(value: number, edges: number[]) {
   const index = edges.findIndex((edge) => value < edge);
   return index === -1 ? edges.length + 1 : index + 1;
 }
 
-function cellView(cell: Cell, metric: Metric, level: Level) {
+const EDGES = { km: [15, 30, 45, 60], ele: [100, 250, 450, 700], int: [15, 25, 35, 50] } as const;
+const UNIT = { km: "км", ele: "м", int: "%" } as const;
+
+function cellValue(cell: Cell, metric: Metric, level: Level) {
   if (cell.workout_count === 0) return null;
   if (metric === "km") {
-    const meters = level === "blocks" || level === "months" ? cell.weekly_distance_meters ?? cell.distance_meters : cell.distance_meters;
+    const meters = level === "weeks" ? cell.distance_meters : cell.weekly_distance_meters ?? cell.distance_meters;
     const km = meters / 1000;
-    const edges = level === "days" ? [5, 10, 15, 20] : [15, 30, 45, 60];
-    return { text: km >= 10 ? String(Math.round(km)) : formatKm(meters), tone: `vol-${step(km, edges)}` };
+    return { text: km >= 10 ? String(Math.round(km)) : formatKm(meters), tone: step(km, [...EDGES.km]) };
   }
-  if (metric === "ele") {
-    const edges = level === "days" ? [30, 80, 150, 250] : [100, 250, 450, 700];
-    return { text: String(Math.round(cell.elevation_gain)), tone: `ele-${step(cell.elevation_gain, edges)}` };
-  }
+  if (metric === "ele") return { text: String(Math.round(cell.elevation_gain)), tone: step(cell.elevation_gain, [...EDGES.ele]) };
   const share = intensityShare(cell);
-  if (share === null) return { text: "—", tone: "int-none" };
-  return { text: `${share}%`, tone: `int-${step(share, [15, 25, 35, 50])}` };
+  if (share === null) return { text: "?", tone: 0 };
+  return { text: String(share), tone: step(share, [...EDGES.int]) };
 }
 
-function periodHeader(period: { start: string; finish: string }, level: Level, index: number, count: number, short: boolean) {
-  const start = new Date(period.start);
-  if (level === "days") return short ? DAYS[index]! : `${DAYS[index]} ${start.getDate()}`;
-  if (level === "months") return short ? MONTHS[start.getMonth()]! : MONTH_NAMES[start.getMonth()]!;
-  if (index === count - 1) return level === "weeks" ? "эта" : "сейчас";
-  const end = new Date(new Date(period.finish).getTime() - 86_400_000);
-  const dm = (date: Date) => `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`;
-  return level === "weeks" || short ? dm(start) : `${dm(start)}–${dm(end)}`;
+function title(metric: Metric, level: Level) {
+  const what = metric === "km" ? "Объём" : metric === "ele" ? "Набор" : "Время с пульсом 150+";
+  if (level === "weeks") return `${what} по неделям, ${UNIT[metric]}`;
+  if (level === "blocks") return `${what} по 4 недели, ${metric === "km" ? "км в неделю" : UNIT[metric]}`;
+  return `${what} по месяцам, ${metric === "km" ? "км в неделю" : UNIT[metric]}`;
 }
 
-function periodTitle(period: { start: string; finish: string }, level: Level) {
+function headerLabel(period: { start: string }, level: Level) {
   const start = new Date(period.start);
-  const end = new Date(new Date(period.finish).getTime() - 86_400_000);
-  if (level === "days") return `${DAYS[(start.getDay() + 6) % 7]}, ${start.getDate()} ${MONTHS[start.getMonth()]}`;
-  if (level === "months") return `${MONTH_NAMES[start.getMonth()]} ${start.getFullYear()}`;
-  return `${start.getDate()} ${MONTHS[start.getMonth()]} – ${end.getDate()} ${MONTHS[end.getMonth()]}`;
+  if (level === "months") return MONTHS[start.getMonth()]!;
+  return `${start.getDate()} ${MONTHS[start.getMonth()]}`;
 }
 
 function useIsPhone() {
@@ -108,159 +96,119 @@ function useIsPhone() {
 export function GroupHeatmap() {
   const [level, setLevel] = useState<Level>("weeks");
   const [metric, setMetric] = useState<Metric>("km");
-  const [selected, setSelected] = useState<{ athleteId: number; index: number } | null>(null);
-  const [metricMenu, setMetricMenu] = useState(false);
+  const [showIdle, setShowIdle] = useState(false);
   const isPhone = useIsPhone();
+  const navigate = useNavigate();
   const { data, loading, error } = useApi<HeatmapData>(`/api/trainer/group-heatmap?level=${level}`);
 
-  useEffect(() => setSelected(null), [level]);
-
   const allPeriods = data?.periods ?? [];
-  // на телефоне в «Неделях» — последние 5, на компьютере — 10
+  // на телефоне — последние 5 недель (4 полные + текущая), на компьютере — все
   const firstVisible = data && isPhone && level === "weeks" ? Math.max(allPeriods.length - 5, 0) : 0;
   const periods = allPeriods.slice(firstVisible);
-  const currentIndex = periods.length - 1;
-  const today = (new Date().getDay() + 6) % 7;
-  const highlight = level === "days" ? today : currentIndex;
-  const metricLabel = METRICS.find((item) => item.value === metric)!.label;
+  const current = periods.length - 1;
+  const cycle = level === "weeks" ? "week" : level === "blocks" ? "blocks" : "season";
 
-  const selectedAthlete = selected ? data?.athletes.find((athlete) => athlete.id === selected.athleteId) : null;
-  const selectedCell = selectedAthlete && selected ? selectedAthlete.cells[selected.index + firstVisible] : null;
-  const selectedPeriod = selected ? periods[selected.index] : null;
-
-  const legendEdges =
-    metric === "km"
-      ? level === "days"
-        ? "5 · 10 · 15 · 20+ км"
-        : level === "weeks"
-          ? "15 · 30 · 45 · 60+ км"
-          : "15 · 30 · 45 · 60+ км в неделю"
-      : metric === "ele"
-        ? level === "days"
-          ? "30 · 80 · 150 · 250+ м"
-          : "100 · 250 · 450 · 700+ м"
-        : "15 · 25 · 35 · 50%+ времени в зонах 150+";
-  const rampPrefix = metric === "km" ? "vol" : metric === "ele" ? "ele" : "int";
+  const athletes = (data?.athletes ?? []).slice().sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
+  const visibleCells = (athlete: HeatmapData["athletes"][number]) => athlete.cells.slice(firstVisible);
+  const active = athletes.filter((athlete) => visibleCells(athlete).some((cell) => cell.workout_count > 0));
+  const idle = athletes.filter((athlete) => !visibleCells(athlete).some((cell) => cell.workout_count > 0));
+  const rows = showIdle ? [...active, ...idle] : active;
+  const ramp = metric === "km" ? "vol" : metric === "ele" ? "ele" : "int";
+  const edges = EDGES[metric];
+  const legendTop = `${edges[edges.length - 1]}+ ${metric === "int" ? "%" : UNIT[metric]}`;
 
   return (
-    <section className="ds-block ds-pad heatmap" aria-label="Группа по периодам">
-      <div className="hm-ctl">
-        <div className="ds-seg hm-levels" role="group" aria-label="Период">
-          {LEVELS.map((item) => (
-            <button key={item.value} type="button" aria-pressed={level === item.value} onClick={() => setLevel(item.value)}>
-              {isPhone ? item.short : item.label}
-            </button>
-          ))}
-        </div>
-        {isPhone ? (
-          <div className="hm-metric-menu">
-            <button type="button" className="hm-mbtn" aria-haspopup="menu" aria-expanded={metricMenu} onClick={() => setMetricMenu((open) => !open)}>
-              {metricLabel}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-            {metricMenu ? (
-              <div className="hm-menu" role="menu">
-                {METRICS.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={metric === item.value}
-                    onClick={() => {
-                      setMetric(item.value);
-                      setMetricMenu(false);
-                    }}
-                  >
-                    <i style={{ background: item.dot }} />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="hm-chips" role="group" aria-label="Что в ячейке">
-            {METRICS.map((item) => (
-              <button key={item.value} type="button" aria-pressed={metric === item.value} onClick={() => setMetric(item.value)}>
-                <i style={{ background: item.dot }} />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        )}
+    <section className="ds-block ds-pad gh" aria-label="Группа по периодам">
+      <b className="gh-title">{title(metric, level)}</b>
+      <div className="ds-seg gh-metric" role="group" aria-label="Что в клетке">
+        {METRICS.map((item) => (
+          <button key={item.value} type="button" aria-pressed={metric === item.value} onClick={() => setMetric(item.value)}>
+            {item.label}
+          </button>
+        ))}
       </div>
+      <div className="gh-ctl">
+        <div className="gh-legend" aria-label={`Шкала: от 0 до ${legendTop}`}>
+          <span>0</span>
+          {[1, 2, 3, 4, 5].map((index) => (
+            <i key={index} className={`t-${ramp}-${index}`} />
+          ))}
+          <span>{legendTop}</span>
+        </div>
+        <label className="gh-period">
+          <span className="sr-only">Период</span>
+          <select value={level} onChange={(event) => setLevel(event.target.value as Level)}>
+            <option value="weeks">{isPhone ? "5 недель" : "10 недель"}</option>
+            <option value="blocks">по 4 недели</option>
+            <option value="months">сезон</option>
+          </select>
+        </label>
+      </div>
+      {metric === "int" ? <p className="gh-note">Доля времени бега с пульсом 150 и выше: чем темнее, тем больше тяжёлой работы.</p> : null}
 
       {loading && !data ? (
         <div className="skeleton-block" style={{ height: 240, borderRadius: 12 }} />
       ) : error || !data ? (
         <p className="ds-sub">{error || "Не удалось загрузить"}</p>
-      ) : !data.athletes.length ? (
+      ) : !athletes.length ? (
         <p className="ds-sub">В группе пока нет спортсменов.</p>
       ) : (
-        <div className="hm-scroll">
-          <table className="hm-table">
+        <div className="gh-scroll">
+          <table className="gh-table">
             <thead>
               <tr>
-                <th style={{ width: isPhone ? (level === "days" ? 88 : 76) : 150 }} />
+                <th className="gh-name" />
                 {periods.map((period, index) => (
-                  <th key={period.start} className={index === highlight ? "is-now" : undefined}>
-                    {level === "days" && index === today && !isPhone ? "сегодня" : periodHeader(period, level, index + firstVisible, allPeriods.length, isPhone)}
+                  <th key={period.start} className={index === current ? "is-now" : undefined}>
+                    {headerLabel(period, level)}
+                    {index === current ? <small>идёт</small> : null}
                   </th>
                 ))}
-                {isPhone || level !== "weeks" ? null : <th className="hm-side hm-avg">ср. 4 нед</th>}
-                {isPhone ? null : <th className="hm-side">Свежесть</th>}
+                {isPhone ? null : <th className="gh-side">Свежесть</th>}
               </tr>
             </thead>
             <tbody>
-              {data.athletes.map((athlete) => {
-                const weekMeters =
-                  level === "days" ? athlete.cells.reduce((sum, cell) => sum + cell.distance_meters, 0) : null;
+              {rows.map((athlete) => {
+                const joined = new Date(athlete.member_since).getTime();
                 return (
                   <tr key={athlete.id}>
-                    <td className="hm-name">
+                    <th className="gh-name" scope="row">
                       <Link to={`/trainer/athletes/${athlete.id}`}>
-                        <b>{athlete.full_name.split(" ")[0]}</b>
-                        {weekMeters !== null && isPhone ? <span>{formatKm(weekMeters)} км</span> : null}
+                        <span>{isPhone ? athlete.full_name.split(" ")[0] : athlete.full_name}</span>
+                        <i className="gh-chev" aria-hidden="true" />
                       </Link>
-                    </td>
+                    </th>
                     {periods.map((period, index) => {
                       const cell = athlete.cells[index + firstVisible]!;
-                      const future = level === "days" && index > today;
-                      const view = future ? null : cellView(cell, metric, level);
-                      const isSel = selected?.athleteId === athlete.id && selected.index === index;
-                      const classes = [
-                        "hm-c",
-                        future ? "is-future" : view ? `t-${view.tone}` : level === "days" ? "is-rest" : "is-empty",
-                        index === highlight ? "is-now" : "",
-                        isSel ? "is-sel" : ""
-                      ].join(" ");
+                      const beforeJoin = new Date(period.finish).getTime() <= joined;
+                      const value = cellValue(cell, metric, level);
+                      const isNow = index === current;
+                      const cls = beforeJoin
+                        ? "gh-c is-na"
+                        : !value
+                          ? "gh-c is-zero"
+                          : isNow
+                            ? "gh-c is-now"
+                            : value.tone
+                              ? `gh-c t-${ramp}-${value.tone}`
+                              : "gh-c is-zero";
                       return (
                         <td key={period.start}>
                           <button
                             type="button"
-                            className={classes}
-                            disabled={future}
-                            onClick={() => setSelected(isSel ? null : { athleteId: athlete.id, index })}
-                            aria-label={`${athlete.full_name}, ${periodTitle(period, level)}: ${view ? view.text : "нет пробежек"}`}
+                            className={cls}
+                            onClick={() => navigate(`/trainer/athletes/${athlete.id}?cycle=${cycle}`)}
+                            aria-label={`${athlete.full_name}, ${headerLabel(period, level)}${isNow ? " (идёт)" : ""}: ${
+                              beforeJoin ? "ещё не в клубе" : value ? `${value.text} ${UNIT[metric]}` : "нет пробежек"
+                            }`}
                           >
-                            {future ? "" : view ? view.text : level === "days" ? (isPhone ? "—" : "отдых") : "—"}
+                            {beforeJoin ? "" : value ? value.text : "—"}
                           </button>
                         </td>
                       );
                     })}
-                    {isPhone || level !== "weeks" ? null : (
-                      <td className="hm-side hm-avg">
-                        {/* средний км за 4 последние полные недели — текущая ещё идёт */}
-                        {(() => {
-                          const average = athlete.cells.slice(-5, -1).reduce((sum, cell) => sum + cell.distance_meters, 0) / 4;
-                          return average > 0 ? `${formatKm(average)} км` : "—";
-                        })()}
-                      </td>
-                    )}
                     {isPhone ? null : (
-                      <td className="hm-side">
+                      <td className="gh-side">
                         {athlete.freshness ? (
                           <span className={`ds-pill ${FRESH_CLASS[athlete.freshness.zone]}`}>
                             {athlete.freshness.tsb > 0 ? "+" : athlete.freshness.tsb < 0 ? "−" : ""}
@@ -279,78 +227,16 @@ export function GroupHeatmap() {
         </div>
       )}
 
-      {selectedAthlete && selectedCell && selectedPeriod ? (
-        <div className="hm-detail" role="status">
-          <div className="hm-detail-head">
-            <b>
-              {selectedAthlete.full_name.split(" ")[0]} · {periodTitle(selectedPeriod, level)}
-            </b>
-            <button type="button" className="hm-close" onClick={() => setSelected(null)} aria-label="Закрыть">
-              ×
-            </button>
-          </div>
-          {selectedCell.workout_count ? (
-            <>
-              <div className="hm-detail-grid">
-                <span>Объём</span>
-                <b>
-                  {formatKm(selectedCell.distance_meters)} км · {selectedCell.workout_count}{" "}
-                  {selectedCell.workout_count === 1 ? "пробежка" : selectedCell.workout_count < 5 ? "пробежки" : "пробежек"}
-                </b>
-                <span>Набор</span>
-                <b>{Math.round(selectedCell.elevation_gain)} м</b>
-                <span>Время</span>
-                <b>{formatDuration(Math.round(selectedCell.moving_time_seconds))}</b>
-              </div>
-              {selectedCell.zone_seconds.some((value) => value > 0) ? (
-                <ZoneBar seconds={selectedCell.zone_seconds} />
-              ) : null}
-            </>
-          ) : (
-            <p className="ds-sub">Пробежек не было.</p>
-          )}
-          <Link
-            className="ds-link"
-            style={{ fontSize: 14 }}
-            to={`/trainer/athletes/${selectedAthlete.id}?cycle=${level === "days" ? "week" : level === "months" ? "season" : level === "blocks" ? "blocks" : "week"}`}
-          >
-            Циклы спортсмена ›
-          </Link>
-        </div>
+      {idle.length && !showIdle ? (
+        <button type="button" className="gh-idle" onClick={() => setShowIdle(true)}>
+          <b>Без пробежек · {idle.length}</b>
+          <span>{idle.map((athlete) => athlete.full_name.split(" ")[0]).join(", ")} ›</span>
+        </button>
       ) : null}
-
-      <div className="hm-legend">
-        <span>
-          Цвет
-          <span className="hm-ramp" aria-hidden="true">
-            {[1, 2, 3, 4, 5].map((index) => (
-              <i key={index} className={`t-${rampPrefix}-${index}`} />
-            ))}
-          </span>
-          {legendEdges}
-        </span>
-        <span>Рамка — {level === "days" ? "сегодня" : "текущий период"} · нажмите на ячейку — подробности</span>
-      </div>
+      <p className="gh-note">
+        {level === "months" ? MONTH_NAMES[new Date().getMonth()] : "Текущая неделя"} серым — период ещё идёт. Нажмите на имя или клетку —
+        откроется спортсмен.
+      </p>
     </section>
-  );
-}
-
-function ZoneBar({ seconds }: { seconds: number[] }) {
-  const total = seconds.reduce((sum, value) => sum + value, 0) || 1;
-  const percents = seconds.map((value) => Math.round((value / total) * 100));
-  return (
-    <>
-      <div className="ds-zbar" role="img" aria-label={percents.map((p, i) => `${ZONE_LABELS[i]} — ${p}%`).join(", ")}>
-        {percents.map((p, i) => (p > 0 ? <i key={i} style={{ flex: p, background: `var(--hrz-${i + 1})` }} /> : null))}
-      </div>
-      <div className="ds-zleg">
-        {percents.map((p, i) => (
-          <span key={i}>
-            <i style={{ background: `var(--hrz-${i + 1})` }} />
-            {ZONE_LABELS[i]} · {p}%
-          </span>
-        ))}
-      </div>
-    </>
   );
 }

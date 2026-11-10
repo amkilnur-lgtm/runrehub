@@ -191,6 +191,8 @@ export function ResultsPanel({
   const seasons = [...seasonMap.entries()].sort((a, b) => b[0] - a[0]).map(([year, rows]) => ({ year, rows }));
   const recentDays = 30;
   const canEdit = data.canEdit;
+  // старты добавляет сам спортсмен; тренер может только поправить уже внесённые
+  const canAdd = canEdit && viewer !== "trainer";
 
   if (data.results.length === 0) {
     return (
@@ -204,7 +206,7 @@ export function ResultsPanel({
               времени. Запланированный старт покажет отсчёт дней.
             </p>
           )}
-          {canEdit ? (
+          {canAdd ? (
             <button type="button" className="ds-btn ds-btn-1" style={{ marginTop: 14 }} onClick={() => setEditing({})}>
               <PlusIcon />
               Добавить старт
@@ -264,7 +266,7 @@ export function ResultsPanel({
             const result = best.result;
             if (!result) {
               // пустая плитка у своего кабинета открывает форму с этой дистанцией
-              return canEdit ? (
+              return canAdd ? (
                 <button
                   key={best.distanceMeters}
                   type="button"
@@ -365,7 +367,7 @@ export function ResultsPanel({
         );
       })}
 
-      {!title && canEdit ? (
+      {!title && canAdd ? (
         <button type="button" className="ds-btn ds-btn-2 ds-btn-full" onClick={() => setEditing({})}>
           <PlusIcon />
           Добавить старт

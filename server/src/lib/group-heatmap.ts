@@ -83,7 +83,7 @@ export async function getGroupHeatmap(coachId: number, level: HeatmapLevel) {
 
   const athletesResult = await pool.query(
     `
-      select u.id, u.full_name, u.avatar_url,
+      select u.id, u.full_name, u.avatar_url, u.created_at,
              (select max(start_date) from workouts w where w.user_id = u.id) as last_workout_at
       from users u
       where u.role = 'athlete' and u.coach_id = $1
@@ -159,6 +159,7 @@ export async function getGroupHeatmap(coachId: number, level: HeatmapLevel) {
         id,
         full_name: row.full_name,
         avatar_url: row.avatar_url,
+        member_since: row.created_at,
         last_workout_at: row.last_workout_at,
         cells: cells.get(id) ?? [],
         freshness: summary ? { tsb: summary.tsb, zone: summary.zone } : null

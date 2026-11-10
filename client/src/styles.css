@@ -4500,3 +4500,64 @@ button.ds-li.fit-row:disabled { cursor: default; }
 .bd-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .bd-clear { margin-left: auto; color: var(--danger-ink); }
 .athlete-bd { display: inline-block; margin-top: 4px; padding: 4px 0; background: none; border: 0; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--accent); cursor: pointer; }
+/* Таблица отрезков: фиксированные колонки — шапка стоит ровно над числами, темп по центру своей колонки */
+.ds-laps { table-layout: fixed; }
+.ds-laps th:nth-child(1), .ds-laps td:nth-child(1) { width: 28px; }
+.ds-laps th:nth-child(2), .ds-laps td:nth-child(2) { width: 17%; }
+.ds-laps th:nth-child(3), .ds-laps td:nth-child(3) { width: 19%; }
+.ds-laps th:nth-child(4), .ds-laps td:nth-child(4) { width: 22%; text-align: center; }
+.ds-laps th:nth-child(5), .ds-laps td:nth-child(5) { width: 16%; }
+.ds-laps th, .ds-laps td { white-space: nowrap; }
+.ds-laps td:nth-child(4) .lap-pace { min-width: 0; width: 100%; max-width: 64px; }
+.workout-club .wc-reply { align-self: flex-start; margin-left: -6px; }
+
+/* Тепловая карта группы v2: сплошная таблица */
+.gh { display: flex; flex-direction: column; gap: 10px; }
+.gh-title { font-size: 16px; font-weight: 800; }
+.gh-metric button { white-space: nowrap; }
+.gh-ctl { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.gh-legend { display: flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--ink-muted); }
+.gh-legend i { display: block; width: 16px; height: 10px; }
+.gh-legend span:first-child { margin-right: 3px; } .gh-legend span:last-child { margin-left: 3px; }
+.gh-period select { appearance: none; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 800; color: var(--accent); padding: 8px 18px 8px 4px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--accent) 50%), linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position: right 6px center, right 1px center; background-size: 5px 5px; background-repeat: no-repeat; }
+.gh-note { margin: 0; font-size: 12.5px; color: var(--ink-muted); font-weight: 600; line-height: 1.4; }
+.gh-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.gh-table { border-collapse: separate; border-spacing: 1px; width: 100%; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.gh-table thead th { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); text-align: center; padding: 0 0 4px; line-height: 1.15; vertical-align: bottom; }
+.gh-table thead th.is-now { color: var(--ink-2); }
+.gh-table thead th small { display: block; font-weight: 600; color: var(--ink-muted); }
+.gh-table th.gh-name { width: 96px; text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.gh-name a { display: flex; align-items: center; gap: 4px; min-height: 42px; color: var(--ink); font-size: 14.5px; font-weight: 700; text-decoration: none; padding-right: 4px; }
+.gh-name a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-chev { flex: none; width: 6px; height: 6px; border-right: 2px solid var(--ink-muted); border-bottom: 2px solid var(--ink-muted); transform: rotate(-45deg); }
+.gh-table td { padding: 0; }
+.gh-c { display: block; width: 100%; height: 42px; border: 0; border-radius: 0; font: inherit; font-size: 14px; font-weight: 800; color: var(--ink); background: var(--surface); cursor: pointer; }
+.gh-c.is-zero { color: var(--ink-muted); font-weight: 600; background: var(--bg); }
+.gh-c.is-na { background: transparent; cursor: default; }
+.gh-c.is-now { color: var(--ink-muted); font-weight: 700; background: var(--bg); }
+.gh-c:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gh-side { width: 130px; text-align: right; font-size: 13px; }
+.gh-idle { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; width: 100%; border: 0; border-top: 1px solid var(--border); background: none; padding: 10px 0 0; font: inherit; text-align: left; cursor: pointer; color: var(--ink-2); }
+.gh-idle b { font-size: 14px; white-space: nowrap; }
+.gh-idle span { font-size: 13px; color: var(--ink-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 721px) { .gh-table th.gh-name { width: 170px; } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* клетки v2: шкала поверх фона клетки */
+.gh-c.t-vol-1 { background: var(--vol-1); }
+.gh-c.t-vol-2 { background: var(--vol-2); }
+.gh-c.t-vol-3 { background: var(--vol-3); }
+.gh-c.t-vol-4 { background: var(--vol-4); color: var(--cell-ink-dark); }
+.gh-c.t-vol-5 { background: var(--vol-5); color: var(--cell-ink-dark); }
+.gh-c.t-ele-1 { background: var(--ele-1); }
+.gh-c.t-ele-2 { background: var(--ele-2); }
+.gh-c.t-ele-3 { background: var(--ele-3); }
+.gh-c.t-ele-4 { background: var(--ele-4); color: var(--cell-ink-dark); }
+.gh-c.t-ele-5 { background: var(--ele-5); color: var(--cell-ink-dark); }
+.gh-c.t-int-1 { background: var(--int-1); }
+.gh-c.t-int-2 { background: var(--int-2); }
+.gh-c.t-int-3 { background: var(--int-3); }
+.gh-c.t-int-4 { background: var(--int-4); color: var(--cell-ink-dark); }
+.gh-c.t-int-5 { background: var(--int-5); color: var(--cell-ink-dark); }

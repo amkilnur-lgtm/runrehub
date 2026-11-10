@@ -92,7 +92,7 @@ export function TrainerStartsPage() {
     <div className="ds-screen" style={{ gap: 20 }}>
       <div>
         <h1 className="ds-title">Старты</h1>
-        <p className="ds-sub">Старты группы. Добавить старт — в карточке спортсмена, вкладка «Результаты».</p>
+        <p className="ds-sub">Старты группы. Старты и результаты добавляют сами спортсмены.</p>
       </div>
       {[
         { title: "На этой неделе", rows: thisWeek },

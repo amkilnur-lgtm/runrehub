@@ -1017,7 +1017,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             <thead>
               <tr>
                 <th scope="col">#</th>
-                <th scope="col">Дистанция</th>
+                <th scope="col">Км</th>
                 <th scope="col">Время</th>
                 <th scope="col">Темп</th>
                 <th scope="col">Пульс</th>
