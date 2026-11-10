@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { PbGrid } from "../components/PbGrid";
 import { formatRaceTime } from "../components/Results";
 import { UserAvatar } from "../components/UserAvatar";
 import { useApi } from "../hooks/useApi";
@@ -382,39 +383,7 @@ export function AthleteProfilePage() {
       )}
 
       {data.personalBests.some((best) => best.result) ? (
-        <section className="ds-block ds-pad" aria-label="Личные рекорды">
-          <b className="mate-bt">Личные рекорды</b>
-          <div className="mate-pb">
-            {data.personalBests.map((best) => {
-              const fresh =
-                best.result && best.distanceMeters === data.freshBestDistance;
-              return (
-                <div
-                  key={best.distanceMeters}
-                  className={
-                    fresh ? "is-fresh" : best.result ? undefined : "is-empty"
-                  }
-                >
-                  <span>{best.label}</span>
-                  <b>
-                    {best.result
-                      ? formatRaceTime(best.result.official_time_seconds)
-                      : "ещё нет"}
-                  </b>
-                  {/* где и когда — второй строкой, не за тапом */}
-                  {best.result ? (
-                    <small>
-                      {fresh && best.improvementSeconds
-                        ? `−${formatRaceTime(best.improvementSeconds)} · `
-                        : ""}
-                      {shortDate(best.result.race_date)} · {best.result.name}
-                    </small>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <PbGrid bests={data.personalBests} freshDistance={data.freshBestDistance} workoutHref={(id) => `/athlete/workouts/${id}`} caption="официальное время" />
       ) : null}
 
       {data.upcoming.length || data.past.length ? (

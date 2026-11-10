@@ -31,7 +31,7 @@ function day(iso: string) {
 }
 
 function distanceLabel(meters: number) {
-  const known: Record<number, string> = { 5000: "5 км", 10000: "10 км", 21097: "21,1 км", 42195: "42,2 км" };
+  const known: Record<number, string> = { 1000: "1 км", 3000: "3 км", 5000: "5 км", 10000: "10 км", 21097: "21,1 км", 42195: "42,2 км" };
   const hit = Object.keys(known).map(Number).find((value) => Math.abs(value - meters) / value <= 0.02);
   return hit ? known[hit]! : `${(meters / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} км`;
 }

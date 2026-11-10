@@ -1,3 +1,4 @@
+import { PbGrid } from "./PbGrid";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { api } from "../api";
@@ -46,6 +47,8 @@ export type ResultDraft = Partial<{
 }>;
 
 const DISTANCES = [
+  { meters: 1000, label: "1 км" },
+  { meters: 3000, label: "3 км" },
   { meters: 5000, label: "5 км" },
   { meters: 10000, label: "10 км" },
   { meters: 21097, label: "21,1 км" },
@@ -255,62 +258,14 @@ export function ResultsPanel({
         </div>
       ) : null}
 
-      <div>
-        <div className="ds-grp">
-          <span>Личные рекорды</span>
-          <span>по протоколу</span>
-        </div>
-        {/* рекорды — плитками 2×2, чтобы отличались от списков стартов ниже */}
-        <div className="pb-tiles">
-          {data.personalBests.map((best) => {
-            const result = best.result;
-            if (!result) {
-              // пустая плитка у своего кабинета открывает форму с этой дистанцией
-              return canAdd ? (
-                <button
-                  key={best.distanceMeters}
-                  type="button"
-                  className="pb-tile2 is-empty"
-                  onClick={() => setEditing({ draft: { status: "finished", distanceMeters: best.distanceMeters } })}
-                  aria-label={`Добавить результат на ${best.label}`}
-                >
-                  <span className="pb-d">{best.label}</span>
-                  <span className="pb-none">ещё нет</span>
-                  <span className="pb-add">+ Добавить</span>
-                </button>
-              ) : (
-                <div key={best.distanceMeters} className="pb-tile2 is-empty">
-                  <span className="pb-d">{best.label}</span>
-                  <span className="pb-none">пока нет</span>
-                </div>
-              );
-            }
-            const fresh = result.id === latestRecordId && daysUntil(result.race_date) > -recentDays;
-            const { day, month } = dateParts(result.race_date);
-            return (
-              <button
-                key={best.distanceMeters}
-                type="button"
-                className={fresh ? "pb-tile2 is-fresh" : "pb-tile2"}
-                disabled={!canEdit}
-                onClick={() => setEditing({ result })}
-              >
-                <span className="pb-d">{best.label}</span>
-                <span className="pb-t">{formatRaceTime(result.official_time_seconds)}</span>
-                {/* дата первой: длинное название обрезается, а дата видна всегда */}
-                <span className="pb-m">
-                  {day} {month} · {result.name}
-                </span>
-                {fresh ? (
-                  <span className="pb-fresh">
-                    {best.improvementSeconds ? `быстрее на ${formatRaceTime(best.improvementSeconds)}` : "новый рекорд"}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* рекорды — сплошная сетка 3×2; пустая клетка в своём кабинете добавляет результат на эту дистанцию */}
+      <PbGrid
+        bests={data.personalBests}
+        freshDistance={data.personalBests.find((best) => best.result && best.result.id === latestRecordId && daysUntil(best.result.race_date) > -recentDays)?.distanceMeters ?? null}
+        workoutHref={(id) => `/${viewer === "trainer" ? "trainer" : "athlete"}/workouts/${id}`}
+        onEdit={canEdit ? (best) => best.result && setEditing({ result: best.result as RaceResult }) : undefined}
+        onAdd={canAdd ? (meters) => setEditing({ draft: { status: "finished", distanceMeters: meters } }) : undefined}
+      />
 
       {seasons.map(({ year, rows }, index) => {
         const summary = `${rows.length} ${pluralRu(rows.length, "старт", "старта", "стартов")}`;
