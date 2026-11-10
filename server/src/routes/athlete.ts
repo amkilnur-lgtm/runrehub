@@ -11,7 +11,7 @@ import { pool } from "../lib/db.js";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
 import { config } from "../config.js";
 import { getTeammateProfile } from "../lib/teammate-profile.js";
-import { getClub } from "../lib/club.js";
+import { getClub, getClubEvents } from "../lib/club.js";
 import { buildNextCursor, hasPartialCursor } from "../lib/pagination.js";
 import {
   downsampleRoute,
@@ -451,6 +451,13 @@ export async function athleteRoutes(app: FastifyInstance) {
     const coachId = rows[0]?.coach_id;
     if (!coachId) return reply.code(404).send({ message: "Вы пока не в группе" });
     return getClub(request.user.id, Number(coachId), false);
+  });
+
+  app.get("/api/athlete/club-events", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["athlete"]);
+    const { rows } = await pool.query(`select coach_id from users where id = $1`, [request.user.id]);
+    if (!rows[0]?.coach_id) return { events: [] };
+    return getClubEvents(request.user.id, Number(rows[0].coach_id));
   });
 
   app.get("/api/athlete/athletes/:id/profile", { preHandler: requireAuth }, async (request, reply) => {

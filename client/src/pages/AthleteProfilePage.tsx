@@ -54,6 +54,30 @@ type TeammateProfile = {
     average_speed: number | null;
     average_heartrate: number | null;
   }[];
+  about: string | null;
+  rank_label: string | null;
+  achievements: { id: number; title: string; year: number | null }[];
+  recovering: boolean;
+  birthday: string | null;
+  upcoming: {
+    id: number;
+    name: string;
+    race_date: string;
+    distance_meters: number;
+    goal_time_seconds: number | null;
+    viewer_too: boolean;
+  }[];
+  past: {
+    id: number;
+    name: string;
+    race_date: string;
+    distance_meters: number;
+    official_time_seconds: number | null;
+    place_overall: number | null;
+    participants: number | null;
+    is_record: boolean;
+  }[];
+  finished_count: number;
   moment: {
     kind: "record" | "luck" | "support" | "welcome";
     workoutId: number | null;
@@ -113,6 +137,15 @@ function memberSince(value: string) {
       ? ""
       : ` ${date.getFullYear()}`;
   return `в клубе с ${MONTHS_FULL[date.getMonth()]}${year}`;
+}
+
+function shortDate(value: string) {
+  const date = new Date(value);
+  const year =
+    date.getFullYear() === new Date().getFullYear()
+      ? ""
+      : ` ${date.getFullYear()}`;
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}${year}`;
 }
 
 function runDate(value: string) {
@@ -212,9 +245,35 @@ export function AthleteProfilePage() {
         />
         <div>
           <h1>{athlete.full_name}</h1>
-          <span>{sub}</span>
+          <span>
+            {[data.birthday ? `ДР ${data.birthday}` : null, sub]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
         </div>
       </header>
+      {data.rank_label || data.achievements.length || data.recovering ? (
+        <div className="mate-reg">
+          {data.recovering ? (
+            <span className="ds-pill ds-pill-soft">Восстанавливается</span>
+          ) : null}
+          {data.rank_label ? (
+            <span className="ds-pill ds-pill-accent">{data.rank_label}</span>
+          ) : null}
+          {data.achievements.slice(0, 2).map((item) => (
+            <span key={item.id} className="ds-pill ds-pill-soft">
+              {item.title}
+              {item.year ? ` · ${item.year}` : ""}
+            </span>
+          ))}
+          {data.achievements.length > 2 ? (
+            <span className="mate-more-ach">
+              ещё {data.achievements.length - 2}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {data.about ? <p className="mate-about">{data.about}</p> : null}
 
       {primary || telegram ? (
         <div className="mate-act">
@@ -322,32 +381,6 @@ export function AthleteProfilePage() {
         </section>
       )}
 
-      {data.nextStart ? (
-        <section className="ds-block ds-pad" aria-label="Ближайший старт">
-          <b className="mate-bt">Ближайший старт</b>
-          <div className="mate-race">
-            <div className="mate-race-d">
-              <b>{new Date(data.nextStart.race_date).getDate()}</b>
-              <span>
-                {MONTHS[new Date(data.nextStart.race_date).getMonth()]}
-              </span>
-            </div>
-            <div className="mate-race-m">
-              <b>{data.nextStart.name}</b>
-              <span>
-                {formatKm(data.nextStart.distance_meters, 1)} км ·{" "}
-                {data.nextStart.days === 0
-                  ? "сегодня"
-                  : `через ${data.nextStart.days} ${pluralRu(data.nextStart.days, "день", "дня", "дней")}`}
-              </span>
-            </div>
-            {data.nextStart.viewer_too ? (
-              <span className="ds-pill ds-pill-accent">вы тоже</span>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
       {data.personalBests.some((best) => best.result) ? (
         <section className="ds-block ds-pad" aria-label="Личные рекорды">
           <b className="mate-bt">Личные рекорды</b>
@@ -368,13 +401,13 @@ export function AthleteProfilePage() {
                       ? formatRaceTime(best.result.official_time_seconds)
                       : "ещё нет"}
                   </b>
-                  {fresh ? (
+                  {/* где и когда — второй строкой, не за тапом */}
+                  {best.result ? (
                     <small>
-                      {best.improvementSeconds
-                        ? `−${formatRaceTime(best.improvementSeconds)}`
-                        : "новый"}{" "}
-                      · {new Date(best.result!.race_date).getDate()}{" "}
-                      {MONTHS[new Date(best.result!.race_date).getMonth()]}
+                      {fresh && best.improvementSeconds
+                        ? `−${formatRaceTime(best.improvementSeconds)} · `
+                        : ""}
+                      {shortDate(best.result.race_date)} · {best.result.name}
                     </small>
                   ) : null}
                 </div>
@@ -382,6 +415,93 @@ export function AthleteProfilePage() {
             })}
           </div>
         </section>
+      ) : null}
+
+      {data.upcoming.length || data.past.length ? (
+        <div className="mate-starts">
+          {data.upcoming.length ? (
+            <div className="ds-list">
+              <b className="mate-lh">Впереди</b>
+              {data.upcoming.map((race) => {
+                const days = Math.round(
+                  (new Date(race.race_date).getTime() -
+                    new Date(new Date().toDateString()).getTime()) /
+                    86_400_000,
+                );
+                return (
+                  <div key={race.id} className="ds-li">
+                    <div className="club-dd">
+                      <b>{new Date(race.race_date).getDate()}</b>
+                      <span>{MONTHS[new Date(race.race_date).getMonth()]}</span>
+                    </div>
+                    <div className="ds-m">
+                      <b>{race.name}</b>
+                      <span>
+                        {formatKm(race.distance_meters, 1)} км
+                        {race.goal_time_seconds
+                          ? ` · цель ${formatRaceTime(race.goal_time_seconds)}`
+                          : ""}{" "}
+                        ·{" "}
+                        {days <= 0
+                          ? "сегодня"
+                          : `через ${days} ${pluralRu(days, "день", "дня", "дней")}`}
+                      </span>
+                    </div>
+                    {race.viewer_too ? (
+                      <span className="ds-pill ds-pill-accent">вы тоже</span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+          {data.past.length ? (
+            <div className="ds-list">
+              <b className="mate-lh">
+                Прошедшие старты
+                <span>
+                  {data.finished_count}{" "}
+                  {pluralRu(data.finished_count, "старт", "старта", "стартов")}
+                </span>
+              </b>
+              {data.past.map((race) => (
+                <div key={race.id} className="ds-li">
+                  <div className="club-dd">
+                    <b>{new Date(race.race_date).getDate()}</b>
+                    <span>{MONTHS[new Date(race.race_date).getMonth()]}</span>
+                  </div>
+                  <div className="ds-m">
+                    <b>{race.name}</b>
+                    <span>
+                      {formatKm(race.distance_meters, 1)} км
+                      {race.place_overall
+                        ? ` · ${race.place_overall}${race.participants ? ` из ${race.participants.toLocaleString("ru-RU")}` : " место"}`
+                        : ""}
+                      {new Date(race.race_date).getFullYear() !==
+                      new Date().getFullYear()
+                        ? ` · ${new Date(race.race_date).getFullYear()}`
+                        : ""}
+                    </span>
+                  </div>
+                  <div className="mate-v">
+                    <b>{formatRaceTime(race.official_time_seconds)}</b>
+                    {race.is_record ? (
+                      <span className="mate-pr">ЛР</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+              {data.finished_count > data.past.length ? (
+                <Link
+                  to={`/athlete/athletes/${athlete.id}/runs?tab=results`}
+                  className="ds-li mate-more"
+                >
+                  Все старты ({data.finished_count}) ›
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {hasRuns ? (

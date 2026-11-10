@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getClub } from "../lib/club.js";
+import { getHealth } from "../lib/health.js";
 import { birthdaySchema } from "./auth.js";
 
 import { getAthleteTrends } from "../lib/athlete-trends.js";
@@ -178,6 +179,20 @@ export async function trainerRoutes(app: FastifyInstance) {
     );
     if (!rowCount) return reply.code(404).send({ message: "Спортсмен не найден" });
     return { ok: true, ...body };
+  });
+
+  // «Здоровье» спортсмена — только если он дал согласие и не закрыл раздел от тренера
+  app.get("/api/trainer/athletes/:id/health", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    const { rows } = await pool.query(
+      `select health_consent_at, health_share_coach from users where id = $1 and coach_id = $2 and role = 'athlete'`,
+      [athleteId, request.user.id]
+    );
+    if (!rows[0]) return reply.code(404).send({ message: "Спортсмен не найден" });
+    if (!rows[0].health_consent_at || !rows[0].health_share_coach) return { shared: false };
+    const health = await getHealth(athleteId);
+    return { shared: true, labs: health.labs, supplements: health.supplements.filter((item) => !item.stopped_on) };
   });
 
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {

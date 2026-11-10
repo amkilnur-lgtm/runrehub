@@ -14,6 +14,7 @@ import {
   ResultsPanel,
 } from "../components/Results";
 import { useToast } from "../components/ToastProvider";
+import { CoachHealthBlock } from "../components/CoachHealthBlock";
 import { BirthdayDialog } from "../components/BirthdayDialog";
 import { UserAvatar } from "../components/UserAvatar";
 import { forgetApiCache, useApi } from "../hooks/useApi";
@@ -1040,6 +1041,8 @@ export function TrainerAthletePage() {
           {fitOpen === "ctl" && fitness ? fitPanel : null}
         </div>
       </div>
+
+      <CoachHealthBlock athleteId={athleteId} />
 
       <CyclesBlock athleteId={athleteId} initialLevel={initialCycle} />
 

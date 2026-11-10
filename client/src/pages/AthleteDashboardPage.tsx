@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../components/AuthProvider";
 import { UserAvatar } from "../components/UserAvatar";
+import { ClubEvents } from "../components/ClubEvents";
 import { useApi } from "../hooks/useApi";
 import { formatAgo, formatDuration, formatKm, formatPace, pluralRu } from "../lib";
 
@@ -287,6 +288,8 @@ export function AthleteDashboardPage() {
         </section>
       ) : null}
 
+      {/* последним блоком — «В клубе»: поддержка без сравнения (отчёт «Личный профиль и здоровье») */}
+      <ClubEvents />
     </div>
   );
 }

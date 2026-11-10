@@ -74,7 +74,10 @@ export function AthleteProfileView({ endpoint, backTo, backLabel, workoutHref, t
   const [nextCursor, setNextCursor] = useState<ProfileData["nextCursor"]>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [period, setPeriod] = useState<StatsPeriodKey>("week");
-  const [tab, setTab] = useState<"runs" | "results">("runs");
+  // со страницы одногруппника «Все старты» открывают сразу вкладку результатов
+  const [tab, setTab] = useState<"runs" | "results">(() =>
+    new URLSearchParams(window.location.search).get("tab") === "results" ? "results" : "runs"
+  );
 
   useEffect(() => {
     if (data) {

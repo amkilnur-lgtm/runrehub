@@ -1,6 +1,8 @@
 import { pool } from "./db.js";
 import { getAthleteResults } from "./race-results.js";
 import { getWeeklyVolume } from "./weekly-volume.js";
+import { getPublicProfile } from "./public-profile.js";
+import { formatBirthday } from "./club.js";
 
 // Страница одногруппника: только то, что видно группе. Самочувствие, боль, комментарии
 // тренера, форма/усталость и зоны сюда не попадают — это видит только тренер.
@@ -10,8 +12,13 @@ const LUCK_DAYS = 7;
 const PAUSE_DAYS = 21;
 const NEWCOMER_DAYS = 30;
 
+function formatDay(value: string | Date) {
+  if (typeof value === "string") return value.slice(0, 10);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
 export async function getTeammateProfile(viewerId: number, athleteId: number) {
-  const [profile, volume, recent, nextStart, results, lastRun] = await Promise.all([
+  const [profile, volume, recent, nextStart, results, lastRun, pub, viewerPlans] = await Promise.all([
     pool.query(
       `select u.id, u.full_name, u.avatar_url, u.created_at, u.telegram_username, c.full_name as coach_name
        from users u left join users c on c.id = u.coach_id
@@ -52,7 +59,9 @@ export async function getTeammateProfile(viewerId: number, athleteId: number) {
        from workouts w left join workout_corrections wc on wc.workout_id = w.id
        where w.user_id = $1`,
       [athleteId]
-    )
+    ),
+    getPublicProfile(athleteId),
+    pool.query(`select race_date, distance_meters from race_results where user_id = $1 and status = 'planned'`, [viewerId])
   ]);
   const person = profile.rows[0];
   if (!person) return null;
@@ -108,6 +117,42 @@ export async function getTeammateProfile(viewerId: number, athleteId: number) {
         }
       : null,
     personalBests: results.personalBests,
+    // шапка: что спортсмен сам показал клубу
+    about: pub.about,
+    rank_label: pub.rank_label,
+    achievements: pub.achievements,
+    recovering: pub.recovering,
+    birthday: pub.birthday && !pub.birthday.hidden ? formatBirthday(pub.birthday.day, pub.birthday.month) : null,
+    // старты: впереди — до трёх, ближайший первым; прошедшие — пять последних
+    upcoming: results.results
+      .filter((row) => row.status === "planned" && row.race_date >= new Date().toISOString().slice(0, 10))
+      .sort((a, b) => a.race_date.localeCompare(b.race_date))
+      .slice(0, 3)
+      .map((row) => ({
+        id: row.id,
+        name: row.name,
+        race_date: row.race_date,
+        distance_meters: row.distance_meters,
+        goal_time_seconds: row.goal_time_seconds,
+        viewer_too: viewerPlans.rows.some(
+          (plan) => formatDay(plan.race_date) === row.race_date && Number(plan.distance_meters) === row.distance_meters
+        )
+      })),
+    past: results.results
+      .filter((row) => row.status === "finished")
+      .slice(0, 5)
+      .map((row) => ({
+        id: row.id,
+        name: row.name,
+        race_date: row.race_date,
+        distance_meters: row.distance_meters,
+        official_time_seconds: row.official_time_seconds,
+        place_overall: row.place_overall,
+        participants: row.participants,
+        is_record: row.is_record,
+        workout_id: row.workout_id
+      })),
+    finished_count: results.results.filter((row) => row.status === "finished").length,
     freshBestDistance: freshBest?.distanceMeters ?? null,
     recent: recent.rows.map((row) => ({
       id: Number(row.id),

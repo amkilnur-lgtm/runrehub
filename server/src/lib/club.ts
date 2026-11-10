@@ -101,3 +101,60 @@ export async function notifyCoachesAboutBirthdays(now = new Date()) {
     await pool.query(`update users set birthday_notified_on = current_date where id = $1`, [row.id]);
   }
 }
+
+// «В клубе» внизу главной спортсмена: 2–3 поддерживающих события — день рождения сегодня,
+// свежий личный рекорд (7 дней), возвращение после паузы (первая пробежка после 14+ дней).
+// Чужих темпа и пульса здесь нет.
+export async function getClubEvents(viewerId: number, coachId: number) {
+  const club = await getClub(viewerId, coachId, false);
+  const mates = club.athletes.filter((person) => !person.is_me);
+  const events: { kind: "birthday" | "record" | "return"; athlete_id: number; full_name: string; avatar_url: string | null; text: string; sub: string; workout_id: number | null }[] = [];
+  for (const person of club.today.filter((p) => !p.is_me && !p.is_coach)) {
+    events.push({ kind: "birthday", athlete_id: person.id, full_name: person.full_name, avatar_url: person.avatar_url, text: `Сегодня день рождения у ${person.full_name.split(" ")[0]}`, sub: "поздравить", workout_id: person.last_workout_id });
+  }
+  if (!mates.length) return { events };
+  const ids = mates.map((p) => p.id);
+  const [records, returns] = await Promise.all([
+    pool.query(
+      `select r.user_id, r.name, r.race_date, r.distance_meters, r.official_time_seconds, r.workout_id
+       from race_results r
+       where r.user_id = any($1::int[]) and r.status = 'finished' and r.official_time_seconds is not null
+         and r.race_date >= current_date - 7
+         and not exists (
+           select 1 from race_results b where b.user_id = r.user_id and b.status = 'finished'
+             and b.distance_meters = r.distance_meters and b.official_time_seconds <= r.official_time_seconds and b.id <> r.id
+             and b.race_date <= r.race_date
+         )
+       order by r.race_date desc`,
+      [ids]
+    ),
+    pool.query(
+      `select w.user_id, w.id, w.start_date,
+              (select max(p.start_date) from workouts p where p.user_id = w.user_id and p.start_date < w.start_date) as prev
+       from workouts w
+       where w.user_id = any($1::int[]) and w.start_date >= now() - interval '3 days'
+         and w.start_date = (select max(x.start_date) from workouts x where x.user_id = w.user_id)`,
+      [ids]
+    )
+  ]);
+  const byId = new Map(mates.map((p) => [p.id, p]));
+  const km = (m: number) => (m >= 42000 && m <= 42400 ? "марафоне" : m >= 21000 && m <= 21200 ? "полумарафоне" : `${Math.round(m / 1000)} км`);
+  const time = (s: number) => {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
+  };
+  for (const row of records.rows) {
+    const person = byId.get(Number(row.user_id));
+    if (!person) continue;
+    events.push({ kind: "record", athlete_id: person.id, full_name: person.full_name, avatar_url: person.avatar_url, text: `${person.full_name.split(" ")[0]} — личный рекорд на ${km(Number(row.distance_meters))}`, sub: `${time(Number(row.official_time_seconds))} · ${row.name}`, workout_id: row.workout_id ?? person.last_workout_id });
+  }
+  for (const row of returns.rows) {
+    const person = byId.get(Number(row.user_id));
+    if (!person || !row.prev) continue;
+    const gap = Math.floor((new Date(row.start_date).getTime() - new Date(row.prev).getTime()) / 86_400_000);
+    if (gap < 14) continue;
+    const weeks = Math.round(gap / 7);
+    events.push({ kind: "return", athlete_id: person.id, full_name: person.full_name, avatar_url: person.avatar_url, text: `${person.full_name.split(" ")[0]} снова на пробежках`, sub: `первая пробежка за ${weeks} ${weeks === 1 ? "неделю" : weeks < 5 ? "недели" : "недель"}`, workout_id: Number(row.id) });
+  }
+  return { events: events.slice(0, 3) };
+}

@@ -5,6 +5,8 @@ import { User } from "../types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
+import { useNavigate } from "react-router-dom";
+
 import { BirthdayDialog } from "./BirthdayDialog";
 import { UserAvatar } from "./UserAvatar";
 
@@ -16,7 +18,8 @@ type EditableAvatarMenuProps = {
 
 export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
   const { fullName, avatarUrl, className } = props;
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const showToast = useToast();
   const [birthdayOpen, setBirthdayOpen] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
@@ -158,16 +161,29 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
           >
             {currentAvatarUrl ? "Изменить фото" : "Загрузить фото"}
           </button>
-          <button
-            type="button"
-            className="avatar-menu-item"
-            onClick={() => {
-              setIsAvatarMenuOpen(false);
-              setBirthdayOpen(true);
-            }}
-          >
-            День рождения
-          </button>
+          {user?.role === "athlete" ? (
+            <button
+              type="button"
+              className="avatar-menu-item"
+              onClick={() => {
+                setIsAvatarMenuOpen(false);
+                navigate("/athlete/profile");
+              }}
+            >
+              Мой профиль
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="avatar-menu-item"
+              onClick={() => {
+                setIsAvatarMenuOpen(false);
+                setBirthdayOpen(true);
+              }}
+            >
+              День рождения
+            </button>
+          )}
           {currentAvatarUrl ? (
             <button
               type="button"
