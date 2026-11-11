@@ -238,74 +238,50 @@ export function AthleteProfilePage() {
           ‹ Назад
         </Link>
       )}
+      {/* шапка (вариант А): разряд меткой рядом с именем, под шапкой — короткий список фактов */}
       <header className="mate-head">
-        <UserAvatar
-          fullName={athlete.full_name}
-          avatarUrl={athlete.avatar_url}
-          className="mate-av"
-        />
+        <UserAvatar fullName={athlete.full_name} avatarUrl={athlete.avatar_url} className="mate-av" />
         <div>
-          <h1>{athlete.full_name}</h1>
+          <h1>
+            {athlete.full_name}
+            {data.rank_label ? <span className="mate-rank">{data.rank_label}</span> : null}
+          </h1>
           <span>
-            {[data.birthday ? `ДР ${data.birthday}` : null, sub]
-              .filter(Boolean)
-              .join(" · ")}
+            {data.recovering ? "восстанавливается · " : ""}
+            {memberSince(athlete.member_since)}
           </span>
         </div>
       </header>
-      {data.rank_label || data.achievements.length || data.recovering ? (
-        <div className="mate-reg">
-          {data.recovering ? (
-            <span className="ds-pill ds-pill-soft">Восстанавливается</span>
+      {data.birthday || data.achievements.length ? (
+        <div className="ds-list mate-facts">
+          {data.birthday ? (
+            <div className="ds-li">
+              <span className="mate-fi" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 12V8M12 5.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z"/></svg></span>
+              <div className="ds-m">
+                <b>{data.birthday}</b>
+                <span>день рождения</span>
+              </div>
+            </div>
           ) : null}
-          {data.rank_label ? (
-            <span className="ds-pill ds-pill-accent">{data.rank_label}</span>
-          ) : null}
-          {data.achievements.slice(0, 2).map((item) => (
-            <span key={item.id} className="ds-pill ds-pill-soft">
-              {item.title}
-              {item.year ? ` · ${item.year}` : ""}
-            </span>
+          {data.achievements.map((item) => (
+            <div key={item.id} className="ds-li">
+              <span className="mate-fi" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3h10l-3 6h-4L7 3z"/><circle cx="12" cy="15" r="6"/><path d="M12 12.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z"/></svg></span>
+              <div className="ds-m">
+                <b className="mate-wrap">{item.title}</b>
+                {item.year ? <span>{item.year}</span> : null}
+              </div>
+            </div>
           ))}
-          {data.achievements.length > 2 ? (
-            <span className="mate-more-ach">
-              ещё {data.achievements.length - 2}
-            </span>
-          ) : null}
         </div>
       ) : null}
       {data.about ? <p className="mate-about">{data.about}</p> : null}
 
-      {primary || telegram ? (
+      {/* приложение и так внутри Telegram — отдельной кнопки «Написать в Telegram» нет */}
+      {primary ? (
         <div className="mate-act">
-          {primary ? (
-            <button
-              type="button"
-              className="ds-btn ds-btn-1"
-              onClick={primary.onClick}
-            >
-              {primary.label}
-            </button>
-          ) : null}
-          {telegram ? (
-            primary ? (
-              <button
-                type="button"
-                className="ds-btn ds-btn-3"
-                onClick={() => openTelegram(telegram)}
-              >
-                Написать
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="ds-btn ds-btn-1"
-                onClick={() => openTelegram(telegram)}
-              >
-                Написать в Telegram
-              </button>
-            )
-          ) : null}
+          <button type="button" className="ds-btn ds-btn-1" onClick={primary.onClick}>
+            {primary.label}
+          </button>
         </div>
       ) : null}
 

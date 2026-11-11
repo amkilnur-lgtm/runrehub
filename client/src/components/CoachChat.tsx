@@ -32,7 +32,8 @@ export function CoachChat({
   title,
   subtitle,
   placeholder,
-  emptyText
+  emptyText,
+  peerAvatarUrl
 }: {
   workoutId: number;
   viewer: "athlete" | "trainer";
@@ -40,6 +41,7 @@ export function CoachChat({
   subtitle?: string;
   placeholder: string;
   emptyText?: string;
+  peerAvatarUrl?: string | null;
 }) {
   const { user } = useAuth();
   const showToast = useToast();
@@ -98,26 +100,41 @@ export function CoachChat({
   }
 
   let lastDay = "";
+  // собеседник: из его сообщений (имя и фото), иначе — из того, что передала страница
+  const peer = messages?.find((item) => item.author_id !== user?.id);
+  const peerName = peer?.author_name ?? title;
   return (
     <div className="chat">
       <div className="chat-head">
-        <b>{title}</b>
-        {subtitle ? <span>{subtitle}</span> : null}
+        <UserAvatar fullName={peerName} avatarUrl={peer?.author_avatar_url ?? peerAvatarUrl ?? null} className="chat-head-av" />
+        <div>
+          <b>{peerName}</b>
+          <span>{subtitle ?? (viewer === "trainer" ? "спортсмен · только вы двое" : "тренер · только вы двое")}</span>
+        </div>
       </div>
       {messages === null ? null : messages.length === 0 ? (
         emptyText ? <p className="chat-empty">{emptyText}</p> : null
       ) : (
         <div className="chat-list">
-          {messages.map((message) => {
+          {messages.map((message, index) => {
             const mine = message.author_id === user?.id;
+            const next = messages[index + 1];
+            const prev = messages[index - 1];
+            // подряд от одного автора — склеиваем: аватар только у последнего, углы скруглены по-группе
+            const lastInGroup = !next || next.author_id !== message.author_id || dayLabel(next.created_at) !== dayLabel(message.created_at);
+            const firstInGroup = !prev || prev.author_id !== message.author_id || dayLabel(prev.created_at) !== dayLabel(message.created_at);
             const day = dayLabel(message.created_at);
             const showDay = day !== lastDay;
             lastDay = day;
             return (
               <div key={message.id}>
                 {showDay ? <span className="chat-day">{day}</span> : null}
-                <div className={mine ? "chat-row is-me" : "chat-row"}>
-                  {mine ? null : <UserAvatar fullName={message.author_name} avatarUrl={message.author_avatar_url} className="chat-av" />}
+                <div className={`chat-row${mine ? " is-me" : ""}${firstInGroup ? "" : " is-cont"}${lastInGroup ? " is-last" : ""}`}>
+                  {mine ? null : lastInGroup ? (
+                    <UserAvatar fullName={message.author_name} avatarUrl={message.author_avatar_url} className="chat-av" />
+                  ) : (
+                    <span className="chat-av-gap" aria-hidden="true" />
+                  )}
                   <button
                     type="button"
                     className="chat-bub"

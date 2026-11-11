@@ -945,7 +945,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
 
       {/* одна переписка спортсмена и тренера (комментарий тренера — его сообщение); одногруппники не видят */}
       {mode === "trainer" || canEdit ? (
-        <section className="ds-block ds-pad workout-coach" aria-label="Переписка с тренером">
+        <section className="ds-block workout-coach chat-card" aria-label="Переписка с тренером">
           <CoachChat
             workoutId={data.workout.id}
             viewer={mode}

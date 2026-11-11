@@ -4732,3 +4732,37 @@ html { -webkit-tap-highlight-color: transparent; }
 .gh-wd { display: block; font-weight: 600; }
 .gh-table thead th.is-now .gh-wd, .gh-table thead th.is-now { color: var(--accent); }
 .gh-scroll.is-switching { opacity: .55; transition: opacity 120ms ease-out; }
+
+/* Переписка — окно чата (вариант А): шапка собеседника, плотные облачка со временем в строке, строка ввода снизу */
+.chat-card { padding: 0; overflow: hidden; }
+.chat-card .chat { gap: 0; }
+.chat-card .chat-head { display: flex; gap: 10px; align-items: center; justify-content: flex-start; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.chat-head .chat-head-av { width: 36px; height: 36px; font-size: 12px; flex: none; }
+.chat-card .chat-head b { display: block; font-size: 15px; font-weight: 800; }
+.chat-card .chat-head > div > span { display: block; font-size: 12.5px; color: var(--ink-muted); font-weight: 600; }
+.chat-card .chat-empty { padding: 14px 16px 4px; }
+.chat-card .chat-list { padding: 10px 12px 12px; gap: 0; }
+.chat-card .chat-day { align-self: center; display: table; margin: 4px auto 8px; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); font-size: 11.5px; }
+.chat-card .chat-row { gap: 6px; margin-top: 6px; }
+.chat-card .chat-row.is-cont { margin-top: 2px; }
+.chat-card .chat-row .chat-av { width: 26px; height: 26px; }
+.chat-av-gap { width: 26px; flex: none; }
+.chat-card .chat-bub { max-width: 78%; padding: 6px 10px 6px 12px; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 2px 8px; border-radius: 16px; }
+.chat-card .chat-row:not(.is-me) .chat-bub { border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
+.chat-card .chat-row:not(.is-me).is-cont .chat-bub { border-top-left-radius: 5px; }
+.chat-card .chat-row:not(.is-me):not(.is-last) .chat-bub { border-bottom-left-radius: 5px; }
+.chat-card .chat-row:not(.is-me).is-last .chat-bub { border-bottom-left-radius: 5px; }
+.chat-card .chat-row.is-me.is-cont .chat-bub { border-top-right-radius: 5px; }
+.chat-card .chat-row.is-me .chat-bub { border-bottom-right-radius: 5px; }
+.chat-card .chat-text { font-size: 15px; line-height: 1.35; }
+.chat-card .chat-bub small { margin: 0 0 0 auto; transform: translateY(2px); white-space: nowrap; }
+.chat-card .chat-act { padding: 2px 0 0 32px; }
+.chat-card .chat-compose { padding: 8px 10px; border-top: 1px solid var(--border); align-items: center; }
+.chat-card .chat-compose textarea { min-height: 40px; padding: 9px 14px; border-radius: 20px; }
+.chat-card .chat-send { width: 40px; height: 40px; }
+.mate-head h1 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.mate-rank { font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-soft-ink); letter-spacing: 0; }
+.mate-facts .ds-li { min-height: 52px; padding-top: 9px; padding-bottom: 9px; align-items: flex-start; }
+.mate-fi { width: 24px; height: 24px; display: grid; place-items: center; flex: none; color: var(--ink-muted); }
+.mate-facts .ds-m .mate-wrap { white-space: normal; font-size: 15px; line-height: 1.35; }
+.mate-about { -webkit-line-clamp: 4; }
