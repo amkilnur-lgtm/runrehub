@@ -22,6 +22,7 @@ const pageLoaders = {
   TrainerFeedPage: () => import("./pages/TrainerFeedPage").then((m) => ({ default: m.TrainerFeedPage })),
   TrainerReviewPage: () => import("./pages/TrainerReviewPage").then((m) => ({ default: m.TrainerReviewPage })),
   TrainerStartsPage: () => import("./pages/TrainerStartsPage").then((m) => ({ default: m.TrainerStartsPage })),
+  TrainerProfilePage: () => import("./pages/TrainerProfilePage").then((m) => ({ default: m.TrainerProfilePage })),
   TrainerRunsPage: () => import("./pages/TrainerRunsPage").then((m) => ({ default: m.TrainerRunsPage })),
   WorkoutPage: () => import("./pages/WorkoutPage").then((m) => ({ default: m.WorkoutPage })),
   AthleteDashboardPage: () => import("./pages/AthleteDashboardPage").then((m) => ({ default: m.AthleteDashboardPage })),
@@ -35,6 +36,7 @@ const AdminPage = lazy(pageLoaders.AdminPage);
 const TrainerDashboardPage = lazy(pageLoaders.TrainerDashboardPage);
 const TrainerAthletePage = lazy(pageLoaders.TrainerAthletePage);
 const TrainerRunsPage = lazy(pageLoaders.TrainerRunsPage);
+const TrainerProfilePage = lazy(pageLoaders.TrainerProfilePage);
 const TrainerFeedPage = lazy(pageLoaders.TrainerFeedPage);
 const TrainerReviewPage = lazy(pageLoaders.TrainerReviewPage);
 const TrainerStartsPage = lazy(pageLoaders.TrainerStartsPage);
@@ -77,6 +79,7 @@ const router = createBrowserRouter([
               { path: "/trainer/starts", element: <TrainerStartsPage /> },
               { path: "/trainer/athletes/:id", element: <TrainerAthletePage /> },
               { path: "/trainer/runs", element: <TrainerRunsPage /> },
+              { path: "/trainer/profile", element: <TrainerProfilePage /> },
               { path: "/trainer/workouts/:id", element: <WorkoutPage mode="trainer" /> }
             ]
           },

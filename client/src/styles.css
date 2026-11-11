@@ -4876,3 +4876,24 @@ button.back-link::before { content: "‹ "; }
 .lf-picked { display: flex; align-items: center; gap: 12px; }
 .lf-picked .ds-m b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .lf-form .hl-date input:not([type="date"]) { width: 100%; }
+
+/* Шапка: аватар 44 px, зона нажатия 48 до края; тап — профиль */
+.app-topbar-me { display: grid; place-items: center; width: 48px; height: 48px; margin-right: -4px; border-radius: 50%; -webkit-tap-highlight-color: transparent; }
+.app-topbar .app-topbar-me .user-avatar.app-topbar-avatar { width: 44px; height: 44px; font-size: 15px; }
+.app-topbar-me:active .user-avatar { filter: brightness(0.9); }
+.app-topbar-me.active .user-avatar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.app-topbar-me:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Профиль: крупное фото с камерой, имя по центру, «Настройки» внизу */
+.me-top { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 4px 0 2px; }
+.me-top h1 { margin: 4px 0 0; font-size: 24px; font-weight: 800; }
+.me-sub { font-size: 14px; color: var(--ink-muted); font-weight: 600; }
+.me-asclub { font-size: 14.5px; font-weight: 700; color: var(--accent); text-decoration: none; padding: 6px 8px; }
+.avatar-menu.is-photo .avatar-menu-trigger { position: relative; }
+.user-avatar.me-photo { width: 88px; height: 88px; font-size: 28px; }
+.avatar-cam { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; background: var(--surface); color: var(--ink); display: grid; place-items: center; box-shadow: 0 0 0 2px var(--bg), 0 1px 3px rgba(0,0,0,.12); }
+.avatar-menu.is-photo .avatar-menu-popover { left: 50%; right: auto; transform: translateX(-50%); }
+.me-theme { width: auto; flex: none; }
+.me-theme button { padding: 6px 10px; font-size: 13.5px; }
+.me-logout { color: var(--danger-ink); font: inherit; font-size: 15.5px; font-weight: 800; border: 0; background: none; text-align: left; width: 100%; cursor: pointer; }
+.ds-li.me-logout, button.ds-li.me-logout { color: var(--danger-ink); font-weight: 800; font-size: 15.5px; }

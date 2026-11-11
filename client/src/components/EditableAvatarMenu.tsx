@@ -14,10 +14,13 @@ type EditableAvatarMenuProps = {
   fullName: string | null | undefined;
   avatarUrl?: string | null;
   className?: string;
+  // «photo» — большое фото в профиле: значок камеры, в меню только «Изменить / Удалить фото»
+  variant?: "menu" | "photo";
 };
 
 export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
-  const { fullName, avatarUrl, className } = props;
+  const { fullName, avatarUrl, className, variant = "menu" } = props;
+  const photoOnly = variant === "photo";
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const showToast = useToast();
@@ -125,15 +128,27 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
   }
 
   return (
-    <div className="avatar-menu" ref={avatarMenuRef}>
+    <div className={photoOnly ? "avatar-menu is-photo" : "avatar-menu"} ref={avatarMenuRef}>
       <button
         type="button"
         className="avatar-menu-trigger"
         aria-label={currentAvatarUrl ? "Фото профиля" : "Добавить фото профиля"}
         aria-expanded={isAvatarMenuOpen}
-        onClick={() => setIsAvatarMenuOpen((open) => !open)}
+        onClick={() => {
+          // без фото в профиле — сразу выбор файла, меню не нужно
+          if (photoOnly && !currentAvatarUrl) handleAvatarPickClick();
+          else setIsAvatarMenuOpen((open) => !open);
+        }}
       >
         <UserAvatar fullName={fullName} avatarUrl={currentAvatarUrl} className={className} ariaHidden />
+        {photoOnly ? (
+          <span className="avatar-cam" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
+        ) : null}
       </button>
       <input
         ref={fileInputRef}
@@ -161,7 +176,7 @@ export function EditableAvatarMenu(props: EditableAvatarMenuProps) {
           >
             {currentAvatarUrl ? "Изменить фото" : "Загрузить фото"}
           </button>
-          {user?.role === "athlete" ? (
+          {photoOnly ? null : user?.role === "athlete" ? (
             <button
               type="button"
               className="avatar-menu-item"

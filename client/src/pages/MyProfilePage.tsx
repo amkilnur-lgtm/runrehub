@@ -1,6 +1,9 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import { api } from "../api";
+import { EditableAvatarMenu } from "../components/EditableAvatarMenu";
+import { ProfileSettings } from "../components/ProfileSettings";
 import { useAuth } from "../components/AuthProvider";
 import { HealthSection } from "../components/HealthSection";
 import { BirthdayDialog } from "../components/BirthdayDialog";
@@ -131,16 +134,18 @@ export function MyProfilePage() {
 
   return (
     <div className="ds-screen me">
-      <header className="mate-head">
-        <UserAvatar
+      <header className="me-top">
+        <EditableAvatarMenu
           fullName={user.fullName}
           avatarUrl={user.avatarUrl}
-          className="mate-av"
+          className="me-photo"
+          variant="photo"
         />
-        <div>
-          <h1>{user.fullName}</h1>
-          <span>фото меняется по нажатию на аватар в шапке</span>
-        </div>
+        <h1>{user.fullName}</h1>
+        {profile.rank_label ? <span className="me-sub">{profile.rank_label}</span> : null}
+        <Link className="me-asclub" to={`/athlete/athletes/${user.id}`}>
+          Как меня видит клуб ›
+        </Link>
       </header>
 
       <div>
@@ -320,6 +325,8 @@ export function MyProfilePage() {
       </div>
 
       <HealthSection />
+
+      <ProfileSettings />
 
       {birthdayOpen ? (
         <BirthdayDialog

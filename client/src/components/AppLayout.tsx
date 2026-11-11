@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import { EditableAvatarMenu } from "./EditableAvatarMenu";
 import { NavGestures } from "./NavGestures";
 import { ThemeToggle } from "./ThemeToggle";
+import { UserAvatar } from "./UserAvatar";
 
 type NavItem = { to: string; label: string; end?: boolean; icon: React.ReactNode; badgeKey?: "review" };
 
@@ -92,15 +93,22 @@ export function AppLayout() {
             </nav>
           ) : null}
           <div className="app-topbar-actions">
-            <ThemeToggle />
-            <button type="button" className="icon-button" onClick={handleLogout} aria-label="Выйти" title="Выйти">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                <path d="M10 4H5v16h5M13 8l4 4-4 4M9 12h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {user ? (
-              <EditableAvatarMenu fullName={user.fullName} avatarUrl={user.avatarUrl} className="app-topbar-avatar" />
-            ) : null}
+            {user && (user.role === "athlete" || user.role === "trainer") ? (
+              // профиль — с первого тапа по аватару; тема и «Выйти» — внизу профиля
+              <NavLink to={`/${user.role}/profile`} className="app-topbar-me" aria-label="Мой профиль">
+                <UserAvatar fullName={user.fullName} avatarUrl={user.avatarUrl} className="app-topbar-avatar" ariaHidden />
+              </NavLink>
+            ) : (
+              <>
+                <ThemeToggle />
+                <button type="button" className="icon-button" onClick={handleLogout} aria-label="Выйти" title="Выйти">
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path d="M10 4H5v16h5M13 8l4 4-4 4M9 12h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {user ? <EditableAvatarMenu fullName={user.fullName} avatarUrl={user.avatarUrl} className="app-topbar-avatar" /> : null}
+              </>
+            )}
           </div>
         </div>
       </header>
