@@ -1,3 +1,4 @@
+import { getAthleteZones } from "../lib/hr-zones.js";
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
@@ -633,6 +634,7 @@ export async function athleteRoutes(app: FastifyInstance) {
     return {
       ...correctedView,
       like: await getWorkoutLikeState(workoutId, request.user.id),
+      hr_zones: (await getAthleteZones([Number(workoutResult.rows[0].user_id)])).get(Number(workoutResult.rows[0].user_id)) ?? null,
       // самочувствие — личная отметка: одногруппнику не показываем
       feeling: workoutResult.rows[0].is_owner ? await getWorkoutFeeling(workoutId) : null
     };

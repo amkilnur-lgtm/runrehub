@@ -154,7 +154,7 @@ export function TrainerReviewPage() {
   const lapRows = workLaps.length
     ? workLaps
     : (workout?.laps ?? []).filter((lap) => lap.distance_meters >= 100);
-  const hrZones = workout ? heartRateZones(workout.streams) : null;
+  const hrZones = workout ? heartRateZones(workout.streams, workout.hr_zones) : null;
   const paceSummary = workout
     ? buildPaceSummary(workout.laps, workLaps, workout.structure)
     : null;

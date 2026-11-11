@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { prefetchApi, useApi } from "../hooks/useApi";
 import { formatKm } from "../lib";
+import { intensityPercent } from "../lib-hrzones";
 
 // Тепловая карта группы — по исследованию «Страница тренера и клуба»:
 // сплошная таблица без плиток и штриховки; текущий период помечен один раз в шапке,
@@ -81,17 +82,10 @@ const FRESH_CLASS = {
   overload: "ds-pill-danger",
 } as const;
 
-// Интенсивность — пульсовые зоны в одну цифру: минута до 130 весит 0, 130–150 — ⅓, 150–162 — ⅔, 162+ — 1.
-// 0% — всё в лёгкой зоне, 100% — всё в верхней. Лёгкий бег ~15–25%, ровный ~30–35%, интервалы ~40–55%.
-const ZONE_WEIGHTS = [0, 1 / 3, 2 / 3, 1];
+// Интенсивность — доля времени бега в 3–5 зоне по личным зонам спортсмена (lib-hrzones.ts).
+// У любителей обычно 0–10%; неделя с интервалами — 15–35%. Ориентир 80/20 — не больше 20%.
 function intensityShare(cell: Cell) {
-  const total = cell.zone_seconds.reduce((sum, value) => sum + value, 0);
-  if (total <= 0) return null;
-  const weighted = cell.zone_seconds.reduce(
-    (sum, value, index) => sum + value * (ZONE_WEIGHTS[index] ?? 0),
-    0,
-  );
-  return Math.round((weighted / total) * 100);
+  return intensityPercent(cell.zone_seconds);
 }
 
 function step(value: number, edges: number[]) {
@@ -102,12 +96,12 @@ function step(value: number, edges: number[]) {
 const EDGES = {
   km: [15, 30, 45, 60],
   ele: [100, 250, 450, 700],
-  int: [20, 30, 40, 50],
+  int: [5, 10, 20, 30],
 } as const;
 const DAY_EDGES = {
   km: [5, 10, 15, 20],
   ele: [30, 80, 150, 250],
-  int: [20, 30, 40, 50],
+  int: [5, 10, 20, 30],
 } as const;
 const DAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 const UNIT = { km: "км", ele: "м", int: "%" } as const;
@@ -144,7 +138,11 @@ function title(metric: Metric, level: Level) {
   const what =
     metric === "km" ? "Объём" : metric === "ele" ? "Набор" : "Интенсивность";
   const unit =
-    metric === "km" && level === "months" ? "км в неделю" : UNIT[metric];
+    metric === "km" && level === "months"
+      ? "км в неделю"
+      : metric === "int"
+        ? "% времени в 3–5 зоне"
+        : UNIT[metric];
   const by =
     level === "days"
       ? "по дням"
@@ -269,7 +267,7 @@ export function GroupHeatmap() {
       </div>
       {metric === "int" ? (
         <p className="gh-note">
-          0% — весь бег до 130, 100% — весь выше 162
+          Зоны у каждого свои: из intervals.icu, без него — по максимальному пульсу. Ориентир 80/20 — не больше 20%
         </p>
       ) : null}
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DEFAULT_HR_ZONES, intensityPercent, zoneRangeLabels, zonesSourceNote, type AthleteHrZones } from "../lib-hrzones";
 import {
   Link,
   useNavigate,
@@ -54,6 +55,7 @@ type Cycles = {
   totals: Totals;
   previous: Totals;
   zone_seconds: number[];
+  hr_zones: AthleteHrZones | null;
   threshold: Threshold;
   pace_zone_bounds: number[] | null;
   pace_zone_seconds: number[] | null;
@@ -119,7 +121,6 @@ const MONTHS = [
   "ноя",
   "дек",
 ];
-const ZONE_LABELS = ["до 130", "130–150", "150–162", "162+"];
 const PACE_ZONE_NAMES = [
   "Лёгкий",
   "Марафонский",
@@ -587,7 +588,9 @@ function CyclesBlock({
             <div className="cy-zones">
               <div className="cy-title" style={{ marginTop: 0 }}>
                 <b>Зоны пульса</b>
-                <span>доля времени бега</span>
+                <span>
+                  в 3–5 зоне {intensityPercent(cycles.zone_seconds) ?? 0}%
+                </span>
               </div>
               <div className="ds-zbar">
                 {cycles.zone_seconds.map((value, index) =>
@@ -606,11 +609,12 @@ function CyclesBlock({
                 {cycles.zone_seconds.map((value, index) => (
                   <span key={index}>
                     <i style={{ background: `var(--hrz-${index + 1})` }} />
-                    {ZONE_LABELS[index]} ·{" "}
+                    {index + 1} · {zoneRangeLabels((cycles.hr_zones ?? DEFAULT_HR_ZONES).bounds)[index]} ·{" "}
                     {Math.round((value / zoneTotal) * 100)}%
                   </span>
                 ))}
               </div>
+              <p className="ds-zsrc">{zonesSourceNote(cycles.hr_zones ?? DEFAULT_HR_ZONES)}</p>
             </div>
           ) : null}
         </>

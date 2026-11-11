@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_HR_ZONES, zoneIndex, zoneRangeLabels, zonesSourceNote, type AthleteHrZones } from "../lib-hrzones";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
@@ -67,28 +68,20 @@ function formatKmShort(meters: number) {
   return (meters / 1000).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: meters >= 100000 ? 0 : 2 });
 }
 
-// Зоны пульса общие для всех: до 130 · 130–150 · 150–162 · 162+ (client/DESIGN.md)
-const HR_ZONES = [
-  { label: "до 130", max: 130 },
-  { label: "130–150", max: 150 },
-  { label: "150–162", max: 162 },
-  { label: "162+", max: Infinity }
-];
-
 type HrZoneShare = { label: string; percent: number };
 
-export function heartRateZones(streams: WorkoutData["streams"]): HrZoneShare[] | null {
+export function heartRateZones(streams: WorkoutData["streams"], zones: AthleteHrZones | null | undefined): HrZoneShare[] | null {
+  const bounds = (zones ?? DEFAULT_HR_ZONES).bounds;
   const hr = streams?.heartrate ?? [];
   const time = streams?.time ?? [];
   const size = Math.min(hr.length, time.length);
   if (size < 30) return null;
-  const seconds = [0, 0, 0, 0];
+  const seconds = [0, 0, 0, 0, 0];
   for (let index = 1; index < size; index += 1) {
     const dt = time[index]! - time[index - 1]!;
     const bpm = hr[index]!;
     if (!(dt > 0 && dt <= 30) || !(bpm >= 60 && bpm <= 230)) continue;
-    const zone = HR_ZONES.findIndex((item) => bpm < item.max);
-    seconds[zone] += dt;
+    seconds[zoneIndex(bpm, bounds)] += dt;
   }
   const total = seconds.reduce((sum, value) => sum + value, 0);
   if (total < 60) return null;
@@ -105,7 +98,8 @@ export function heartRateZones(streams: WorkoutData["streams"]): HrZoneShare[] |
         rest -= 1;
       }
     });
-  return HR_ZONES.map((zone, index) => ({ label: zone.label, percent: percents[index]! }));
+  const labels = zoneRangeLabels(bounds);
+  return labels.map((label, index) => ({ label: `${index + 1} · ${label}`, percent: percents[index]! }));
 }
 
 function paceOf(speed: number | null | undefined) {
@@ -154,17 +148,16 @@ export function buildPaceSummary(laps: WorkoutData["laps"], workLaps: WorkoutDat
 }
 
 export function buildHrSummary(zones: HrZoneShare[]) {
-  const above150 = zones[2]!.percent + zones[3]!.percent;
-  const above162 = zones[3]!.percent;
-  if (above162 >= 50) return `Больше половины времени — выше 162 (${above162}%)`;
-  if (above150 >= 85) return `Почти всё время — выше 150 (${above150}%)`;
-  if (above150 >= 55) return `Большая часть времени — выше 150 (${above150}%)`;
-  if (above150 >= 40) return `Около половины времени — выше 150 (${above150}%)`;
-  if (above150 >= 15) return `${above150}% времени — выше 150`;
-  return zones[0]!.percent >= 60 ? "Спокойно: большую часть времени пульс до 130" : "В основном 130–150 — аэробная работа";
+  const work = zones[2]!.percent + zones[3]!.percent + zones[4]!.percent;
+  const top = zones[4]!.percent;
+  if (top >= 30) return `${top}% времени — порог и выше (5 зона)`;
+  if (work >= 85) return `Почти всё время — в 3–5 зоне (${work}%)`;
+  if (work >= 50) return `Больше половины времени — в 3–5 зоне (${work}%)`;
+  if (work >= 15) return `${work}% времени — в 3–5 зоне`;
+  return "Спокойно: почти всё время в 1–2 зоне";
 }
 
-export function HrZonesBar({ zones }: { zones: HrZoneShare[] }) {
+export function HrZonesBar({ zones, note }: { zones: HrZoneShare[]; note?: string }) {
   return (
     <>
       <div className="ds-zbar" role="img" aria-label={`Время в зонах: ${zones.map((zone) => `${zone.label} — ${zone.percent}%`).join(", ")}`}>
@@ -180,6 +173,7 @@ export function HrZonesBar({ zones }: { zones: HrZoneShare[] }) {
           </span>
         ))}
       </div>
+      {note ? <p className="ds-zsrc">{note}</p> : null}
     </>
   );
 }
@@ -808,7 +802,8 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       : [];
   const showingWork = Boolean(data.structure && lapFilter === "work" && workLaps.length);
   const visibleLaps = showingWork ? workLaps : data.laps;
-  const hrZones = heartRateZones(data.streams);
+  const personalZones = data.hr_zones ?? DEFAULT_HR_ZONES;
+  const hrZones = heartRateZones(data.streams, personalZones);
   const paceSummary = buildPaceSummary(data.laps, workLaps, data.structure);
   const hrSummary = hrZones ? buildHrSummary(hrZones) : null;
   const startDate = data.workout.start_date ? new Date(data.workout.start_date) : null;
@@ -1064,11 +1059,12 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           cursor={chartCursor}
           onCursor={setChartCursor}
           zones={[
-            { from: 130, to: 150, color: "var(--hrz-2-bg)" },
-            { from: 150, to: 162, color: "var(--hrz-3-bg)" },
-            { from: 162, to: 240, color: "var(--hrz-4-bg)" }
+            { from: personalZones.bounds[0], to: personalZones.bounds[1], color: "var(--hrz-2-bg)" },
+            { from: personalZones.bounds[1], to: personalZones.bounds[2], color: "var(--hrz-3-bg)" },
+            { from: personalZones.bounds[2], to: personalZones.bounds[3], color: "var(--hrz-4-bg)" },
+            { from: personalZones.bounds[3], to: 240, color: "var(--hrz-5-bg)" }
           ]}
-          footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
+          footer={hrZones ? <HrZonesBar zones={hrZones} note={zonesSourceNote(personalZones)} /> : null}
         />
       </section>
 

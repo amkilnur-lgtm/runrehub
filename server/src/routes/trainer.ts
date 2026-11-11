@@ -1,3 +1,4 @@
+import { getAthleteZones } from "../lib/hr-zones.js";
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getClub } from "../lib/club.js";
@@ -697,7 +698,11 @@ export async function trainerRoutes(app: FastifyInstance) {
       correction
     );
 
-    return { ...correctedView, feeling: await getWorkoutFeeling(workoutId) };
+    return {
+      ...correctedView,
+      feeling: await getWorkoutFeeling(workoutId),
+      hr_zones: (await getAthleteZones([Number(workoutResult.rows[0].athlete_id)])).get(Number(workoutResult.rows[0].athlete_id)) ?? null
+    };
   });
 
   app.delete("/api/trainer/workouts/:id", { preHandler: requireAuth }, async (request, reply) => {

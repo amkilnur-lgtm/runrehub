@@ -45,8 +45,8 @@
   --chart-pace-ink: #1a338f;
   --chart-grid-glow: rgb(255 255 255 / 0.2);
   /* Зоны пульса — светофор, общие для всех: до 130 · 130–150 · 150–162 · 162+ */
-  --hrz-1: #4f86d9; --hrz-2: #2f9e5b; --hrz-3: #e8a317; --hrz-4: #d9442f;
-  --hrz-1-bg: #eaf1fb; --hrz-2-bg: #ecf6ef; --hrz-3-bg: #fdf4e0; --hrz-4-bg: #fcebe8;
+  --hrz-1: #4f86d9; --hrz-2: #2f9e5b; --hrz-3: #e8a317; --hrz-4: #ec7a2c; --hrz-5: #d9442f;
+  --hrz-1-bg: #eaf1fb; --hrz-2-bg: #ecf6ef; --hrz-3-bg: #fdf4e0; --hrz-4-bg: #fdefe3; --hrz-5-bg: #fcebe8;
   /* Тепловая карта: объём · набор · интенсивность (у первой ступени — рамка) */
   /* объём — оттенок акцента (OKLCH 259–266°), светлые ступени чуть к голубому, чтобы не уходили в сиреневый */
   --vol-1: #dbebff; --vol-2: #b4d2ff; --vol-3: #7da9ff; --vol-4: #3f6de5; --vol-5: #1f3fad;
@@ -115,8 +115,8 @@
   --chart-pace-soft: #1d2a5c;
   --chart-pace-ink: #c9d5fc;
   --chart-grid-glow: rgb(255 255 255 / 0.045);
-  --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
-  --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
+  --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d9692a; --hrz-5: #d6405a;
+  --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #2f1d12; --hrz-5-bg: #31171d;
   --vol-1: #253a6c; --vol-2: #3153a0; --vol-3: #4874d8; --vol-4: #77a4f6; --vol-5: #b6d2ff;
   --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
   --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
@@ -163,8 +163,8 @@
     --chart-pace-soft: #1d2a5c;
     --chart-pace-ink: #c9d5fc;
     --chart-grid-glow: rgb(255 255 255 / 0.045);
-    --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d6405a;
-    --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #31171d;
+    --hrz-1: #5b8fe0; --hrz-2: #1f8f73; --hrz-3: #bd8612; --hrz-4: #d9692a; --hrz-5: #d6405a;
+    --hrz-1-bg: #18233a; --hrz-2-bg: #142a24; --hrz-3-bg: #2c2412; --hrz-4-bg: #2f1d12; --hrz-5-bg: #31171d;
     --vol-1: #253a6c; --vol-2: #3153a0; --vol-3: #4874d8; --vol-4: #77a4f6; --vol-5: #b6d2ff;
     --ele-1: #1d4a40; --ele-2: #256356; --ele-3: #2f8e77; --ele-4: #5fbfa6; --ele-5: #a6dccf;
     --int-1: #5a2a14; --int-2: #7f3a19; --int-3: #b5521f; --int-4: #e0753a; --int-5: #f7ac7c;
@@ -4822,3 +4822,6 @@ html { -webkit-tap-highlight-color: transparent; }
 .mate-bt2 { display: flex; justify-content: space-between; align-items: baseline; }
 .mate-bt2 b { font-size: 16px; font-weight: 800; } .mate-bt2 span { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
 .mate-vol .runs-vol { height: 44px; }
+
+/* подпись, по каким зонам посчитано (личные из intervals.icu / по макс. пульсу) */
+.ds-zsrc { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); font-weight: 600; }

@@ -1,6 +1,6 @@
 import { pool } from "./db.js";
 import { getDailyLoads, computeFitnessSeries, summarizeFitness } from "./fitness.js";
-import { zoneSecondsFromStream } from "./group-heatmap.js";
+import { getAthleteZones, getWorkoutZoneSeconds } from "./hr-zones.js";
 import { getThreshold, paceZoneBounds, paceZonesFor } from "./pace-zones.js";
 
 // Циклы в карточке спортсмена у тренера: неделя по дням · 4 недели по неделям ·
@@ -45,28 +45,11 @@ async function totalsBetween(athleteId: number, from: Date, to: Date) {
 }
 
 async function zonesFor(workoutIds: number[]) {
-  if (!workoutIds.length) return [0, 0, 0, 0];
-  const missing = await pool.query(
-    `select w.id, s.heartrate_stream, s.time_stream
-     from unnest($1::int[]) ids(id) join workouts w on w.id = ids.id
-     left join workout_hr_zones z on z.workout_id = w.id
-     left join workout_streams s on s.workout_id = w.id
-     where z.workout_id is null`,
-    [workoutIds]
-  );
-  for (const row of missing.rows) {
-    const [z1, z2, z3, z4] = zoneSecondsFromStream(row.heartrate_stream ?? [], row.time_stream ?? []);
-    await pool.query(
-      `insert into workout_hr_zones (workout_id, z1_seconds, z2_seconds, z3_seconds, z4_seconds) values ($1,$2,$3,$4,$5) on conflict do nothing`,
-      [row.id, z1, z2, z3, z4]
-    );
+  const total = [0, 0, 0, 0, 0];
+  for (const seconds of (await getWorkoutZoneSeconds(workoutIds)).values()) {
+    seconds.forEach((value, zone) => (total[zone]! += value));
   }
-  const { rows } = await pool.query(
-    `select coalesce(sum(z1_seconds),0) z1, coalesce(sum(z2_seconds),0) z2, coalesce(sum(z3_seconds),0) z3, coalesce(sum(z4_seconds),0) z4
-     from workout_hr_zones where workout_id = any($1::int[])`,
-    [workoutIds]
-  );
-  return [rows[0].z1, rows[0].z2, rows[0].z3, rows[0].z4].map(Number);
+  return total;
 }
 
 function sum(rows: Array<Record<string, unknown>>): Totals {
@@ -106,7 +89,8 @@ export async function getAthleteCycles(athleteId: number, level: CycleLevel) {
     }),
     totals: sum(rows),
     previous: sum(previousRows),
-    zone_seconds: zoneSeconds
+    zone_seconds: zoneSeconds,
+    hr_zones: (await getAthleteZones([athleteId])).get(athleteId) ?? null
   };
 }
 

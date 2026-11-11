@@ -23,6 +23,7 @@ import { config } from "./config.js";
 import { ensureSchema, pool } from "./lib/db.js";
 import { addStravaEvent } from "./lib/strava-events.js";
 import { getAvatarUploadsRoot } from "./lib/avatar-storage.js";
+import { refreshIntervalsHrZones } from "./lib/hr-zones.js";
 import { forceDueIntervalsAthletes, syncDueIntervalsAthletes } from "./lib/intervals.js";
 import { getForceIntervalMinutes } from "./lib/app-settings.js";
 import {
@@ -207,10 +208,13 @@ addStravaEvent({
   message: "sync cron scheduler started",
   details: { intervalMinutes: config.STRAVA_SYNC_INTERVAL_MINUTES }
 });
-const runSyncTick = () =>
+const runSyncTick = () => {
   void syncDueIntervalsAthletes(app.log).catch((error) => {
     app.log.error({ err: error }, "intervals cron tick failed");
   });
+  // личные пульсовые зоны из intervals.icu — раз в сутки на спортсмена
+  void refreshIntervalsHrZones().catch((error) => app.log.error({ err: error }, "hr zones refresh failed"));
+};
 setInterval(runSyncTick, syncIntervalMs);
 // немедленный первый тик после старта (setInterval иначе ждёт полный интервал —
 // после каждого деплоя/рестарта синк простаивал бы 15 минут)
