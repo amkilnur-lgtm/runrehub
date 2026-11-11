@@ -384,6 +384,7 @@ function CyclesBlock({
 }) {
   const [level, setLevel] = useState<CycleLevel>(initialLevel);
   const [paceOpen, setPaceOpen] = useState(false);
+  const [hrOpen, setHrOpen] = useState(false);
   const { data, refresh } = useApi<Cycles>(
     `/api/trainer/athletes/${athleteId}/cycles?level=${level}`,
   );
@@ -658,12 +659,19 @@ function CyclesBlock({
           </div>
           {zoneTotal > 0 ? (
             <div className="cy-zones">
-              <div className="cy-title" style={{ marginTop: 0 }}>
+              {/* как зоны темпа: свёрнуто — полоса и доля в 3–5 зоне; границы зон и пульс по тесту — по нажатию */}
+              <button
+                type="button"
+                className="cy-toggle"
+                aria-expanded={hrOpen}
+                onClick={() => setHrOpen((value) => !value)}
+              >
                 <b>Зоны пульса</b>
                 <span>
-                  в 3–5 зоне {intensityPercent(cycles.zone_seconds) ?? 0}%
+                  {hrOpen ? "свернуть" : `в 3–5 зоне ${intensityPercent(cycles.zone_seconds) ?? 0}%`}
                 </span>
-              </div>
+                <i className="cy-chev" aria-hidden="true" />
+              </button>
               <div className="ds-zbar">
                 {cycles.zone_seconds.map((value, index) =>
                   value > 0 ? (
@@ -677,6 +685,8 @@ function CyclesBlock({
                   ) : null,
                 )}
               </div>
+              {hrOpen ? (
+              <>
               <div className="ds-zleg">
                 {cycles.zone_seconds.map((value, index) => (
                   <span key={index}>
@@ -687,6 +697,8 @@ function CyclesBlock({
                 ))}
               </div>
               <HrZonesLine athleteId={athleteId} zones={cycles.hr_zones ?? DEFAULT_HR_ZONES} onSaved={refresh} />
+              </>
+              ) : null}
             </div>
           ) : null}
         </>
