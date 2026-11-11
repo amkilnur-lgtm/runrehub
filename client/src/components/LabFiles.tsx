@@ -23,6 +23,12 @@ function sizeLabel(bytes: number) {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} МБ` : `${Math.max(1, Math.round(bytes / 1024))} КБ`;
 }
 
+// сегодняшняя дата по местному времени (toISOString дал бы вчера после полуночи по Уфе)
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 export function openLabFile(url: string) {
   const absolute = new URL(url, window.location.origin).toString();
   const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; openLink?: (u: string) => void } } }).Telegram?.WebApp;
@@ -83,7 +89,7 @@ export function LabFileUpload<T>({ onUploaded }: { onUploaded: (next: T) => void
   const showToast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localToday);
   const [title, setTitle] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -138,7 +144,7 @@ export function LabFileUpload<T>({ onUploaded }: { onUploaded: (next: T) => void
           </div>
           <label className="hl-date">
             <span>дата сдачи</span>
-            <input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setDate(event.target.value)} />
+            <input type="date" value={date} max={localToday()} onChange={(event) => setDate(event.target.value)} />
           </label>
           <label className="hl-date">
             <span>подпись, если нужно</span>

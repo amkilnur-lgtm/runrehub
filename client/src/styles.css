@@ -4897,3 +4897,11 @@ button.back-link::before { content: "‹ "; }
 .me-theme button { padding: 6px 10px; font-size: 13.5px; }
 .me-logout { color: var(--danger-ink); font: inherit; font-size: 15.5px; font-weight: 800; border: 0; background: none; text-align: left; width: 100%; cursor: pointer; }
 .ds-li.me-logout, button.ds-li.me-logout { color: var(--danger-ink); font-weight: 800; font-size: 15.5px; }
+/* форма загрузки анализов: длинное имя файла и поле даты не вылезают за карточку */
+.lf-picked { min-width: 0; }
+.lf-picked .ds-m { flex: 1; min-width: 0; }
+.lf-picked .ds-m b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lf-form .hl-date { min-width: 0; }
+.lf-form .hl-date input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; display: block; }
+.lf-form input[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; }
+.lf-form input[type="date"]::-webkit-date-and-time-value { text-align: left; }

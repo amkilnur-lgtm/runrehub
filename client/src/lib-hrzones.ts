@@ -33,9 +33,13 @@ export function zonesSourceNote(zones: AthleteHrZones) {
   return `Общие зоны клуба · порог ${zones.lthr}`;
 }
 
-// Интенсивность: доля времени в 3–5 зоне (выше лёгкого бега), %
+// Индекс интенсивности: средний «вес» минуты бега по 5 личным зонам.
+// 1 зона — 10%, 2 — 25%, 3 — 50%, 4 — 75%, 5 — 100%: 10% — весь бег в 1 зоне, 100% — весь на пороге и выше.
+// Тот же смысл, что у «Усталости» (минута в зоне N весит N), только без объёма.
+// На данных клуба (окт–ноя 2026): лёгкие недели 10–15%, недели с работой 18–27%.
+export const ZONE_WEIGHTS = [10, 25, 50, 75, 100];
 export function intensityPercent(seconds: number[]) {
   const total = seconds.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return null;
-  return Math.round((((seconds[2] ?? 0) + (seconds[3] ?? 0) + (seconds[4] ?? 0)) / total) * 100);
+  return Math.round(seconds.reduce((sum, value, index) => sum + value * (ZONE_WEIGHTS[index] ?? 0), 0) / total);
 }

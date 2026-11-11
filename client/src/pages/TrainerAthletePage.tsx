@@ -659,7 +659,7 @@ function CyclesBlock({
           </div>
           {zoneTotal > 0 ? (
             <div className="cy-zones">
-              {/* как зоны темпа: свёрнуто — полоса и доля в 3–5 зоне; границы зон и пульс по тесту — по нажатию */}
+              {/* как зоны темпа: свёрнуто — полоса и индекс интенсивности; границы зон и пульс по тесту — по нажатию */}
               <button
                 type="button"
                 className="cy-toggle"
@@ -668,7 +668,7 @@ function CyclesBlock({
               >
                 <b>Зоны пульса</b>
                 <span>
-                  {hrOpen ? "свернуть" : `в 3–5 зоне ${intensityPercent(cycles.zone_seconds) ?? 0}%`}
+                  {hrOpen ? "свернуть" : `интенсивность ${intensityPercent(cycles.zone_seconds) ?? 0}%`}
                 </span>
                 <i className="cy-chev" aria-hidden="true" />
               </button>

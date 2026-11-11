@@ -82,8 +82,7 @@ const FRESH_CLASS = {
   overload: "ds-pill-danger",
 } as const;
 
-// Интенсивность — доля времени бега в 3–5 зоне по личным зонам спортсмена (lib-hrzones.ts).
-// У любителей обычно 0–10%; неделя с интервалами — 15–35%. Доля времени в 3–5 зоне · ориентир — не больше 20%.
+// Интенсивность — индекс по 5 личным зонам (lib-hrzones.ts → intensityPercent).
 function intensityShare(cell: Cell) {
   return intensityPercent(cell.zone_seconds);
 }
@@ -96,18 +95,18 @@ function step(value: number, edges: number[]) {
 const EDGES = {
   km: [15, 30, 45, 60],
   ele: [100, 250, 450, 700],
-  int: [5, 10, 20, 30],
+  int: [12, 15, 20, 25],
 } as const;
 const DAY_EDGES = {
   km: [5, 10, 15, 20],
   ele: [30, 80, 150, 250],
-  int: [5, 10, 20, 30],
+  int: [12, 15, 20, 25],
 } as const;
 // по месяцам — сумма за месяц (не среднее в неделю: тренеру понятнее «сколько набегал за октябрь»)
 const MONTH_EDGES = {
   km: [60, 120, 180, 240],
   ele: [400, 1000, 1800, 2800],
-  int: [5, 10, 20, 30],
+  int: [12, 15, 20, 25],
 } as const;
 const DAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 const UNIT = { km: "км", ele: "м", int: "%" } as const;
@@ -258,8 +257,8 @@ export function GroupHeatmap() {
         ))}
       </div>
       <div className="gh-ctl">
-        <div className="gh-legend" aria-label={`Шкала: от 0 до ${legendTop}`}>
-          <span>0</span>
+        <div className="gh-legend" aria-label={`Шкала: от ${metric === "int" ? "10" : "0"} до ${legendTop}`}>
+          <span>{metric === "int" ? "10" : "0"}</span>
           {[1, 2, 3, 4, 5].map((index) => (
             <i key={index} className={`t-${ramp}-${index}`} />
           ))}
@@ -268,7 +267,7 @@ export function GroupHeatmap() {
       </div>
       {metric === "int" ? (
         <p className="gh-note">
-          Время в 3–5 зоне · норма до 20%
+          10% — весь бег в 1 зоне, 100% — весь в 5 зоне
         </p>
       ) : null}
 

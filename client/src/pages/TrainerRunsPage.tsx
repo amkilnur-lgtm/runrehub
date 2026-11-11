@@ -98,7 +98,7 @@ export function TrainerRunsPage() {
                 <b>{Math.round(total.e)}</b>
               </div>
               <div>
-                <span>в 3–5 зоне</span>
+                <span>интенсивность</span>
                 <b>{intensity === null ? "—" : `${intensity}%`}</b>
               </div>
             </div>
@@ -123,7 +123,7 @@ export function TrainerRunsPage() {
                           {run.moving_time_seconds > 0 && run.distance_meters > 0
                             ? formatPace(run.distance_meters / run.moving_time_seconds).replace("/км", "")
                             : formatDuration(Math.round(run.moving_time_seconds))}
-                          {share !== null && share > 0 ? ` · ${share}%` : ""}
+                          {share !== null ? ` · ${share}%` : ""}
                         </span>
                       </div>
                     </Link>
