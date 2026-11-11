@@ -225,7 +225,10 @@ export function AthleteProfilePage() {
               setCongratulated(true);
               showToast("success", `${name} увидит лайк на последней пробежке`);
             } catch (error) {
-              showToast("error", error instanceof Error ? error.message : "Не получилось");
+              showToast(
+                "error",
+                error instanceof Error ? error.message : "Не получилось",
+              );
             }
           },
         }
@@ -250,49 +253,88 @@ export function AthleteProfilePage() {
           ‹ Назад
         </Link>
       )}
-      {/* шапка (вариант А): разряд меткой рядом с именем, под шапкой — короткий список фактов */}
-      <header className="mate-head">
-        <UserAvatar fullName={athlete.full_name} avatarUrl={athlete.avatar_url} className="mate-av" />
-        <div>
-          <h1>
-            {athlete.full_name}
-            {data.rank_label ? <span className="mate-rank">{data.rank_label}</span> : null}
-          </h1>
-          <span>
-            {data.recovering ? "отдых · " : ""}
-            {memberSince(athlete.member_since)}
-          </span>
-        </div>
-      </header>
-      {data.birthday || data.achievements.length ? (
-        <div className="ds-list mate-facts">
-          {data.birthday ? (
-            <div className="ds-li">
-              <span className="mate-fi" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 12V8M12 5.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z"/></svg></span>
-              <div className="ds-m">
-                <b>{data.birthday}</b>
-                <span>день рождения</span>
+      {/* всё про человека — одной карточкой: фото, имя с разрядом, «в клубе с …», о себе, ниже мелко ДР и достижения */}
+      <section className="ds-block mate-card" aria-label="О спортсмене">
+        <header className="mate-head">
+          <UserAvatar
+            fullName={athlete.full_name}
+            avatarUrl={athlete.avatar_url}
+            className="mate-av"
+          />
+          <div>
+            <h1>
+              {athlete.full_name}
+              {data.rank_label ? (
+                <span className="mate-rank">{data.rank_label}</span>
+              ) : null}
+            </h1>
+            <span>
+              {data.recovering ? "отдых · " : ""}
+              {memberSince(athlete.member_since)}
+            </span>
+          </div>
+        </header>
+        {data.about ? <p className="mate-about">{data.about}</p> : null}
+        {data.birthday || data.achievements.length ? (
+          <div className="mate-facts2">
+            {data.birthday ? (
+              <div className="mate-fact">
+                <span className="mate-fi" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 12V8M12 5.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z" />
+                  </svg>
+                </span>
+                <p>
+                  {data.birthday} <span>· день рождения</span>
+                </p>
               </div>
-            </div>
-          ) : null}
-          {data.achievements.map((item) => (
-            <div key={item.id} className="ds-li">
-              <span className="mate-fi" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3h10l-3 6h-4L7 3z"/><circle cx="12" cy="15" r="6"/><path d="M12 12.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z"/></svg></span>
-              <div className="ds-m">
-                <b className="mate-wrap">{item.title}</b>
-                {item.year ? <span>{item.year}</span> : null}
+            ) : null}
+            {data.achievements.map((item) => (
+              <div key={item.id} className="mate-fact">
+                <span className="mate-fi" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 3h10l-3 6h-4L7 3z" />
+                    <circle cx="12" cy="15" r="6" />
+                    <path d="M12 12.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" />
+                  </svg>
+                </span>
+                <p>
+                  {item.title}
+                  {item.year ? <span> · {item.year}</span> : null}
+                </p>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {data.about ? <p className="mate-about">{data.about}</p> : null}
+            ))}
+          </div>
+        ) : null}
+      </section>
 
       {/* приложение и так внутри Telegram — отдельной кнопки «Написать в Telegram» нет */}
       {primary ? (
         <div className="mate-act">
-          <button type="button" className="ds-btn ds-btn-1" onClick={() => void primary.onClick()}
-            disabled={congratulated}>
+          <button
+            type="button"
+            className="ds-btn ds-btn-1"
+            onClick={() => void primary.onClick()}
+            disabled={congratulated}
+          >
             {primary.label}
           </button>
         </div>
@@ -311,7 +353,10 @@ export function AthleteProfilePage() {
           className="ds-block ds-pad mate-vol"
           aria-label="Последние 4 недели"
         >
-          <b className="mate-bt">Последние 4 недели</b>
+          <div className="mate-bt2">
+            <b>Бег</b>
+            <span>последние 4 недели</span>
+          </div>
           {data.paused && lastRun ? (
             <p className="mate-pause">
               Пауза в беге. Последняя пробежка — {lastRun.getDate()}{" "}
@@ -324,9 +369,7 @@ export function AthleteProfilePage() {
                 <b>{formatKm(last4.distance_meters)}</b>
               </div>
               <div>
-                <span>
-                  {pluralRu(last4.runs, "пробежка", "пробежки", "пробежек")}
-                </span>
+                <span>пробежек</span>
                 <b>{last4.runs}</b>
               </div>
               <div>
@@ -372,7 +415,12 @@ export function AthleteProfilePage() {
       )}
 
       {data.personalBests.some((best) => best.result) ? (
-        <PbGrid bests={data.personalBests} freshDistance={data.freshBestDistance} workoutHref={(id) => `/athlete/workouts/${id}`} caption="официальное время" />
+        <PbGrid
+          bests={data.personalBests}
+          freshDistance={data.freshBestDistance}
+          workoutHref={(id) => `/athlete/workouts/${id}`}
+          caption="официальное время"
+        />
       ) : null}
 
       {data.upcoming.length || data.past.length ? (

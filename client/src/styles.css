@@ -4808,3 +4808,17 @@ html { -webkit-tap-highlight-color: transparent; }
 .fc2-map > * { margin: 0 !important; } .fc2-run { padding-bottom: 12px; } .fc2-run .fc2-map:last-child { margin-bottom: 0; }
 .fc2-map .feed-map { margin: 0; height: 120px; aspect-ratio: auto; border-radius: 0; }
 .fc2 .feed-run-link { margin: 0 !important; padding-bottom: 12px !important; } .fc2 .fc2-foot { margin-top: 0 !important; }
+
+/* Страница спортсмена: карточка «о человеке» */
+.mate-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.mate-card .mate-head .mate-av { width: 64px; height: 64px; font-size: 20px; }
+.mate-card .mate-head h1 { font-size: 22px; }
+.mate-card .mate-about { margin: 0; color: var(--ink-2); font-size: 15px; }
+.mate-facts2 { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.mate-fact { display: flex; gap: 10px; align-items: flex-start; }
+.mate-fact .mate-fi { width: 18px; height: 20px; }
+.mate-fact p { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
+.mate-fact p span { color: var(--ink-muted); }
+.mate-bt2 { display: flex; justify-content: space-between; align-items: baseline; }
+.mate-bt2 b { font-size: 16px; font-weight: 800; } .mate-bt2 span { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+.mate-vol .runs-vol { height: 44px; }

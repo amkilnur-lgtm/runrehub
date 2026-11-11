@@ -183,6 +183,7 @@ export function GroupHeatmap() {
   const isPhone = useIsPhone();
   const navigate = useNavigate();
   const { data: fresh, loading, error } = useApi<HeatmapData>(`/api/trainer/group-heatmap?level=${level}`);
+  const monthData = useApi<HeatmapData>("/api/trainer/group-heatmap?level=weeks").data;
   // пока новый период грузится — держим прежнюю таблицу, чтобы страница не прыгала
   const [kept, setKept] = useState<HeatmapData | null>(null);
   useEffect(() => {
@@ -211,14 +212,14 @@ export function GroupHeatmap() {
   const athletes = (data?.athletes ?? [])
     .slice()
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
-  const visibleCells = (athlete: HeatmapData["athletes"][number]) =>
-    athlete.cells.slice(firstVisible);
-  const active = athletes.filter((athlete) =>
-    visibleCells(athlete).some((cell) => cell.workout_count > 0),
+  // «без пробежек» — по последним 5 неделям, одинаково во всех периодах: таблица не меняет высоту
+  const activeIds = new Set(
+    (monthData?.athletes ?? data?.athletes ?? [])
+      .filter((athlete) => athlete.cells.slice(-5).some((cell) => cell.workout_count > 0))
+      .map((athlete) => athlete.id),
   );
-  const idle = athletes.filter(
-    (athlete) => !visibleCells(athlete).some((cell) => cell.workout_count > 0),
-  );
+  const active = athletes.filter((athlete) => activeIds.has(athlete.id));
+  const idle = athletes.filter((athlete) => !activeIds.has(athlete.id));
   const rows = showIdle ? [...active, ...idle] : active;
   const ramp = metric === "km" ? "vol" : metric === "ele" ? "ele" : "int";
   const edges = edgesFor(metric, viewLevel);
@@ -268,8 +269,7 @@ export function GroupHeatmap() {
       </div>
       {metric === "int" ? (
         <p className="gh-note">
-          Пульсовые зоны одной цифрой: 0% — всё до 130, 100% — всё выше 162.
-          Лёгкий бег ~20%, интервалы ~45%.
+          0% — весь бег до 130, 100% — весь выше 162
         </p>
       ) : null}
 
