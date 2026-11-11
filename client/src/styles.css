@@ -4717,3 +4717,15 @@ button.pbg-c:focus-visible { outline: 2px solid var(--accent); outline-offset: -
   .icon-button:hover, .app-topbar-actions .theme-toggle:hover { background: transparent; }
 }
 html { -webkit-tap-highlight-color: transparent; }
+
+/* Отклик на нажатие (press.ts): строки и клетки темнеют, кнопки темнеют и чуть «проседают» */
+.ds-li, .pbg-c, .gh-c, .ds-btn, .chat-send, .feel-chip, .ds-seg button, .icon-button, .app-nav-link { transition: background-color 80ms ease-out, transform 80ms ease-out, filter 80ms ease-out; }
+.ds-li.is-pressed, label.ds-li.is-pressed, .pbg-c.is-pressed, .run-row.is-pressed, .result-row.is-pressed, .feed-run-link.is-pressed, .cy-toggle.is-pressed, .gh-idle.is-pressed {
+  background-color: color-mix(in oklab, var(--ink) 7%, var(--surface)) !important;
+}
+.gh-c.is-pressed { filter: brightness(0.92); }
+.ds-btn.is-pressed, .chat-send.is-pressed, .feel-chip.is-pressed, button.ds-btn-1.is-pressed { filter: brightness(0.9); transform: scale(0.98); }
+.ds-seg button.is-pressed, .icon-button.is-pressed, .app-nav-link.is-pressed, .ds-link.is-pressed, .avatar-menu-trigger.is-pressed { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) { .ds-btn.is-pressed, .chat-send.is-pressed, .feel-chip.is-pressed { transform: none; } }
+/* длинные ленты: не рисуем то, что далеко за экраном */
+.feed-card { content-visibility: auto; contain-intrinsic-size: auto 420px; }

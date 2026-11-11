@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../components/AuthProvider";
 import { isTelegramMiniApp } from "../telegram";
-import logoImage from "../assets/logo_red horizontal.png";
+import logoImage from "../assets/logo-red-horizontal.webp";
 
 export function LoginPage() {
   const { user, loading, login } = useAuth();

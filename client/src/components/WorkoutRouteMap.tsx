@@ -1,3 +1,4 @@
+import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import type { LngLatBoundsLike, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { useResolvedTheme, type ResolvedTheme } from "../hooks/useResolvedTheme";

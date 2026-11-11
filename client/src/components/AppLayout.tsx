@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "../api";
 
-import logoImage from "../assets/logo_red horizontal.png";
+import logoImage from "../assets/logo-red-horizontal.webp";
 import { useAuth } from "./AuthProvider";
 import { EditableAvatarMenu } from "./EditableAvatarMenu";
 import { NavGestures } from "./NavGestures";
@@ -105,7 +105,10 @@ export function AppLayout() {
         </div>
       </header>
       <main className="app-content">
-        <Outlet />
+        {/* пока часть страницы догружается — спокойный скелет, шапка и вкладки остаются на месте */}
+        <Suspense fallback={<div className="ds-screen" aria-busy="true"><div className="skeleton-block" style={{ height: 56, width: 220 }} /><div className="skeleton-block" style={{ height: 280, borderRadius: 16 }} /></div>}>
+          <Outlet />
+        </Suspense>
       </main>
       {/* «назад» возвращает на то же место страницы, новая страница — сверху */}
       <ScrollRestoration />

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 
@@ -7,24 +7,49 @@ import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import { AuthProvider } from "./components/AuthProvider";
 import { ToastProvider } from "./components/ToastProvider";
 import { LoginPage } from "./pages/LoginPage";
-import { AdminPage } from "./pages/AdminPage";
-import { TrainerDashboardPage } from "./pages/TrainerDashboardPage";
-import { TrainerAthletePage } from "./pages/TrainerAthletePage";
-import { TrainerFeedPage } from "./pages/TrainerFeedPage";
-import { TrainerReviewPage } from "./pages/TrainerReviewPage";
-import { TrainerStartsPage } from "./pages/TrainerStartsPage";
-import { WorkoutPage } from "./pages/WorkoutPage";
-import { AthleteDashboardPage } from "./pages/AthleteDashboardPage";
-import { AthleteProfilePage } from "./pages/AthleteProfilePage";
-import { AthleteProfileRunsPage } from "./pages/AthleteProfileRunsPage";
-import { MyProfilePage } from "./pages/MyProfilePage";
-import { AthleteRunsPage } from "./pages/AthleteRunsPage";
-import { AthleteStartsPage } from "./pages/AthleteStartsPage";
 import "@fontsource-variable/manrope";
 import "@fontsource/unbounded/cyrillic-700.css";
 import "@fontsource/unbounded/latin-700.css";
-import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
+import { installPressFeedback } from "./press";
+
+// Страницы — отдельными частями: старт приложения быстрее, а после первого экрана
+// остальные части тихо догружаются, чтобы переходы оставались мгновенными (см. preloadPages)
+const pageLoaders = {
+  AdminPage: () => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+  TrainerDashboardPage: () => import("./pages/TrainerDashboardPage").then((m) => ({ default: m.TrainerDashboardPage })),
+  TrainerAthletePage: () => import("./pages/TrainerAthletePage").then((m) => ({ default: m.TrainerAthletePage })),
+  TrainerFeedPage: () => import("./pages/TrainerFeedPage").then((m) => ({ default: m.TrainerFeedPage })),
+  TrainerReviewPage: () => import("./pages/TrainerReviewPage").then((m) => ({ default: m.TrainerReviewPage })),
+  TrainerStartsPage: () => import("./pages/TrainerStartsPage").then((m) => ({ default: m.TrainerStartsPage })),
+  WorkoutPage: () => import("./pages/WorkoutPage").then((m) => ({ default: m.WorkoutPage })),
+  AthleteDashboardPage: () => import("./pages/AthleteDashboardPage").then((m) => ({ default: m.AthleteDashboardPage })),
+  AthleteProfilePage: () => import("./pages/AthleteProfilePage").then((m) => ({ default: m.AthleteProfilePage })),
+  AthleteProfileRunsPage: () => import("./pages/AthleteProfileRunsPage").then((m) => ({ default: m.AthleteProfileRunsPage })),
+  MyProfilePage: () => import("./pages/MyProfilePage").then((m) => ({ default: m.MyProfilePage })),
+  AthleteRunsPage: () => import("./pages/AthleteRunsPage").then((m) => ({ default: m.AthleteRunsPage })),
+  AthleteStartsPage: () => import("./pages/AthleteStartsPage").then((m) => ({ default: m.AthleteStartsPage })),
+};
+const AdminPage = lazy(pageLoaders.AdminPage);
+const TrainerDashboardPage = lazy(pageLoaders.TrainerDashboardPage);
+const TrainerAthletePage = lazy(pageLoaders.TrainerAthletePage);
+const TrainerFeedPage = lazy(pageLoaders.TrainerFeedPage);
+const TrainerReviewPage = lazy(pageLoaders.TrainerReviewPage);
+const TrainerStartsPage = lazy(pageLoaders.TrainerStartsPage);
+const WorkoutPage = lazy(pageLoaders.WorkoutPage);
+const AthleteDashboardPage = lazy(pageLoaders.AthleteDashboardPage);
+const AthleteProfilePage = lazy(pageLoaders.AthleteProfilePage);
+const AthleteProfileRunsPage = lazy(pageLoaders.AthleteProfileRunsPage);
+const MyProfilePage = lazy(pageLoaders.MyProfilePage);
+const AthleteRunsPage = lazy(pageLoaders.AthleteRunsPage);
+const AthleteStartsPage = lazy(pageLoaders.AthleteStartsPage);
+
+export function preloadPages() {
+  const run = () => Object.values(pageLoaders).forEach((load) => void load().catch(() => undefined));
+  const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback;
+  if (idle) idle(run);
+  else window.setTimeout(run, 1200);
+}
 
 const router = createBrowserRouter([
   {
@@ -81,3 +106,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </AuthProvider>
   </React.StrictMode>
 );
+
+// после первого экрана — догружаем остальные страницы и включаем отклик на нажатие
+preloadPages();
+installPressFeedback();
