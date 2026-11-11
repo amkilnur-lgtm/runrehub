@@ -103,21 +103,24 @@ const DAY_EDGES = {
   ele: [30, 80, 150, 250],
   int: [5, 10, 20, 30],
 } as const;
+// по месяцам — сумма за месяц (не среднее в неделю: тренеру понятнее «сколько набегал за октябрь»)
+const MONTH_EDGES = {
+  km: [60, 120, 180, 240],
+  ele: [400, 1000, 1800, 2800],
+  int: [5, 10, 20, 30],
+} as const;
 const DAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 const UNIT = { km: "км", ele: "м", int: "%" } as const;
 
 function edgesFor(metric: Metric, level: Level) {
-  return level === "days" ? DAY_EDGES[metric] : EDGES[metric];
+  return level === "days" ? DAY_EDGES[metric] : level === "months" ? MONTH_EDGES[metric] : EDGES[metric];
 }
 
 function cellValue(cell: Cell, metric: Metric, level: Level) {
   if (cell.workout_count === 0) return null;
   const edges = [...edgesFor(metric, level)];
   if (metric === "km") {
-    const meters =
-      level === "months"
-        ? (cell.weekly_distance_meters ?? cell.distance_meters)
-        : cell.distance_meters;
+    const meters = cell.distance_meters;
     const km = meters / 1000;
     return {
       text: km >= 10 ? String(Math.round(km)) : formatKm(meters),
@@ -126,7 +129,11 @@ function cellValue(cell: Cell, metric: Metric, level: Level) {
   }
   if (metric === "ele")
     return {
-      text: String(Math.round(cell.elevation_gain)),
+      // 4 цифры не влезают в клетку телефона: 1250 → «1,3к»
+      text:
+        cell.elevation_gain >= 1000
+          ? `${(cell.elevation_gain / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}к`
+          : String(Math.round(cell.elevation_gain)),
       tone: step(cell.elevation_gain, edges),
     };
   const share = intensityShare(cell);
@@ -138,9 +145,7 @@ function title(metric: Metric, level: Level) {
   const what =
     metric === "km" ? "Объём" : metric === "ele" ? "Набор" : "Интенсивность";
   const unit =
-    metric === "km" && level === "months"
-      ? "км в неделю"
-      : UNIT[metric];
+    UNIT[metric];
   const by =
     level === "days"
       ? "по дням"
@@ -202,8 +207,6 @@ export function GroupHeatmap() {
   const todayIndex = (new Date().getDay() + 6) % 7;
   const viewLevel = data?.level ?? level;
   const current = viewLevel === "days" ? todayIndex : periods.length - 1;
-  const cycle =
-    level === "weeks" ? "blocks" : level === "months" ? "season" : "week";
 
   const athletes = (data?.athletes ?? [])
     .slice()
@@ -289,6 +292,11 @@ export function GroupHeatmap() {
                     key={period.start}
                     className={index === current ? "is-now" : undefined}
                   >
+                    <Link
+                      className="gh-colhead"
+                      to={`/trainer/runs?from=${encodeURIComponent(period.start)}&to=${encodeURIComponent(period.finish)}`}
+                      aria-label={`Пробежки клуба: ${headerLabel(period, viewLevel)}`}
+                    >
                     {viewLevel === "days" ? (
                       <>
                         <span className="gh-wd">
@@ -304,6 +312,7 @@ export function GroupHeatmap() {
                         <small>идёт</small>
                       )
                     ) : null}
+                    </Link>
                   </th>
                 ))}
                 {isPhone ? null : <th className="gh-side">Свежесть</th>}
@@ -348,25 +357,10 @@ export function GroupHeatmap() {
                             className={cls}
                             onClick={() =>
                               navigate(
-                                `/trainer/athletes/${athlete.id}?cycle=${cycle}`,
+                                `/trainer/runs?athlete=${athlete.id}&from=${encodeURIComponent(period.start)}&to=${encodeURIComponent(period.finish)}`,
                               )
                             }
-                            aria-label={`${athlete.full_name}, ${
-                              viewLevel === "days" ? (
-                                <>
-                                  <span className="gh-wd">
-                                    {
-                                      headerLabel(period, viewLevel).split(
-                                        " ",
-                                      )[0]
-                                    }
-                                  </span>
-                                  {headerLabel(period, viewLevel).split(" ")[1]}
-                                </>
-                              ) : (
-                                headerLabel(period, viewLevel)
-                              )
-                            }${isNow ? " (идёт)" : ""}: ${
+                            aria-label={`${athlete.full_name}, ${headerLabel(period, viewLevel)}${isNow ? " (идёт)" : ""}: ${
                               beforeJoin
                                 ? "ещё не в клубе"
                                 : value
@@ -426,7 +420,7 @@ export function GroupHeatmap() {
             ? MONTH_NAMES[new Date().getMonth()]![0]!.toUpperCase() +
               MONTH_NAMES[new Date().getMonth()]!.slice(1)
             : "Текущая неделя"}{" "}
-        серым — ещё идёт. Нажмите на имя или клетку — откроется спортсмен.
+        серым — ещё идёт. Клетка — пробежки за эти дни, дата сверху — весь клуб.
       </p>
     </section>
   );

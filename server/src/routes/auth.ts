@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { removeAvatarFile, saveAvatarFromDataUrl } from "../lib/avatar-storage.js";
 import { pool } from "../lib/db.js";
+import { labFileUrl } from "../lib/lab-files.js";
+import { deleteAllLabFiles, deleteLabFile, MAX_LAB_BYTES, readLabFile, saveLabFile } from "../lib/lab-files.js";
 import { addLabEntry, cycleEndSchema, cyclePeriodSchema, cycleSettingsSchema, getHealth, healthSettingsSchema, labEntrySchema, supplementSchema } from "../lib/health.js";
 import { achievementSchema, getPublicProfile, publicProfileSchema, savePublicProfile } from "../lib/public-profile.js";
 import { clearAuthCookie, loadCurrentUser, requireAuth, setAuthCookie, verifyPassword } from "../lib/auth.js";
@@ -162,7 +164,13 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // «Здоровье»: анализы и витамины. Без согласия — только чтение настроек
-  app.get("/api/auth/health", { preHandler: requireAuth }, async (request) => getHealth(request.user.id));
+  // ссылки на файлы анализов — подписанные, на 30 минут: открываются и во встроенном браузере Telegram
+  const healthWithLinks = async (userId: number) => {
+    const health = await getHealth(userId);
+    return { ...health, lab_files: health.lab_files.map((file) => ({ ...file, url: labFileUrl(app, file.id) })) };
+  };
+
+  app.get("/api/auth/health", { preHandler: requireAuth }, async (request) => healthWithLinks(request.user.id));
 
   app.put("/api/auth/health/settings", { preHandler: requireAuth }, async (request) => {
     const body = healthSettingsSchema.parse(request.body);
@@ -170,13 +178,14 @@ export async function authRoutes(app: FastifyInstance) {
     if (body.consent === false) {
       // отзыв согласия — удаляем всё о здоровье
       await pool.query(`delete from lab_results where user_id = $1`, [request.user.id]);
+      await deleteAllLabFiles(request.user.id);
       await pool.query(`delete from supplements where user_id = $1`, [request.user.id]);
       await pool.query(`delete from cycle_periods where user_id = $1`, [request.user.id]);
       await pool.query(`update users set cycle_enabled = false, cycle_share_coach = false where id = $1`, [request.user.id]);
       await pool.query(`update users set health_consent_at = null where id = $1`, [request.user.id]);
     }
     if (body.share_coach !== undefined) await pool.query(`update users set health_share_coach = $2 where id = $1`, [request.user.id, body.share_coach]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   const requireConsent = async (userId: number) => {
@@ -187,12 +196,54 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/api/auth/health/labs", { preHandler: requireAuth }, async (request, reply) => {
     if (!(await requireConsent(request.user.id))) return reply.code(403).send({ message: "Сначала подтвердите согласие" });
     await addLabEntry(request.user.id, labEntrySchema.parse(request.body));
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.delete("/api/auth/health/labs/:id", { preHandler: requireAuth }, async (request) => {
     await pool.query(`delete from lab_results where id = $1 and user_id = $2`, [Number((request.params as { id: string }).id), request.user.id]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
+  });
+
+  // Анализы файлом: тело — сам файл (фото или PDF), дата и подпись — в query, имя — в заголовке
+  app.post("/api/auth/health/lab-files", { preHandler: requireAuth, bodyLimit: MAX_LAB_BYTES + 1024 }, async (request, reply) => {
+    if (!(await requireConsent(request.user.id))) return reply.code(403).send({ message: "Сначала подтвердите согласие" });
+    const q = z
+      .object({ taken_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), title: z.string().trim().max(80).optional() })
+      .parse(request.query);
+    const mime = String(request.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+    if (!Buffer.isBuffer(request.body)) return reply.code(400).send({ message: "Можно фото или PDF" });
+    const rawName = String(request.headers["x-file-name"] ?? "");
+    let originalName: string | null = null;
+    try {
+      originalName = rawName ? decodeURIComponent(rawName).slice(0, 120) : null;
+    } catch {
+      originalName = null;
+    }
+    await saveLabFile(request.user.id, { buffer: request.body, mime, takenOn: q.taken_on, title: q.title || null, originalName });
+    return healthWithLinks(request.user.id);
+  });
+
+  app.delete("/api/auth/health/lab-files/:id", { preHandler: requireAuth }, async (request) => {
+    await deleteLabFile(request.user.id, Number((request.params as { id: string }).id));
+    return healthWithLinks(request.user.id);
+  });
+
+  app.get("/api/lab-file", async (request, reply) => {
+    let payload: { kind?: string; fileId?: number };
+    try {
+      payload = app.jwt.verify(String((request.query as { t?: unknown }).t ?? ""));
+    } catch {
+      return reply.code(404).send({ message: "Ссылка устарела — откройте файл ещё раз из профиля" });
+    }
+    if (payload.kind !== "lab" || !Number.isSafeInteger(payload.fileId)) return reply.code(404).send({ message: "Ссылка устарела" });
+    const file = await readLabFile(payload.fileId!);
+    if (!file) return reply.code(404).send({ message: "Файл не найден" });
+    return reply
+      .header("Content-Type", file.mime)
+      .header("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`)
+      .header("Cache-Control", "private, no-store")
+      .header("X-Robots-Tag", "noindex")
+      .send(file.buffer);
   });
 
   app.put("/api/auth/health/cycle/settings", { preHandler: requireAuth }, async (request, reply) => {
@@ -201,7 +252,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (body.enabled !== undefined) await pool.query(`update users set cycle_enabled = $2 where id = $1`, [request.user.id, body.enabled]);
     if (body.share_coach !== undefined) await pool.query(`update users set cycle_share_coach = $2 where id = $1`, [request.user.id, body.share_coach]);
     if (body.hormonal !== undefined) await pool.query(`update users set cycle_hormonal = $2 where id = $1`, [request.user.id, body.hormonal]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.post("/api/auth/health/cycle", { preHandler: requireAuth }, async (request, reply) => {
@@ -212,7 +263,7 @@ export async function authRoutes(app: FastifyInstance) {
       `insert into cycle_periods (user_id, started_on) values ($1, $2) on conflict (user_id, started_on) do nothing`,
       [request.user.id, body.started_on]
     );
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.put("/api/auth/health/cycle/:id/end", { preHandler: requireAuth }, async (request) => {
@@ -222,19 +273,19 @@ export async function authRoutes(app: FastifyInstance) {
       request.user.id,
       body.ended_on
     ]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.delete("/api/auth/health/cycle/:id", { preHandler: requireAuth }, async (request) => {
     await pool.query(`delete from cycle_periods where id = $1 and user_id = $2`, [Number((request.params as { id: string }).id), request.user.id]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.post("/api/auth/health/supplements", { preHandler: requireAuth }, async (request, reply) => {
     if (!(await requireConsent(request.user.id))) return reply.code(403).send({ message: "Сначала подтвердите согласие" });
     const body = supplementSchema.parse(request.body);
     await pool.query(`insert into supplements (user_id, name, dose) values ($1, $2, $3)`, [request.user.id, body.name, body.dose]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.put("/api/auth/health/supplements/:id/stop", { preHandler: requireAuth }, async (request) => {
@@ -242,12 +293,12 @@ export async function authRoutes(app: FastifyInstance) {
       Number((request.params as { id: string }).id),
       request.user.id
     ]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.delete("/api/auth/health/supplements/:id", { preHandler: requireAuth }, async (request) => {
     await pool.query(`delete from supplements where id = $1 and user_id = $2`, [Number((request.params as { id: string }).id), request.user.id]);
-    return getHealth(request.user.id);
+    return healthWithLinks(request.user.id);
   });
 
   app.post("/api/auth/logout", async (_request, reply) => {

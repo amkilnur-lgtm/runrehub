@@ -108,6 +108,13 @@ app.setErrorHandler((error: any, request, reply) => {
 
 await ensureSchema();
 
+// файлы анализов приходят телом запроса как есть (фото или PDF)
+app.addContentTypeParser(
+  ["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+  { parseAs: "buffer", bodyLimit: 11 * 1024 * 1024 },
+  (_request, body, done) => done(null, body)
+);
+
 await app.register(authRoutes);
 await app.register(storyLinkRoutes);
 await app.register(resultsRoutes);
@@ -131,11 +138,14 @@ if (indexHtml) {
   });
 }
 
+fs.mkdirSync(path.join(avatarUploadsRoot, "avatars"), { recursive: true });
+// публично — только аватары; файлы анализов (uploads/labs) отдаются по подписанной ссылке
 await app.register(fastifyStatic, {
-  root: avatarUploadsRoot,
-  prefix: "/uploads/",
+  root: path.join(avatarUploadsRoot, "avatars"),
+  prefix: "/uploads/avatars/",
   decorateReply: false
 });
+
 
 // --- Healthcheck с проверкой БД ---
 app.get("/api/health", async (_request, reply) => {

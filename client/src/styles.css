@@ -4847,3 +4847,32 @@ html { -webkit-tap-highlight-color: transparent; }
 .chat-card .chat-compose.has-text .chat-send { background: var(--accent); color: #fff; }
 .hrz-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .hrz-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink-muted); }
+
+/* Пробежки за период (из тепловой карты) */
+.rp-head h1 { margin: 0; font-size: 26px; font-weight: 800; }
+.rp-head p { margin: 2px 0 0; color: var(--ink-muted); font-weight: 600; }
+.rp-sum { grid-template-columns: repeat(4, 1fr); }
+.rp-row { display: flex; align-items: center; gap: 12px; }
+.rp-row .rp-av { width: 36px; height: 36px; font-size: 12px; flex: none; }
+.rp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rp-main b { font-size: 15.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-main span { font-size: 13px; color: var(--ink-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-num { text-align: right; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.rp-num b { font-size: 17px; font-weight: 800; }
+.rp-num span { font-size: 13px; color: var(--ink-muted); font-weight: 600; white-space: nowrap; }
+.gh-colhead { color: inherit; text-decoration: none; display: block; padding: 2px 0; border-radius: 6px; }
+.gh-colhead:active { background: var(--surface-2); }
+.rp-sum > div { padding: 0 8px; }
+.runs-period { display: flex; flex-direction: column; gap: 14px; }
+button.back-link { border: 0; background: none; font: inherit; font-weight: 650; font-size: 14.5px; cursor: pointer; }
+button.back-link::before { content: "‹ "; }
+
+/* Анализы файлами */
+.lf-row { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
+.lf-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; border: 0; background: none; font: inherit; color: inherit; text-align: left; padding: 0; cursor: pointer; }
+.lf-ic { width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); color: var(--ink-muted); display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.lf-ic.is-pdf { background: var(--accent-soft); color: var(--accent-soft-ink); }
+.lf-del { width: 40px; height: 40px; border: 0; background: none; color: var(--ink-muted); display: grid; place-items: center; border-radius: 10px; cursor: pointer; flex: none; }
+.lf-picked { display: flex; align-items: center; gap: 12px; }
+.lf-picked .ds-m b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.lf-form .hl-date input:not([type="date"]) { width: 100%; }

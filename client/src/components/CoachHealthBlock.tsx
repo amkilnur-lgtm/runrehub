@@ -1,6 +1,6 @@
 import { useApi } from "../hooks/useApi";
+import { LabFileList, type LabFile } from "./LabFiles";
 import {
-  LabHistory,
   labDate,
   type LabSession,
   type Supplement,
@@ -20,6 +20,7 @@ export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
     | {
         shared: true;
         labs: LabSession[];
+        lab_files: LabFile[];
         supplements: Supplement[];
         cycle: CoachCycle;
       }
@@ -27,7 +28,7 @@ export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
   if (
     !data ||
     !data.shared ||
-    (!data.labs.length && !data.supplements.length && !data.cycle)
+    (!data.lab_files.length && !data.supplements.length && !data.cycle)
   )
     return null;
   return (
@@ -35,11 +36,11 @@ export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
       <div className="ds-grp">
         <span>Здоровье</span>
         <span>
-          {data.labs[0] ? `анализы ${labDate(data.labs[0].taken_on)}` : ""}
+          {data.lab_files[0] ? `анализы ${labDate(data.lab_files[0].taken_on)}` : ""}
         </span>
       </div>
       <div className="ds-list">
-        <LabHistory labs={data.labs} />
+        <LabFileList files={data.lab_files} />
         {data.supplements.length ? (
           <div className="ds-li">
             <div className="ds-m">

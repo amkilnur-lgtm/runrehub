@@ -1,4 +1,5 @@
-import { getAthleteZones } from "../lib/hr-zones.js";
+import { getAthleteZones, getWorkoutZoneSeconds } from "../lib/hr-zones.js";
+import { labFileUrl } from "../lib/lab-files.js";
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getClub } from "../lib/club.js";
@@ -217,9 +218,10 @@ export async function trainerRoutes(app: FastifyInstance) {
       health.cycle.enabled && health.cycle.share_coach
         ? { day: health.cycle.day, avg_length: health.cycle.avg_length, next_in_days: health.cycle.next_in_days, alert: health.cycle.alert }
         : null;
-    if (!rows[0].health_share_coach) return cycle ? { shared: true, labs: [], supplements: [], cycle } : { shared: false };
-    return { shared: true, labs: health.labs, supplements: health.supplements.filter((item) => !item.stopped_on), cycle };
+    if (!rows[0].health_share_coach) return cycle ? { shared: true, labs: [], lab_files: [], supplements: [], cycle } : { shared: false };
+    return { shared: true, labs: health.labs, lab_files: health.lab_files.map((file) => ({ ...file, url: labFileUrl(app, file.id) })), supplements: health.supplements.filter((item) => !item.stopped_on), cycle };
   });
+
 
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
@@ -1294,6 +1296,33 @@ export async function trainerRoutes(app: FastifyInstance) {
   });
 
   // Лента команды для тренера — те же карточки, что у атлетов
+  // Пробежки за период (тап по клетке/колонке тепловой карты): весь клуб или один спортсмен
+  app.get("/api/trainer/runs", { preHandler: requireAuth }, async (request) => {
+    requireRole(request, ["trainer"]);
+    const q = z
+      .object({ from: z.string().datetime(), to: z.string().datetime(), athlete: z.coerce.number().int().positive().optional() })
+      .parse(request.query);
+    const { rows } = await pool.query(
+      `select w.id, w.name, w.start_date, u.id as athlete_id, u.full_name as athlete_name, u.avatar_url,
+              coalesce(wc.corrected_distance_meters, w.distance_meters)::float8 as distance_meters,
+              coalesce(wc.corrected_moving_time_seconds, w.moving_time_seconds, 0)::float8 as moving_time_seconds,
+              coalesce(wc.corrected_elevation_gain, w.elevation_gain, 0)::float8 as elevation_gain,
+              w.average_heartrate
+       from workouts w
+       join users u on u.id = w.user_id
+       left join workout_corrections wc on wc.workout_id = w.id
+       where u.coach_id = $1 and u.role = 'athlete' and w.start_date >= $2 and w.start_date < $3
+         and ($4::int is null or u.id = $4)
+       order by w.start_date desc
+       limit 300`,
+      [request.user.id, q.from, q.to, q.athlete ?? null]
+    );
+    const zones = await getWorkoutZoneSeconds(rows.map((row) => Number(row.id)));
+    return {
+      runs: rows.map((row) => ({ ...row, zone_seconds: zones.get(Number(row.id)) ?? null }))
+    };
+  });
+
   app.get("/api/trainer/feed", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["trainer"]);
     const query = workoutCursorQuerySchema.parse(request.query);

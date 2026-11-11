@@ -1,3 +1,4 @@
+import { listLabFiles } from "./lab-files.js";
 import { z } from "zod";
 
 import { pool } from "./db.js";
@@ -52,6 +53,7 @@ export async function getHealth(userId: number) {
   const cycle = await getCycle(userId);
   return {
     cycle,
+    lab_files: await listLabFiles(userId),
     consent_at: user.rows[0]?.health_consent_at ?? null,
     share_coach: Boolean(user.rows[0]?.health_share_coach ?? true),
     labs: [...sessions.values()],
