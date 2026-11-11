@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_HR_ZONES, zoneIndex, zoneRangeLabels, zonesSourceNote, type AthleteHrZones } from "../lib-hrzones";
+import { DEFAULT_HR_ZONES, zoneIndex, zoneRangeLabels, type AthleteHrZones } from "../lib-hrzones";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
@@ -1065,7 +1065,7 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
             { from: personalZones.bounds[2], to: personalZones.bounds[3], color: "var(--hrz-4-bg)" },
             { from: personalZones.bounds[3], to: 240, color: "var(--hrz-5-bg)" }
           ]}
-          footer={hrZones ? <HrZonesBar zones={hrZones} note={zonesSourceNote(personalZones)} /> : null}
+          footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
         />
       </section>
 

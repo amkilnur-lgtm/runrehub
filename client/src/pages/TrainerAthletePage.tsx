@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DEFAULT_HR_ZONES, intensityPercent, zoneRangeLabels, zonesSourceNote, type AthleteHrZones } from "../lib-hrzones";
+import { DEFAULT_HR_ZONES, intensityPercent, zoneRangeLabels, type AthleteHrZones } from "../lib-hrzones";
 import {
   Link,
   useNavigate,
@@ -202,7 +202,6 @@ function HrZonesLine({ athleteId, zones, onSaved }: { athleteId: number; zones: 
   }
   return (
     <p className="ds-zsrc">
-      {zonesSourceNote(zones)}.{" "}
       <button
         type="button"
         className="cy-link"
@@ -212,7 +211,7 @@ function HrZonesLine({ athleteId, zones, onSaved }: { athleteId: number; zones: 
           setEditing(true);
         }}
       >
-        {zones.source === "coach" ? "Изменить" : "Указать по тесту"}
+        {zones.source === "coach" ? `Пульс по тесту: макс. ${zones.max_hr ?? "—"} · порог ${zones.lthr} — изменить` : "Указать пульс по тесту"}
       </button>
     </p>
   );

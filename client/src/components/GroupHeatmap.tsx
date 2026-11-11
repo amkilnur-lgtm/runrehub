@@ -267,7 +267,7 @@ export function GroupHeatmap() {
       </div>
       {metric === "int" ? (
         <p className="gh-note">
-          Зоны у каждого свои: из intervals.icu, без него — по максимальному пульсу. Ориентир 80/20 — не больше 20%
+          Ориентир 80/20 — не больше 20%
         </p>
       ) : null}
 
