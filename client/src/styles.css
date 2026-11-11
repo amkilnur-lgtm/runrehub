@@ -4729,3 +4729,6 @@ html { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) { .ds-btn.is-pressed, .chat-send.is-pressed, .feel-chip.is-pressed { transform: none; } }
 /* длинные ленты: не рисуем то, что далеко за экраном */
 .feed-card { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.gh-wd { display: block; font-weight: 600; }
+.gh-table thead th.is-now .gh-wd, .gh-table thead th.is-now { color: var(--accent); }
+.gh-scroll.is-switching { opacity: .55; transition: opacity 120ms ease-out; }

@@ -16,6 +16,14 @@ function remember(url: string, value: unknown) {
 }
 
 // после изменений (удалили, переименовали) старый ответ не показываем
+// заранее загрузить ответ в кэш (соседние вкладки, переключатели) — переход без ожидания
+export function prefetchApi(url: string) {
+  if (cache.has(url)) return;
+  void api(url)
+    .then((res) => remember(url, res))
+    .catch(() => undefined);
+}
+
 export function forgetApiCache(prefix?: string) {
   for (const key of [...cache.keys()]) {
     if (!prefix || key.startsWith(prefix)) cache.delete(key);

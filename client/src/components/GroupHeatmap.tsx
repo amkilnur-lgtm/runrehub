@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { useApi } from "../hooks/useApi";
+import { prefetchApi, useApi } from "../hooks/useApi";
 import { formatKm } from "../lib";
 
 // Тепловая карта группы — по исследованию «Страница тренера и клуба»:
@@ -182,9 +182,18 @@ export function GroupHeatmap() {
   const [showIdle, setShowIdle] = useState(false);
   const isPhone = useIsPhone();
   const navigate = useNavigate();
-  const { data, loading, error } = useApi<HeatmapData>(
-    `/api/trainer/group-heatmap?level=${level}`,
-  );
+  const { data: fresh, loading, error } = useApi<HeatmapData>(`/api/trainer/group-heatmap?level=${level}`);
+  // пока новый период грузится — держим прежнюю таблицу, чтобы страница не прыгала
+  const [kept, setKept] = useState<HeatmapData | null>(null);
+  useEffect(() => {
+    if (fresh) setKept(fresh);
+  }, [fresh]);
+  const data = fresh ?? kept;
+  const switching = !fresh && Boolean(kept);
+  // остальные периоды — заранее, чтобы переключение было мгновенным
+  useEffect(() => {
+    (["days", "weeks", "months"] as const).forEach((value) => prefetchApi(`/api/trainer/group-heatmap?level=${value}`));
+  }, []);
 
   const allPeriods = data?.periods ?? [];
   // на телефоне — последние 5 недель (4 полные + текущая), на компьютере — все
@@ -194,7 +203,8 @@ export function GroupHeatmap() {
   const periods = allPeriods.slice(firstVisible);
   // текущая колонка: сегодня в «Неделе», последняя — в «Месяце» и «Сезоне»
   const todayIndex = (new Date().getDay() + 6) % 7;
-  const current = level === "days" ? todayIndex : periods.length - 1;
+  const viewLevel = data?.level ?? level;
+  const current = viewLevel === "days" ? todayIndex : periods.length - 1;
   const cycle =
     level === "weeks" ? "blocks" : level === "months" ? "season" : "week";
 
@@ -211,12 +221,12 @@ export function GroupHeatmap() {
   );
   const rows = showIdle ? [...active, ...idle] : active;
   const ramp = metric === "km" ? "vol" : metric === "ele" ? "ele" : "int";
-  const edges = edgesFor(metric, level);
+  const edges = edgesFor(metric, viewLevel);
   const legendTop = `${edges[edges.length - 1]}+ ${metric === "int" ? "%" : UNIT[metric]}`;
 
   return (
     <section className="ds-block ds-pad gh" aria-label="Группа по периодам">
-      <b className="gh-title">{title(metric, level)}</b>
+      <b className="gh-title">{title(metric, viewLevel)}</b>
       <div className="ds-seg gh-metric" role="group" aria-label="Что в клетке">
         {METRICS.map((item) => (
           <button
@@ -273,7 +283,7 @@ export function GroupHeatmap() {
       ) : !athletes.length ? (
         <p className="ds-sub">В группе пока нет спортсменов.</p>
       ) : (
-        <div className="gh-scroll">
+        <div className={switching ? "gh-scroll is-switching" : "gh-scroll"}>
           <table className="gh-table">
             <thead>
               <tr>
@@ -283,9 +293,20 @@ export function GroupHeatmap() {
                     key={period.start}
                     className={index === current ? "is-now" : undefined}
                   >
-                    {headerLabel(period, level)}
+                    {viewLevel === "days" ? (
+                      <>
+                        <span className="gh-wd">
+                          {headerLabel(period, viewLevel).split(" ")[0]}
+                        </span>
+                        {headerLabel(period, viewLevel).split(" ")[1]}
+                      </>
+                    ) : (
+                      headerLabel(period, viewLevel)
+                    )}
                     {index === current ? (
-                      <small>{level === "days" ? "сегодня" : "идёт"}</small>
+                      viewLevel === "days" ? null : (
+                        <small>идёт</small>
+                      )
                     ) : null}
                   </th>
                 ))}
@@ -312,8 +333,8 @@ export function GroupHeatmap() {
                       // будущие дни недели и недели до прихода в клуб — пустые
                       const beforeJoin =
                         new Date(period.finish).getTime() <= joined ||
-                        (level === "days" && index > todayIndex);
-                      const value = cellValue(cell, metric, level);
+                        (viewLevel === "days" && index > todayIndex);
+                      const value = cellValue(cell, metric, viewLevel);
                       const isNow = index === current;
                       const cls = beforeJoin
                         ? "gh-c is-na"
@@ -334,7 +355,22 @@ export function GroupHeatmap() {
                                 `/trainer/athletes/${athlete.id}?cycle=${cycle}`,
                               )
                             }
-                            aria-label={`${athlete.full_name}, ${headerLabel(period, level)}${isNow ? " (идёт)" : ""}: ${
+                            aria-label={`${athlete.full_name}, ${
+                              viewLevel === "days" ? (
+                                <>
+                                  <span className="gh-wd">
+                                    {
+                                      headerLabel(period, viewLevel).split(
+                                        " ",
+                                      )[0]
+                                    }
+                                  </span>
+                                  {headerLabel(period, viewLevel).split(" ")[1]}
+                                </>
+                              ) : (
+                                headerLabel(period, viewLevel)
+                              )
+                            }${isNow ? " (идёт)" : ""}: ${
                               beforeJoin
                                 ? "ещё не в клубе"
                                 : value
