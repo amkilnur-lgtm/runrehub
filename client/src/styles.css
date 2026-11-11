@@ -4905,3 +4905,27 @@ button.back-link::before { content: "‹ "; }
 .lf-form .hl-date input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; display: block; }
 .lf-form input[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; }
 .lf-form input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+
+/* Лента, вариант A: км справа в шапке, название — тихая строка в одну линию */
+.fc2-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px 0; }
+.fc2-author { flex: 1; min-width: 0; min-height: 44px; }
+.fc2-author .fc2-av { width: 40px; height: 40px; font-size: 13px; }
+.fc2-author > div { min-width: 0; }
+.fc2-author b, .fc2-author > div > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc2-head .fc2-big { flex: none; margin: 0; color: var(--ink); text-decoration: none; font-size: 30px; line-height: 1; }
+.fc2-head .fc2-big small { font-size: 14px; margin-left: 2px; }
+.fc2-run { padding: 6px 16px 12px; }
+.fc2-title { font-size: 15px; font-weight: 700; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc2-stats { margin-top: 10px; }
+.fc2-stats b { font-size: 19px; }
+/* название пробежки — третьей строкой под временем, в колонке «кто» */
+.fc2-head { align-items: flex-start; }
+.fc2-avlink { flex: none; display: block; border-radius: 50%; }
+.fc2-head .fc2-av { width: 40px; height: 40px; font-size: 13px; }
+.fc2-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fc2-name { font-size: 15.5px; font-weight: 800; color: var(--ink); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc2-when { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+.fc2-who .fc2-title { margin-top: 3px; font-size: 14.5px; font-weight: 700; color: var(--ink-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc2-head .fc2-big { margin-top: 2px; }
+.fc2-run { padding-top: 10px; }
+.fc2-stats { margin-top: 0; }

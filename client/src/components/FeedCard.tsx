@@ -146,25 +146,31 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
       ? "поставьте первым"
       : "";
 
-  // карточка ленты (вариант А): как главная и страница пробежки — крупно км, ниже время · темп · пульс
+  // карточка ленты (макет «Карточка пробежки в ленте», вариант A): «кто — слева, сколько — справа» в шапке,
+  // название — серой строкой в одну линию, ниже время · темп · пульс; каркас одинаковый у всех карточек
   return (
     <article className="feed-card fc2">
       <header className="fc2-head">
-        <Link to={athleteHref} className="fc2-author">
-          <UserAvatar fullName={item.athlete_name} avatarUrl={item.athlete_avatar_url} className="fc2-av" />
-          <div>
-            <b>{item.athlete_name}</b>
-            <span>{formatAgo(item.start_date)}</span>
-          </div>
+        <Link to={athleteHref} className="fc2-avlink" aria-label={item.athlete_name}>
+          <UserAvatar fullName={item.athlete_name} avatarUrl={item.athlete_avatar_url} className="fc2-av" ariaHidden />
+        </Link>
+        {/* слева: кто → когда → что за пробежка; справа — сколько */}
+        <div className="fc2-who">
+          <Link to={athleteHref} className="fc2-name">
+            {item.athlete_name}
+          </Link>
+          <span className="fc2-when">{formatAgo(item.start_date)}</span>
+          <Link to={workoutHref} className="fc2-title">
+            {item.name}
+          </Link>
+        </div>
+        <Link to={workoutHref} className="fc2-big" tabIndex={-1} aria-hidden="true">
+          {formatKm(item.distance_meters, 2)}
+          <small>км</small>
         </Link>
       </header>
 
-      <Link to={workoutHref} className="feed-run-link fc2-run">
-        <div className="fc2-title">{item.name}</div>
-        <div className="fc2-big">
-          {formatKm(item.distance_meters, 2)}
-          <small>км</small>
-        </div>
+      <Link to={workoutHref} className="feed-run-link fc2-run" aria-label={`${item.name}, ${formatKm(item.distance_meters, 2)} км`}>
         <div className="workout-stats-row fc2-stats">
           <div>
             <span>время</span>
