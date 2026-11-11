@@ -83,7 +83,7 @@ const FRESH_CLASS = {
 } as const;
 
 // Интенсивность — доля времени бега в 3–5 зоне по личным зонам спортсмена (lib-hrzones.ts).
-// У любителей обычно 0–10%; неделя с интервалами — 15–35%. Ориентир 80/20 — не больше 20%.
+// У любителей обычно 0–10%; неделя с интервалами — 15–35%. Доля времени в 3–5 зоне · ориентир — не больше 20%.
 function intensityShare(cell: Cell) {
   return intensityPercent(cell.zone_seconds);
 }
@@ -140,9 +140,7 @@ function title(metric: Metric, level: Level) {
   const unit =
     metric === "km" && level === "months"
       ? "км в неделю"
-      : metric === "int"
-        ? "% времени в 3–5 зоне"
-        : UNIT[metric];
+      : UNIT[metric];
   const by =
     level === "days"
       ? "по дням"
@@ -267,7 +265,7 @@ export function GroupHeatmap() {
       </div>
       {metric === "int" ? (
         <p className="gh-note">
-          Ориентир 80/20 — не больше 20%
+          Время в 3–5 зоне · норма до 20%
         </p>
       ) : null}
 
