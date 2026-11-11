@@ -10,6 +10,7 @@ export type StreamSeries = {
 export type WorkoutFeeling = { effort: "easy" | "normal" | "hard" | null; pain: "none" | "light" | null };
 
 export type WorkoutData = {
+  coach?: { full_name: string; avatar_url: string | null } | null;
   // личные пульсовые зоны владельца пробежки (lib-hrzones.ts)
   hr_zones?: import("../lib-hrzones").AthleteHrZones | null;
   // самочувствие: у своей тренировки и у тренера; у одногруппника null

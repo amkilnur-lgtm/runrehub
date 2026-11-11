@@ -635,6 +635,10 @@ export async function athleteRoutes(app: FastifyInstance) {
       ...correctedView,
       like: await getWorkoutLikeState(workoutId, request.user.id),
       hr_zones: (await getAthleteZones([Number(workoutResult.rows[0].user_id)])).get(Number(workoutResult.rows[0].user_id)) ?? null,
+      // собеседник в переписке по пробежке — свой тренер (имя и фото в шапке чата)
+      coach: workoutResult.rows[0].is_owner
+        ? ((await pool.query(`select c.full_name, c.avatar_url from users me join users c on c.id = me.coach_id where me.id = $1`, [request.user.id])).rows[0] ?? null)
+        : null,
       // самочувствие — личная отметка: одногруппнику не показываем
       feeling: workoutResult.rows[0].is_owner ? await getWorkoutFeeling(workoutId) : null
     };

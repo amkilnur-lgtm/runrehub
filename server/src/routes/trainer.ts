@@ -299,6 +299,19 @@ export async function trainerRoutes(app: FastifyInstance) {
     return { ...state, note: note.rows[0]?.body ?? "", note_updated_at: note.rows[0]?.updated_at ?? null };
   });
 
+  // Пульс по тесту: макс. и/или пороговый; оба null — вернуть к intervals.icu / оценке по истории
+  app.put("/api/trainer/athletes/:id/hr-zones", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const athleteId = Number((request.params as { id: string }).id);
+    if (!(await ownsAthlete(request.user.id, athleteId))) return reply.code(404).send({ message: "Спортсмен не найден" });
+    const body = z
+      .object({ max_hr: z.number().int().min(140).max(230).nullable(), lthr: z.number().int().min(120).max(215).nullable() })
+      .refine((v) => !(v.max_hr && v.lthr) || v.lthr < v.max_hr, { message: "Порог должен быть ниже максимального" })
+      .parse(request.body);
+    await pool.query(`update users set hr_max_coach = $2, hr_lthr_coach = $3 where id = $1`, [athleteId, body.max_hr, body.lthr]);
+    return { ok: true, hr_zones: (await getAthleteZones([athleteId])).get(athleteId) ?? null };
+  });
+
   // Пороговый темп: сек/км или null — сбросить к оценке по старту
   app.put("/api/trainer/athletes/:id/threshold", { preHandler: requireAuth }, async (request, reply) => {
     requireRole(request, ["trainer"]);

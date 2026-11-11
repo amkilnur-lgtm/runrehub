@@ -109,6 +109,7 @@ export function CoachChat({
   // собеседник: из его сообщений (имя и фото), иначе — из того, что передала страница
   const peer = messages?.find((item) => item.author_id !== user?.id);
   const peerName = peer?.author_name ?? title;
+  const peerRole = subtitle ?? (viewer === "trainer" ? "спортсмен" : "тренер");
   return (
     <div className="chat">
       {isGroup ? (
@@ -123,7 +124,8 @@ export function CoachChat({
           <UserAvatar fullName={peerName} avatarUrl={peer?.author_avatar_url ?? peerAvatarUrl ?? null} className="chat-head-av" />
           <div>
             <b>{peerName}</b>
-            <span>{subtitle ?? (viewer === "trainer" ? "спортсмен" : "тренер")}</span>
+            {/* «Тренер · тренер» не дублируем */}
+            {peerRole.toLowerCase() !== peerName.toLowerCase() ? <span>{peerRole}</span> : null}
           </div>
         </div>
       )}
@@ -145,7 +147,7 @@ export function CoachChat({
               <div key={message.id}>
                 {showDay ? <span className="chat-day">{day}</span> : null}
                 <div className={`chat-row${mine ? " is-me" : ""}${firstInGroup ? "" : " is-cont"}${lastInGroup ? " is-last" : ""}`}>
-                  {mine ? null : lastInGroup ? (
+                  {mine || !isGroup ? null : lastInGroup ? (
                     <UserAvatar fullName={message.author_name} avatarUrl={message.author_avatar_url} className="chat-av" />
                   ) : (
                     <span className="chat-av-gap" aria-hidden="true" />
@@ -178,7 +180,7 @@ export function CoachChat({
           })}
         </div>
       )}
-      <div className="chat-compose">
+      <div className={text.trim() ? "chat-compose has-text" : "chat-compose"}>
         <textarea
           ref={inputRef}
           value={text}

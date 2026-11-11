@@ -145,6 +145,79 @@ function paceRanges(bounds: number[]) {
   ];
 }
 
+// Пульс по тесту: тренер задаёт макс. и/или пороговый пульс — главнее intervals.icu и оценки
+function HrZonesLine({ athleteId, zones, onSaved }: { athleteId: number; zones: AthleteHrZones; onSaved: () => void }) {
+  const showToast = useToast();
+  const [editing, setEditing] = useState(false);
+  const [maxHr, setMaxHr] = useState("");
+  const [lthr, setLthr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save(values: { max_hr: number | null; lthr: number | null }) {
+    setSaving(true);
+    try {
+      await api(`/api/trainer/athletes/${athleteId}/hr-zones`, { method: "PUT", body: JSON.stringify(values) });
+      forgetApiCache(`/api/trainer/athletes/${athleteId}`);
+      forgetApiCache("/api/trainer/group-heatmap");
+      setEditing(false);
+      onSaved();
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    const max = maxHr ? Number(maxHr) : null;
+    const thr = lthr ? Number(lthr) : null;
+    const valid = (max !== null || thr !== null) && (max === null || (max >= 140 && max <= 230)) && (thr === null || (thr >= 120 && thr <= 215)) && !(max && thr && thr >= max);
+    return (
+      <div className="cy-thr-edit">
+        <div className="hrz-edit">
+          <label>
+            Макс. пульс
+            <input inputMode="numeric" value={maxHr} placeholder="190" autoFocus onChange={(e) => setMaxHr(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+          </label>
+          <label>
+            Порог, если знаете
+            <input inputMode="numeric" value={lthr} placeholder={max ? String(Math.round(max * 0.91)) : "172"} onChange={(e) => setLthr(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+          </label>
+        </div>
+        <div className="workout-coach-actions">
+          <button type="button" className="ds-btn ds-btn-1 ds-btn-sm" disabled={saving || !valid} onClick={() => void save({ max_hr: max, lthr: thr })}>
+            Сохранить
+          </button>
+          {zones.source === "coach" ? (
+            <button type="button" className="ds-btn ds-btn-3" disabled={saving} onClick={() => void save({ max_hr: null, lthr: null })}>
+              Считать автоматически
+            </button>
+          ) : null}
+          <button type="button" className="ds-btn ds-btn-3" onClick={() => setEditing(false)}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <p className="ds-zsrc">
+      {zonesSourceNote(zones)}.{" "}
+      <button
+        type="button"
+        className="cy-link"
+        onClick={() => {
+          setMaxHr(zones.source === "coach" && zones.max_hr ? String(zones.max_hr) : "");
+          setLthr(zones.source === "coach" ? String(zones.lthr) : "");
+          setEditing(true);
+        }}
+      >
+        {zones.source === "coach" ? "Изменить" : "Указать по тесту"}
+      </button>
+    </p>
+  );
+}
+
 function ThresholdLine({
   athleteId,
   threshold,
@@ -614,7 +687,7 @@ function CyclesBlock({
                   </span>
                 ))}
               </div>
-              <p className="ds-zsrc">{zonesSourceNote(cycles.hr_zones ?? DEFAULT_HR_ZONES)}</p>
+              <HrZonesLine athleteId={athleteId} zones={cycles.hr_zones ?? DEFAULT_HR_ZONES} onSaved={refresh} />
             </div>
           ) : null}
         </>

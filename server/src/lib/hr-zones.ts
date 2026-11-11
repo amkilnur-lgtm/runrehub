@@ -14,7 +14,9 @@ export type AthleteZones = {
   bounds: [number, number, number, number];
   lthr: number;
   max_hr: number | null;
-  source: "intervals" | "estimate" | "default";
+  source: "coach" | "intervals" | "estimate" | "default";
+  // макс. пульс из intervals.icu, если ему не поверили (пробежки чаще выше него)
+  ignored_icu_max: number | null;
 };
 
 function boundsFromLthr(lthr: number): [number, number, number, number] {
@@ -44,29 +46,48 @@ export function zoneSeconds5(heartrate: number[], time: number[], bounds: number
   return seconds.map(Math.round);
 }
 
+// Порядок: тренер → intervals.icu (если пробежки с ним согласны) → оценка по истории → клубный порог.
+// intervals.icu сам ставит макс. пульс и порог ≈ 91% от него; если больше 5% пробежек выше этого
+// «максимума», значение устарело — зоны по нему занижены и интенсивность завышена.
 export async function getAthleteZones(userIds: number[]) {
   const map = new Map<number, AthleteZones>();
   if (!userIds.length) return map;
   const { rows } = await pool.query(
-    `select u.id, u.hr_lthr, u.hr_max, u.hr_zone_bounds,
-            (select percentile_cont(0.95) within group (order by w.max_heartrate) + 3
-               from workouts w where w.user_id = u.id and w.max_heartrate between 120 and 230) as est_max
-     from users u where u.id = any($1::int[])`,
+    `select u.id, u.hr_lthr, u.hr_max, u.hr_zone_bounds, u.hr_max_coach, u.hr_lthr_coach,
+            h.est_max, h.runs, h.over_icu
+     from users u
+     left join lateral (
+       select percentile_cont(0.95) within group (order by w.max_heartrate) + 3 as est_max,
+              count(*)::int as runs,
+              count(*) filter (where u.hr_max is not null and w.max_heartrate > u.hr_max + 2)::int as over_icu
+       from workouts w where w.user_id = u.id and w.max_heartrate between 120 and 230
+     ) h on true
+     where u.id = any($1::int[])`,
     [userIds]
   );
   for (const row of rows) {
     const id = Number(row.id);
+    const estMax = Number(row.est_max) >= 150 ? Math.round(Number(row.est_max)) : null;
+    const coachMax = row.hr_max_coach ? Number(row.hr_max_coach) : null;
+    const coachLthr = row.hr_lthr_coach ? Number(row.hr_lthr_coach) : null;
+    if (coachMax || coachLthr) {
+      const lthr = coachLthr ?? Math.round(coachMax! * 0.91);
+      map.set(id, { bounds: boundsFromLthr(lthr), lthr, max_hr: coachMax, source: "coach", ignored_icu_max: null });
+      continue;
+    }
+    const runs = Number(row.runs) || 0;
+    const icuTrusted = row.hr_lthr && !(runs >= 20 && Number(row.over_icu) / runs > 0.05);
+    const ignored = row.hr_lthr && !icuTrusted && row.hr_max ? Number(row.hr_max) : null;
     const stored = Array.isArray(row.hr_zone_bounds) ? (row.hr_zone_bounds as number[]).map(Number) : null;
-    if (row.hr_lthr && stored && stored.length >= 4) {
-      map.set(id, { bounds: stored.slice(0, 4) as AthleteZones["bounds"], lthr: Number(row.hr_lthr), max_hr: row.hr_max ? Number(row.hr_max) : null, source: "intervals" });
-    } else if (row.hr_lthr) {
-      map.set(id, { bounds: boundsFromLthr(Number(row.hr_lthr)), lthr: Number(row.hr_lthr), max_hr: row.hr_max ? Number(row.hr_max) : null, source: "intervals" });
-    } else if (Number(row.est_max) >= 150) {
-      const max = Math.round(Number(row.est_max));
-      const lthr = Math.round(max * 0.91);
-      map.set(id, { bounds: boundsFromLthr(lthr), lthr, max_hr: max, source: "estimate" });
+    if (icuTrusted) {
+      const lthr = Number(row.hr_lthr);
+      const bounds = stored && stored.length >= 4 ? (stored.slice(0, 4) as AthleteZones["bounds"]) : boundsFromLthr(lthr);
+      map.set(id, { bounds, lthr, max_hr: row.hr_max ? Number(row.hr_max) : null, source: "intervals", ignored_icu_max: null });
+    } else if (estMax) {
+      const lthr = Math.round(estMax * 0.91);
+      map.set(id, { bounds: boundsFromLthr(lthr), lthr, max_hr: estMax, source: "estimate", ignored_icu_max: ignored });
     } else {
-      map.set(id, { bounds: boundsFromLthr(DEFAULT_LTHR), lthr: DEFAULT_LTHR, max_hr: null, source: "default" });
+      map.set(id, { bounds: boundsFromLthr(DEFAULT_LTHR), lthr: DEFAULT_LTHR, max_hr: null, source: "default", ignored_icu_max: null });
     }
   }
   return map;

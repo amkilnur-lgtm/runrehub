@@ -944,9 +944,10 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           <CoachChat
             workoutId={data.workout.id}
             viewer={mode}
-            title={mode === "trainer" ? (data.workout.athlete_name ?? "Спортсмен").split(" ")[0]! : "Тренер"}
+            title={mode === "trainer" ? (data.workout.athlete_name ?? "Спортсмен").split(" ")[0]! : (data.coach?.full_name ?? "Тренер")}
+            peerAvatarUrl={mode === "trainer" ? null : (data.coach?.avatar_url ?? null)}
             placeholder={mode === "trainer" ? "Сообщение спортсмену…" : "Сообщение тренеру…"}
-            emptyText={mode === "trainer" ? undefined : "Тренер посмотрит пробежку и напишет здесь."}
+            emptyText={mode === "trainer" ? undefined : "Тренер посмотрит пробежку и ответит здесь."}
           />
         </section>
       ) : null}

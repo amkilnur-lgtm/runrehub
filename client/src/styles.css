@@ -4825,3 +4825,25 @@ html { -webkit-tap-highlight-color: transparent; }
 
 /* подпись, по каким зонам посчитано (личные из intervals.icu / по макс. пульсу) */
 .ds-zsrc { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+
+/* Переписка — доводка: без линий-разделителей, шапка и поле ввода — части одной карточки,
+   в личном чате без аватаров у облачков, дата — тихой подписью, кнопка отправки внутри поля */
+.chat-card .chat-head { border-bottom: 0; padding: 14px 16px 6px; }
+.chat-card .chat-head-av { width: 40px; height: 40px; }
+.chat-card .chat-head b { font-size: 16px; }
+.chat-card .chat-empty { padding: 6px 16px 10px; font-size: 14px; }
+.chat-card .chat-list { padding: 4px 14px 10px; }
+.chat-card .chat-day { background: none; padding: 0; margin: 8px auto 6px; font-size: 12px; font-weight: 700; color: var(--ink-muted); }
+.chat-card .chat-row { margin-top: 8px; }
+.chat-card .chat-row.is-cont { margin-top: 2px; }
+.chat-card .chat-bub { max-width: 82%; padding: 7px 10px 7px 13px; }
+.chat-card .chat-row:not(.is-me) .chat-bub { background: var(--surface-2); }
+.chat-card .chat-act { padding-left: 0; }
+.chat-card .chat-compose { position: relative; border-top: 0; padding: 4px 12px 12px; }
+.chat-card .chat-compose textarea { min-height: 44px; padding: 11px 50px 11px 16px; border-radius: 22px; }
+.chat-card .chat-send { position: absolute; right: 18px; bottom: 18px; width: 32px; height: 32px; background: transparent; color: var(--ink-muted); }
+.chat-card .chat-send svg { width: 18px; height: 18px; }
+.chat-card .chat-send:disabled { opacity: 1; }
+.chat-card .chat-compose.has-text .chat-send { background: var(--accent); color: #fff; }
+.hrz-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hrz-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink-muted); }
