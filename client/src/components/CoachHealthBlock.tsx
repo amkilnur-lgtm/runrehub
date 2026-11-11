@@ -14,7 +14,8 @@ type CoachCycle = {
 } | null;
 
 // Тренеру: анализы и добавки спортсмена — только если он дал согласие и не закрыл раздел
-export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
+// part="cycle" — наверху под «Состоянием» (пропуск цикла важнее), part="labs" — анализы и добавки внизу страницы
+export function CoachHealthBlock({ athleteId, part }: { athleteId: number; part: "cycle" | "labs" }) {
   const { data } = useApi<
     | { shared: false }
     | {
@@ -25,23 +26,22 @@ export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
         cycle: CoachCycle;
       }
   >(`/api/trainer/athletes/${athleteId}/health`);
-  if (
-    !data ||
-    !data.shared ||
-    (!data.lab_files.length && !data.supplements.length && !data.cycle)
-  )
-    return null;
+  if (!data || !data.shared) return null;
+  if (part === "cycle" && !data.cycle) return null;
+  if (part === "labs" && !data.lab_files.length && !data.supplements.length) return null;
+  const showLabs = part === "labs";
+  const showCycle = part === "cycle";
   return (
     <div>
       <div className="ds-grp">
         <span>Здоровье</span>
         <span>
-          {data.lab_files[0] ? `анализы ${labDate(data.lab_files[0].taken_on)}` : ""}
+          {showLabs && data.lab_files[0] ? `анализы ${labDate(data.lab_files[0].taken_on)}` : showCycle ? "цикл" : ""}
         </span>
       </div>
       <div className="ds-list">
-        <LabFileList files={data.lab_files} />
-        {data.supplements.length ? (
+        {showLabs ? <LabFileList files={data.lab_files} /> : null}
+        {showLabs && data.supplements.length ? (
           <div className="ds-li">
             <div className="ds-m">
               <b>Принимает</b>
@@ -56,7 +56,7 @@ export function CoachHealthBlock({ athleteId }: { athleteId: number }) {
             </div>
           </div>
         ) : null}
-        {data.cycle ? (
+        {showCycle && data.cycle ? (
           <div className="ds-li">
             <div className="ds-m">
               <b>Цикл{data.cycle.day ? ` · день ${data.cycle.day}` : ""}</b>

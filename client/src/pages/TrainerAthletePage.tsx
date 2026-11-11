@@ -1130,7 +1130,7 @@ export function TrainerAthletePage() {
         </div>
       </div>
 
-      <CoachHealthBlock athleteId={athleteId} />
+      <CoachHealthBlock athleteId={athleteId} part="cycle" />
 
       <CyclesBlock athleteId={athleteId} initialLevel={initialCycle} />
 
@@ -1187,6 +1187,9 @@ export function TrainerAthletePage() {
       </div>
 
       {state ? <NotesBlock athleteId={athleteId} initial={state.note} /> : null}
+
+      {/* анализы и добавки — справочно, в самом низу */}
+      <CoachHealthBlock athleteId={athleteId} part="labs" />
     </div>
   );
 }
