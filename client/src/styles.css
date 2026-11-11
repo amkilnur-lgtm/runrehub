@@ -4704,3 +4704,16 @@ button.pbg-c:focus-visible { outline: 2px solid var(--accent); outline-offset: -
 .pbg-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; padding: 9px 0; border-top: 1px solid var(--border); }
 .pbg-kv span { color: var(--ink-muted); font-weight: 600; flex: none; } .pbg-kv b { font-weight: 700; text-align: right; }
 .pbg-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* Телефон: «наведение» включается пальцем при прокрутке и залипает — строки списков мигали серым.
+   На сенсорных экранах подсветку при наведении убираем; отклик на нажатие — только пока палец на строке. */
+@media (hover: none) {
+  a.ds-li:hover, button.ds-li:hover:not(:disabled), button.ds-li.fit-row:hover, .run-row:hover, .leader-row:hover,
+  .result-row:not(:disabled):hover, .feed-act:hover, .feed-likers:hover, .panel-footer-link:hover, .link-row:hover,
+  .trainer-dashboard-workout-row:hover, .secondary-button:hover, .icon-button:hover, button.pbg-c:hover,
+  .group-weeks-table tbody tr:hover > * { background: none; }
+  button.pbg-c:hover { background: var(--surface); }
+  button.pbg-c.is-fresh:hover { background: color-mix(in oklab, var(--gold-bg) 75%, var(--surface)); }
+  .icon-button:hover, .app-topbar-actions .theme-toggle:hover { background: transparent; }
+}
+html { -webkit-tap-highlight-color: transparent; }
