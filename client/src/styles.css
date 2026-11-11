@@ -4766,3 +4766,4 @@ html { -webkit-tap-highlight-color: transparent; }
 .mate-fi { width: 24px; height: 24px; display: grid; place-items: center; flex: none; color: var(--ink-muted); }
 .mate-facts .ds-m .mate-wrap { white-space: normal; font-size: 15px; line-height: 1.35; }
 .mate-about { -webkit-line-clamp: 4; }
+.chat-card .chat-who { flex-basis: 100%; font-size: 12.5px; font-weight: 800; color: var(--accent); margin-bottom: -2px; }

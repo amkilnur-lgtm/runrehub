@@ -1073,15 +1073,16 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
       </section>
 
       {/* общие комментарии клуба: поздравления, поддержка одногруппников */}
-      <section className="ds-block ds-pad workout-club" aria-label="Комментарии клуба">
-        <b className="workout-club-t">Комментарии клуба</b>
-        <WorkoutComments
+      {/* общий чат группы под пробежкой — как групповой чат в Telegram; поздравления пишутся сюда */}
+      <section className="ds-block chat-card" aria-label="Обсуждение в клубе">
+        <CoachChat
           workoutId={data.workout.id}
           viewer={mode}
-          collapsed
           channel="club"
-          emptyLabel="Написать комментарий"
-          hint="видят все в клубе"
+          title="Обсуждение в клубе"
+          subtitle="видят все в группе"
+          placeholder="Написать в обсуждение…"
+          emptyText="Пока никто не написал — поддержите первым."
           initialText={sayText}
         />
       </section>

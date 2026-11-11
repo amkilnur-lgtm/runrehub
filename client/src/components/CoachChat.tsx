@@ -33,7 +33,9 @@ export function CoachChat({
   subtitle,
   placeholder,
   emptyText,
-  peerAvatarUrl
+  peerAvatarUrl,
+  channel = "coach",
+  initialText
 }: {
   workoutId: number;
   viewer: "athlete" | "trainer";
@@ -42,19 +44,23 @@ export function CoachChat({
   placeholder: string;
   emptyText?: string;
   peerAvatarUrl?: string | null;
+  // «club» — общий чат группы под пробежкой: имена у чужих сообщений, как в группе Telegram
+  channel?: "coach" | "club";
+  initialText?: string;
 }) {
+  const isGroup = channel === "club";
   const { user } = useAuth();
   const showToast = useToast();
   const base = viewer === "trainer" ? "/api/trainer" : "/api/athlete";
   const [messages, setMessages] = useState<WorkoutCommentItem[] | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const [sending, setSending] = useState(false);
   const [picked, setPicked] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    api<{ comments: WorkoutCommentItem[] }>(`${base}/workouts/${workoutId}/comments?channel=coach`)
+    api<{ comments: WorkoutCommentItem[] }>(`${base}/workouts/${workoutId}/comments?channel=${channel}`)
       .then((data) => !cancelled && setMessages(data.comments))
       .catch(() => !cancelled && setMessages([]));
     return () => {
@@ -77,7 +83,7 @@ export function CoachChat({
     try {
       const res = await api<{ ok: true; comments: WorkoutCommentItem[] }>(`${base}/workouts/${workoutId}/comments`, {
         method: "POST",
-        body: JSON.stringify({ body, channel: "coach" })
+        body: JSON.stringify({ body, channel })
       });
       setMessages(res.comments);
       setText("");
@@ -105,13 +111,22 @@ export function CoachChat({
   const peerName = peer?.author_name ?? title;
   return (
     <div className="chat">
-      <div className="chat-head">
-        <UserAvatar fullName={peerName} avatarUrl={peer?.author_avatar_url ?? peerAvatarUrl ?? null} className="chat-head-av" />
-        <div>
-          <b>{peerName}</b>
-          <span>{subtitle ?? (viewer === "trainer" ? "спортсмен · только вы двое" : "тренер · только вы двое")}</span>
+      {isGroup ? (
+        <div className="chat-head">
+          <div>
+            <b>{title}</b>
+            {subtitle ? <span>{subtitle}</span> : null}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="chat-head">
+          <UserAvatar fullName={peerName} avatarUrl={peer?.author_avatar_url ?? peerAvatarUrl ?? null} className="chat-head-av" />
+          <div>
+            <b>{peerName}</b>
+            <span>{subtitle ?? (viewer === "trainer" ? "спортсмен" : "тренер")}</span>
+          </div>
+        </div>
+      )}
       {messages === null ? null : messages.length === 0 ? (
         emptyText ? <p className="chat-empty">{emptyText}</p> : null
       ) : (
@@ -141,6 +156,12 @@ export function CoachChat({
                     onClick={() => (message.can_delete ? setPicked(picked === message.id ? null : message.id) : undefined)}
                     aria-label={`${message.author_name}: ${message.body}`}
                   >
+                    {isGroup && !mine && firstInGroup ? (
+                      <span className="chat-who">
+                        {message.author_name.split(" ")[0]}
+                        {message.author_is_trainer ? " · тренер" : ""}
+                      </span>
+                    ) : null}
                     <span className="chat-text">{message.body}</span>
                     <small>{timeLabel(message.created_at)}</small>
                   </button>
