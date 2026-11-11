@@ -6,7 +6,6 @@ import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
 import { RouteStaticMap } from "./RouteStaticMap";
-import { WorkoutComments } from "./WorkoutComments";
 import { formatAgo, formatDistance, formatDuration, formatPace } from "../lib";
 
 type FeedLiker = {
@@ -79,8 +78,6 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
   const [count, setCount] = useState(item.like_count);
   const [likers, setLikers] = useState<FeedLiker[]>(item.likers);
   const [pending, setPending] = useState(false);
-  const [commentCount, setCommentCount] = useState(item.comment_count);
-  const [showComments, setShowComments] = useState(false);
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersList, setLikersList] = useState<LikerRow[] | null>(null);
 
@@ -211,15 +208,6 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
             {hiddenLikers > 0 ? <span className="feed-likers-more">+{hiddenLikers}</span> : null}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="feed-act"
-          aria-expanded={showComments}
-          onClick={() => setShowComments((open) => !open)}
-        >
-          <BubbleIcon />
-          <span className="feed-n">{commentCount}</span>
-        </button>
       </footer>
 
       {likersOpen ? (
@@ -240,11 +228,6 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
         </div>
       ) : null}
 
-      {showComments ? (
-        <div className="feed-comments">
-          <WorkoutComments workoutId={item.id} viewer={viewer} onCountChange={setCommentCount} />
-        </div>
-      ) : null}
     </article>
   );
 }
