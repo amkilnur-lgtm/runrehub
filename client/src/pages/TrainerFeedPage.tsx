@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AthleteFeed } from "../components/AthleteFeed";
+import { useToast } from "../components/ToastProvider";
+import { congratulate as sendCongrats } from "../lib-congrats";
 import { BirthdayDialog } from "../components/BirthdayDialog";
 import { UserAvatar } from "../components/UserAvatar";
 import { forgetApiCache, useApi } from "../hooks/useApi";
@@ -71,6 +73,7 @@ export function TrainerFeedPage({
   const { data: club, refresh } = useApi<Club>(`${base}/club`);
   const [search, setSearch] = useSearchParams();
   const tab = search.get("tab") === "roster" ? "roster" : "feed";
+  const showToast = useToast();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
 
@@ -80,13 +83,18 @@ export function TrainerFeedPage({
       : person.is_me
         ? "/athlete"
         : `/athlete/athletes/${person.id}`;
-  const congratulate = (person: Person) => {
-    const text = encodeURIComponent("С днём рождения! 🎉");
-    if (person.last_workout_id)
-      navigate(
-        `/${viewer === "trainer" ? "trainer" : "athlete"}/workouts/${person.last_workout_id}?say=${text}`,
-      );
-    else navigate(profileHref(person));
+  // поздравление — лайк последней пробежки (общение — в чате группы в Telegram); тренер — открывает спортсмена
+  const congratulate = async (person: Person) => {
+    if (viewer === "trainer" || !person.last_workout_id) {
+      navigate(profileHref(person));
+      return;
+    }
+    try {
+      await sendCongrats(person.last_workout_id);
+      showToast("success", `Поздравили — ${person.full_name.split(" ")[0]} увидит лайк`);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Не получилось");
+    }
   };
   const me = club
     ? ([club.coach, ...club.athletes].find((person) => person?.is_me) ?? null)
@@ -130,13 +138,12 @@ export function TrainerFeedPage({
               <span>{person.full_name}</span>
             </div>
           </div>
-          <button
-            type="button"
-            className="ds-btn ds-btn-1"
-            onClick={() => congratulate(person)}
-          >
-            Поздравить
-          </button>
+          {/* тренер поздравляет в Telegram сам; спортсмену — лайк последней пробежки */}
+          {viewer === "athlete" ? (
+            <button type="button" className="ds-btn ds-btn-1" onClick={() => void congratulate(person)}>
+              Поздравить
+            </button>
+          ) : null}
         </section>
       ))}
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { PbGrid } from "../components/PbGrid";
@@ -5,6 +6,8 @@ import { formatRaceTime } from "../components/Results";
 import { UserAvatar } from "../components/UserAvatar";
 import { useApi } from "../hooks/useApi";
 import { formatKm, formatPace, pluralRu } from "../lib";
+import { congratulate } from "../lib-congrats";
+import { useToast } from "../components/ToastProvider";
 import { getTelegramWebApp, isTelegramMiniApp } from "../telegram";
 
 // Страница одногруппника (утверждённый макет): кто это → одна кнопка по моменту →
@@ -176,6 +179,8 @@ function openTelegram(username: string) {
 
 export function AthleteProfilePage() {
   const params = useParams();
+  const showToast = useToast();
+  const [congratulated, setCongratulated] = useState(false);
   const navigate = useNavigate();
   const { data, error } = useApi<TeammateProfile>(
     `/api/athlete/athletes/${params.id}/profile`,
@@ -208,14 +213,21 @@ export function AthleteProfilePage() {
     .join(" · ");
   const lastRun = data.last_run_at ? new Date(data.last_run_at) : null;
 
+  // «Поздравить / Пожелать удачи» — лайк его последней пробежки: общаемся в чате группы в Telegram
   const primary =
     moment && moment.workoutId
       ? {
-          label: MOMENT_COPY[moment.kind].label,
-          onClick: () =>
-            navigate(
-              `/athlete/workouts/${moment.workoutId}?say=${encodeURIComponent(MOMENT_COPY[moment.kind].text)}`,
-            ),
+          label: congratulated ? "Отправили ✓" : MOMENT_COPY[moment.kind].label,
+          onClick: async () => {
+            if (congratulated) return;
+            try {
+              await congratulate(moment.workoutId!);
+              setCongratulated(true);
+              showToast("success", `${name} увидит лайк на последней пробежке`);
+            } catch (error) {
+              showToast("error", error instanceof Error ? error.message : "Не получилось");
+            }
+          },
         }
       : null;
   const telegram = athlete.telegram_username;
@@ -279,7 +291,8 @@ export function AthleteProfilePage() {
       {/* приложение и так внутри Telegram — отдельной кнопки «Написать в Telegram» нет */}
       {primary ? (
         <div className="mate-act">
-          <button type="button" className="ds-btn ds-btn-1" onClick={primary.onClick}>
+          <button type="button" className="ds-btn ds-btn-1" onClick={() => void primary.onClick()}
+            disabled={congratulated}>
             {primary.label}
           </button>
         </div>

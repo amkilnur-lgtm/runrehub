@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useApi } from "../hooks/useApi";
+import { congratulate } from "../lib-congrats";
+import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
 
 // «В клубе» внизу главной: 2–3 поддерживающих события, без чужих темпа и пульса.
@@ -30,16 +32,21 @@ export function ClubEvents() {
   const [hidden, setHidden] = useState(readHidden);
   const { data } = useApi<{ events: ClubEvent[] }>(hidden ? null : "/api/athlete/club-events");
   const navigate = useNavigate();
+  const showToast = useToast();
   if (hidden || !data?.events.length) return null;
 
-  const open = (event: ClubEvent) => {
-    if (event.kind === "birthday" && event.workout_id) {
-      navigate(`/athlete/workouts/${event.workout_id}?say=${encodeURIComponent("С днём рождения! 🎉")}`);
-    } else if (event.kind === "record" && event.workout_id) {
-      navigate(`/athlete/workouts/${event.workout_id}?say=${encodeURIComponent("Поздравляю с рекордом! 🎉")}`);
-    } else {
-      navigate(`/athlete/athletes/${event.athlete_id}`);
+  // день рождения и рекорд — поздравляем лайком прямо отсюда; остальное — открываем спортсмена
+  const open = async (event: ClubEvent) => {
+    if ((event.kind === "birthday" || event.kind === "record") && event.workout_id) {
+      try {
+        await congratulate(event.workout_id);
+        showToast("success", `Поздравили — ${event.full_name.split(" ")[0]} увидит лайк`);
+      } catch (error) {
+        showToast("error", error instanceof Error ? error.message : "Не получилось");
+      }
+      return;
     }
+    navigate(`/athlete/athletes/${event.athlete_id}`);
   };
 
   return (
@@ -63,7 +70,7 @@ export function ClubEvents() {
       </div>
       <div className="ds-list">
         {data.events.map((event) => (
-          <button key={`${event.kind}-${event.athlete_id}`} type="button" className="ds-li club-ev" onClick={() => open(event)}>
+          <button key={`${event.kind}-${event.athlete_id}`} type="button" className="ds-li club-ev" onClick={() => void open(event)}>
             <UserAvatar fullName={event.full_name} avatarUrl={event.avatar_url} className="club-av" />
             <div className="ds-m">
               <b>{event.text}</b>
