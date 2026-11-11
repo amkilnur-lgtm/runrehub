@@ -4767,3 +4767,44 @@ html { -webkit-tap-highlight-color: transparent; }
 .mate-facts .ds-m .mate-wrap { white-space: normal; font-size: 15px; line-height: 1.35; }
 .mate-about { -webkit-line-clamp: 4; }
 .chat-card .chat-who { flex-basis: 100%; font-size: 12.5px; font-weight: 800; color: var(--accent); margin-bottom: -2px; }
+
+/* Лента клуба — карточка (вариант А) */
+.fc2 { padding: 0; overflow: hidden; }
+.fc2-head { padding: 12px 14px 0; }
+.fc2-author { display: flex; gap: 10px; align-items: center; color: var(--ink); text-decoration: none; }
+.fc2-author .fc2-av { width: 36px; height: 36px; font-size: 12px; flex: none; }
+.fc2-author b { display: block; font-size: 15px; font-weight: 800; }
+.fc2-author > div > span { display: block; font-size: 12.5px; color: var(--ink-muted); font-weight: 600; }
+.fc2-run { display: block; color: var(--ink); text-decoration: none; padding: 8px 14px 12px; }
+.fc2-title { font-size: 16px; font-weight: 800; }
+.fc2-big { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.fc2-big small { font-size: 15px; color: var(--ink-muted); margin-left: 4px; letter-spacing: 0; }
+.fc2-stats { margin-top: 8px; }
+.fc2-stats b { font-size: 18px; }
+.fc2-map { margin-top: 10px; border-radius: 12px; overflow: hidden; height: 120px; }
+.fc2-map > * { height: 100% !important; }
+.fc2-map img, .fc2-map canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fc2-foot { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-top: 1px solid var(--border); }
+.fc2-likers { margin-left: auto; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-muted); cursor: pointer; padding: 6px 4px; }
+.fc2-likers:disabled { cursor: default; }
+
+/* Состав клуба (вариант А) */
+.club-coach { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
+.club-coach b { display: block; font-size: 16px; font-weight: 800; }
+.club-coach > div > span { display: block; font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+.club-av-lg { width: 44px; height: 44px; font-size: 14px; flex: none; }
+.club-row { min-height: 66px; }
+.club-avw { position: relative; flex: none; }
+.club-today-dot { position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 2px var(--surface); }
+.club-tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); vertical-align: 2px; }
+.club-tag.is-gold { background: var(--gold-bg); color: var(--gold-ink); }
+.club-wk { display: flex; gap: 3px; align-items: flex-end; height: 26px; flex: none; }
+.club-wk i { width: 6px; border-radius: 2px; background: var(--vol-2); display: block; }
+.club-wk i.is-now { background: var(--accent); }
+.club-km { min-width: 44px; text-align: right; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; }
+.club-km small { display: block; font-size: 11.5px; color: var(--ink-muted); font-weight: 600; }
+.club-km.is-zero { color: var(--ink-muted); }
+.club-row .ds-m b { white-space: normal; }
+.fc2-map > * { margin: 0 !important; } .fc2-run { padding-bottom: 12px; } .fc2-run .fc2-map:last-child { margin-bottom: 0; }
+.fc2-map .feed-map { margin: 0; height: 120px; aspect-ratio: auto; border-radius: 0; }
+.fc2 .feed-run-link { margin: 0 !important; padding-bottom: 12px !important; } .fc2 .fc2-foot { margin-top: 0 !important; }

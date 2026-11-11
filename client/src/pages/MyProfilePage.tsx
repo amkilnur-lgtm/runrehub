@@ -304,8 +304,8 @@ export function MyProfilePage() {
 
           <label className="ds-li me-row">
             <div className="ds-m">
-              <b>Восстанавливаюсь</b>
-              <span>клуб увидит метку без подробностей</span>
+              <b>Отдых</b>
+              <span>клуб увидит, что вы на паузе</span>
             </div>
             <input
               type="checkbox"

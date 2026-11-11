@@ -259,7 +259,7 @@ export function AthleteProfilePage() {
             {data.rank_label ? <span className="mate-rank">{data.rank_label}</span> : null}
           </h1>
           <span>
-            {data.recovering ? "восстанавливается · " : ""}
+            {data.recovering ? "отдых · " : ""}
             {memberSince(athlete.member_since)}
           </span>
         </div>

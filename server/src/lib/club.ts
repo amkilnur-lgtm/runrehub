@@ -1,5 +1,6 @@
 import { pool } from "./db.js";
 import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "./telegram.js";
+import { getWeeklyVolume } from "./weekly-volume.js";
 
 // «Клуб»: состав группы и дни рождения. День рождения — только день и месяц;
 // клубу виден, пока спортсмен его не скрыл; тренер видит всегда.
@@ -26,7 +27,7 @@ export async function getClub(viewerId: number, coachId: number, viewerIsCoach: 
   const { rows } = await pool.query(
     `
       select u.id, u.full_name, u.avatar_url, u.role, u.created_at, u.telegram_username,
-             u.birthday_day, u.birthday_month, u.birthday_hidden,
+             u.birthday_day, u.birthday_month, u.birthday_hidden, u.recovering,
              last.id as last_workout_id, last.start_date as last_run_at
       from users u
       left join lateral (
@@ -37,6 +38,8 @@ export async function getClub(viewerId: number, coachId: number, viewerIsCoach: 
     [coachId]
   );
   const today = new Date();
+  // состав (вариант А): км этой недели и 6 недель столбиками — без рейтинга, порядок по фамилии
+  const volume = await getWeeklyVolume(rows.map((row) => Number(row.id)), 6);
   const people = rows.map((row) => {
     const visible = row.birthday_day && row.birthday_month && (viewerIsCoach || !row.birthday_hidden || row.id === viewerId);
     const birthday = visible
@@ -58,7 +61,10 @@ export async function getClub(viewerId: number, coachId: number, viewerIsCoach: 
       last_run_at: row.last_run_at ?? null,
       last_workout_id: row.last_workout_id ? Number(row.last_workout_id) : null,
       telegram_username: row.telegram_username ?? null,
-      birthday
+      birthday,
+      recovering: Boolean(row.recovering),
+      is_new: Date.now() - new Date(row.created_at).getTime() < 30 * 86_400_000,
+      weeks: volume.byUser.get(Number(row.id)) ?? []
     };
   });
   // фамилия — последнее слово ФИО («Анна Бегунова» → «Бегунова»)

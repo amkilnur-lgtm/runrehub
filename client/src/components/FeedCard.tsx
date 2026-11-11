@@ -6,7 +6,7 @@ import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 import { UserAvatar } from "./UserAvatar";
 import { RouteStaticMap } from "./RouteStaticMap";
-import { formatAgo, formatDistance, formatDuration, formatPace } from "../lib";
+import { formatAgo, formatDuration, formatPace, formatKm } from "../lib";
 
 type FeedLiker = {
   id: number;
@@ -135,50 +135,58 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
     }
   }
 
-  const stats: Array<[string, string]> = [
-    [formatDistance(item.distance_meters), "дистанция"],
-    [formatDuration(item.moving_time_seconds), "время"],
-    [formatPace(item.average_speed).replace("/км", ""), "темп /км"]
-  ];
-  if (item.average_heartrate) {
-    stats.push([String(Math.round(item.average_heartrate)), "ср. пульс"]);
-  }
-
   const hiddenLikers = Math.max(0, count - likers.length);
+  // «Таня, Даян и ещё 2» — кто поддержал, словами
+  const likersText = likers.length
+    ? `${likers
+        .slice(0, 2)
+        .map((liker) => liker.full_name.split(" ")[0])
+        .join(", ")}${count > 2 ? ` и ещё ${count - 2}` : ""}`
+    : count === 0
+      ? "поставьте первым"
+      : "";
 
+  // карточка ленты (вариант А): как главная и страница пробежки — крупно км, ниже время · темп · пульс
   return (
-    <article className="feed-card">
-      <header className="feed-top">
-        <Link to={athleteHref} className="feed-author">
-          <UserAvatar
-            fullName={item.athlete_name}
-            avatarUrl={item.athlete_avatar_url}
-            className="feed-avatar"
-          />
-          <div className="feed-who">
-            <div className="feed-who-line">
-              <b>{item.athlete_name}</b>
-              <span className="feed-handle">@{item.athlete_username}</span>
-            </div>
-            <span className="feed-ago">{formatAgo(item.start_date)}</span>
+    <article className="feed-card fc2">
+      <header className="fc2-head">
+        <Link to={athleteHref} className="fc2-author">
+          <UserAvatar fullName={item.athlete_name} avatarUrl={item.athlete_avatar_url} className="fc2-av" />
+          <div>
+            <b>{item.athlete_name}</b>
+            <span>{formatAgo(item.start_date)}</span>
           </div>
         </Link>
       </header>
 
-      <Link to={workoutHref} className="feed-run-link">
-        <div className="feed-run-title">{item.name}</div>
-        {item.route ? <RouteStaticMap points={item.route} /> : null}
-        <div className="feed-stats">
-          {stats.map(([value, label]) => (
-            <div className="feed-stat" key={label}>
-              <b>{value}</b>
-              <span>{label}</span>
-            </div>
-          ))}
+      <Link to={workoutHref} className="feed-run-link fc2-run">
+        <div className="fc2-title">{item.name}</div>
+        <div className="fc2-big">
+          {formatKm(item.distance_meters, 2)}
+          <small>км</small>
         </div>
+        <div className="workout-stats-row fc2-stats">
+          <div>
+            <span>время</span>
+            <b>{formatDuration(item.moving_time_seconds)}</b>
+          </div>
+          <div>
+            <span>темп</span>
+            <b>{formatPace(item.average_speed).replace("/км", "").trim()}</b>
+          </div>
+          <div>
+            <span>пульс</span>
+            <b>{item.average_heartrate ? Math.round(item.average_heartrate) : "—"}</b>
+          </div>
+        </div>
+        {item.route ? (
+          <div className="fc2-map">
+            <RouteStaticMap points={item.route} />
+          </div>
+        ) : null}
       </Link>
 
-      <footer className="feed-actions">
+      <footer className="feed-actions fc2-foot">
         <button
           type="button"
           className={`feed-act feed-like${liked ? " is-liked" : ""}`}
@@ -188,24 +196,15 @@ export function FeedCard({ item, viewer = "athlete" }: { item: FeedItem; viewer?
           <HeartIcon />
           <span className="feed-n">{count}</span>
         </button>
-        {likers.length > 0 ? (
+        {likersText ? (
           <button
             type="button"
-            className="feed-likers"
+            className="fc2-likers"
             aria-expanded={likersOpen}
-            title="Кто лайкнул"
+            disabled={!likers.length}
             onClick={() => void toggleLikers()}
           >
-            {likers.map((liker) => (
-              <UserAvatar
-                key={liker.id}
-                fullName={liker.full_name}
-                avatarUrl={liker.avatar_url}
-                className="feed-liker-avatar"
-                ariaHidden
-              />
-            ))}
-            {hiddenLikers > 0 ? <span className="feed-likers-more">+{hiddenLikers}</span> : null}
+            {likersText}
           </button>
         ) : null}
       </footer>

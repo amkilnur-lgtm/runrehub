@@ -7,7 +7,7 @@ import { congratulate as sendCongrats } from "../lib-congrats";
 import { BirthdayDialog } from "../components/BirthdayDialog";
 import { UserAvatar } from "../components/UserAvatar";
 import { forgetApiCache, useApi } from "../hooks/useApi";
-import { formatAgo, pluralRu } from "../lib";
+import { formatAgo, formatKm, pluralRu } from "../lib";
 
 // «Клуб» по исследованию: сверху — день рождения сегодня с одной кнопкой,
 // дальше «Лента · Состав». В составе — ближайшие дни рождения и все атлеты: тренер первым, остальные по фамилии.
@@ -28,6 +28,9 @@ type Person = {
     days: number;
     hidden: boolean;
   } | null;
+  recovering?: boolean;
+  is_new?: boolean;
+  weeks?: number[];
 };
 type Club = {
   coach: Person | null;
@@ -214,47 +217,66 @@ export function TrainerFeedPage({
           ) : null}
 
           <div>
-            <div className="ds-grp">
+            {/* состав (вариант А): тренер отдельно, у атлетов — км этой недели и 6 недель столбиками */}
+            {club.coach ? (
+              <div className="ds-block club-coach">
+                <UserAvatar fullName={club.coach.full_name} avatarUrl={club.coach.avatar_url} className="club-av-lg" />
+                <div>
+                  <b>{club.coach.full_name}</b>
+                  <span>
+                    тренер · {club.athletes.length} {pluralRu(club.athletes.length, "атлет", "атлета", "атлетов")}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div className="ds-grp" style={{ marginTop: 12 }}>
               <span>Атлеты · {club.athletes.length}</span>
+              <span>эта неделя</span>
             </div>
             <div className="ds-list">
-              {club.coach ? (
-                <div className="ds-li">
-                  <UserAvatar
-                    fullName={club.coach.full_name}
-                    avatarUrl={club.coach.avatar_url}
-                    className="club-av"
-                  />
-                  <div className="ds-m">
-                    <b>{club.coach.full_name}</b>
-                    <span>ведёт группу</span>
-                  </div>
-                  <span className="ds-pill ds-pill-accent">Тренер</span>
-                </div>
-              ) : null}
-              {club.athletes.map((person) => (
-                <Link
-                  key={person.id}
-                  to={profileHref(person)}
-                  className="ds-li"
-                >
-                  <UserAvatar
-                    fullName={person.full_name}
-                    avatarUrl={person.avatar_url}
-                    className="club-av"
-                  />
-                  <div className="ds-m">
-                    <b>
-                      {person.full_name}
-                      {person.is_me ? (
-                        <small className="club-me"> · вы</small>
-                      ) : null}
-                    </b>
-                    <span>{sinceLabel(person)}</span>
-                  </div>
-                  <i className="club-chev" aria-hidden="true" />
-                </Link>
-              ))}
+              {club.athletes.map((person) => {
+                const weeks = person.weeks ?? [];
+                const max = Math.max(...weeks, 1);
+                const thisWeek = weeks[weeks.length - 1] ?? 0;
+                const ranToday = person.last_run_at ? new Date(person.last_run_at).toDateString() === new Date().toDateString() : false;
+                const tag =
+                  person.birthday?.days === 0
+                    ? { text: "ДР сегодня", cls: "is-gold" }
+                    : person.birthday?.days === 1
+                      ? { text: "ДР завтра", cls: "is-gold" }
+                      : person.recovering
+                        ? { text: "отдых", cls: "" }
+                        : person.is_new
+                          ? { text: "новенький", cls: "" }
+                          : null;
+                return (
+                  <Link key={person.id} to={profileHref(person)} className="ds-li club-row">
+                    <span className="club-avw">
+                      <UserAvatar fullName={person.full_name} avatarUrl={person.avatar_url} className="club-av-lg" />
+                      {ranToday ? <span className="club-today-dot" title="бегал(а) сегодня" /> : null}
+                    </span>
+                    <div className="ds-m">
+                      <b>
+                        {person.full_name}
+                        {person.is_me ? <small className="club-me"> · вы</small> : null}
+                        {tag ? <span className={`club-tag ${tag.cls}`}>{tag.text}</span> : null}
+                      </b>
+                      <span>{sinceLabel(person)}</span>
+                    </div>
+                    {weeks.some((value) => value > 0) ? (
+                      <span className="club-wk" aria-hidden="true">
+                        {weeks.map((value, index) => (
+                          <i key={index} className={index === weeks.length - 1 ? "is-now" : undefined} style={{ height: `${Math.max(value ? (value / max) * 100 : 0, 10)}%` }} />
+                        ))}
+                      </span>
+                    ) : null}
+                    <span className={thisWeek ? "club-km" : "club-km is-zero"}>
+                      {thisWeek ? formatKm(thisWeek) : "—"}
+                      {thisWeek ? <small>км</small> : null}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </>
