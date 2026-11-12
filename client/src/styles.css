@@ -4851,7 +4851,7 @@ html { -webkit-tap-highlight-color: transparent; }
 /* Пробежки за период (из тепловой карты) */
 .rp-head h1 { margin: 0; font-size: 26px; font-weight: 800; }
 .rp-head p { margin: 2px 0 0; color: var(--ink-muted); font-weight: 600; }
-.rp-sum { grid-template-columns: repeat(4, 1fr); }
+.rp-sum { grid-template-columns: repeat(3, 1fr); }
 .rp-row { display: flex; align-items: center; gap: 12px; }
 .rp-row .rp-av { width: 36px; height: 36px; font-size: 12px; flex: none; }
 .rp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }

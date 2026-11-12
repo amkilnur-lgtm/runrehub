@@ -44,14 +44,21 @@ export function pluralRu(n: number, one: string, few: string, many: string) {
 // «вчера, 19:20», иначе дата.
 export function formatAgo(value: string) {
   const then = new Date(value);
-  const diffMs = Date.now() - then.getTime();
+  const now = new Date();
+  const diffMs = now.getTime() - then.getTime();
   const min = Math.floor(diffMs / 60000);
   if (min < 1) return "только что";
   if (min < 60) return `${min} ${pluralRu(min, "мин", "мин", "мин")} назад`;
-  const hours = Math.floor(min / 60);
-  if (hours < 24) return `${hours} ${pluralRu(hours, "ч", "ч", "ч")} назад`;
+  // «вчера» — по календарным дням, а не «меньше 48 часов»: пробежка позавчера вечером
+  // утром спустя 36 ч иначе показывалась как вчерашняя
+  const dayStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((dayStart(now) - dayStart(then)) / 86_400_000);
   const time = then.toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  if (hours < 48) return `вчера, ${time}`;
+  if (days === 0) {
+    const hours = Math.floor(min / 60);
+    return `${hours} ${pluralRu(hours, "ч", "ч", "ч")} назад`;
+  }
+  if (days === 1) return `вчера, ${time}`;
   return then.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 

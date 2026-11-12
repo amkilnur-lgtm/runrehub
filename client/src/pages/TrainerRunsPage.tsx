@@ -94,10 +94,6 @@ export function TrainerRunsPage() {
                 <b>{runs.length}</b>
               </div>
               <div>
-                <span>набор, м</span>
-                <b>{Math.round(total.e)}</b>
-              </div>
-              <div>
                 <span>интенсивность</span>
                 <b>{intensity === null ? "—" : `${intensity}%`}</b>
               </div>
