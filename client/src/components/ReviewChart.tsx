@@ -120,24 +120,39 @@ function RepBars({
       : "");
   void hrs;
 
+  void conclusion;
   const W = 320;
   const base = 104;
   const top = 22;
+  // справа — шкала темпа (3 линии сетки), чтобы столбики читались и без подписей
+  const axisW = 34;
   // быстрее — выше; шкала от «медленнее самого медленного на 10 с» до самого быстрого
   const lo = slow + Math.max(10, spread * 0.6);
   const height = (value: number) => ((lo - value) / (lo - fast)) * (base - top);
   const gap = reps.length > 10 ? 3 : 6;
-  const bw = (W - 8 - gap * (reps.length - 1)) / reps.length;
+  const bw = (W - 8 - axisW - gap * (reps.length - 1)) / reps.length;
+  const ticks = [fast, (fast + lo) / 2, lo].map((value) => ({ value, y: base - height(value) }));
   const showLabels = bw >= 22;
   return (
     <>
-      <p className="rv-concl">{conclusion}</p>
+      <div className="rv-title">
+        <b>{setIds.some((id) => byTime(id)) ? "Отрезки" : "Темп по отрезкам"}</b>
+        <span>/км</span>
+      </div>
       <svg
         className="rv-chart"
         viewBox={`0 0 ${W} ${base + 18}`}
         role="img"
         aria-label={`Темп по отрезкам: ${reps.map((rep) => pace(rep.pace)).join(", ")} /км`}
       >
+        {ticks.map((tick, i) => (
+          <g key={i}>
+            <line x1={2} x2={W - axisW} y1={tick.y} y2={tick.y} className="rv-grid" />
+            <text x={W - 2} y={tick.y + 4} textAnchor="end" className="rv-cap">
+              {pace(tick.value)}
+            </text>
+          </g>
+        ))}
         {reps.map((rep, index) => {
           const x = 4 + index * (bw + gap);
           const h = Math.max(height(rep.pace), 6);
@@ -182,7 +197,7 @@ function RepBars({
             </g>
           );
         })}
-        <line x1={2} x2={W - 2} y1={base} y2={base} className="rv-axis" />
+        <line x1={2} x2={W - axisW} y1={base} y2={base} className="rv-axis" />
       </svg>
       <p className="rv-note">
         {setIds.some((id) => byTime(id)) ? "Над столбиком — время отрезка, " : "Столбик — темп отрезка, "}цифра внутри — пульс в конце.
@@ -260,8 +275,9 @@ function SteadyLines({ streams }: { streams: WorkoutData["streams"] }) {
   const pHi = quantile(paces, 0.95);
   const W = 320;
   const H = 46;
+  const axisW = 34;
   const n = paces.length;
-  const x = (i: number) => 4 + (i * (W - 8)) / (n - 1);
+  const x = (i: number) => 4 + (i * (W - 8 - axisW)) / (n - 1);
   const pathOf = (
     values: number[],
     lo: number,
@@ -292,13 +308,36 @@ function SteadyLines({ streams }: { streams: WorkoutData["streams"] }) {
   const total = points[points.length - 1]!.km;
   return (
     <>
-      <p className="rv-concl">{conclusion}</p>
+      <div className="rv-title">
+        <b>Темп и пульс по дистанции</b>
+        {drift !== null ? <span>дрейф пульса {Math.max(drift, 0)}%</span> : null}
+      </div>
       <svg
         className="rv-chart"
         viewBox={`0 0 ${W} ${hasHr ? 150 : 82}`}
         role="img"
         aria-label={conclusion}
       >
+        {/* сетка и шкала справа: темп (быстрее — выше) и пульс */}
+        {[
+          { y: 16, label: pace(pLo) },
+          { y: 16 + H / 2, label: pace((pLo + pHi) / 2) },
+          { y: 16 + H, label: pace(pHi) },
+          ...(hasHr
+            ? [
+                { y: 88, label: String(Math.round(hHi)) },
+                { y: 88 + H / 2, label: String(Math.round((hLo + hHi) / 2)) },
+                { y: 88 + H, label: String(Math.round(hLo)) },
+              ]
+            : []),
+        ].map((tick, i) => (
+          <g key={i}>
+            <line x1={2} x2={W - axisW} y1={tick.y} y2={tick.y} className="rv-grid" />
+            <text x={W - 2} y={tick.y + 4} textAnchor="end" className="rv-cap">
+              {tick.label}
+            </text>
+          </g>
+        ))}
         <text x={4} y={10} className="rv-cap">
           темп /км
         </text>
@@ -311,17 +350,17 @@ function SteadyLines({ streams }: { streams: WorkoutData["streams"] }) {
             <path d={pathOf(hrs, hLo, hHi, 88, false)} className="rv-hrl" />
           </>
         ) : null}
-        <text x={4} y={hasHr ? 148 : 80} className="rv-cap">
-          0 км
-        </text>
-        <text
-          x={W - 4}
-          y={hasHr ? 148 : 80}
-          className="rv-cap"
-          textAnchor="end"
-        >
-          {total.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} км
-        </text>
+        {[0, 0.5, 1].map((share) => (
+          <text
+            key={share}
+            x={4 + share * (W - 8 - axisW)}
+            y={hasHr ? 148 : 80}
+            className="rv-cap"
+            textAnchor={share === 0 ? "start" : share === 1 ? "end" : "middle"}
+          >
+            {(total * share).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} км
+          </text>
+        ))}
       </svg>
     </>
   );

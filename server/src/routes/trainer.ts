@@ -17,7 +17,7 @@ import { getWorkoutFeeling } from "../lib/workout-feeling.js";
 import { getGroupHeatmap, type HeatmapLevel } from "../lib/group-heatmap.js";
 import { getAthleteCycles, getAthleteState, type CycleLevel } from "../lib/athlete-cycles.js";
 import { getThreshold } from "../lib/pace-zones.js";
-import { getWeeklyVolume, HAS_COACH_FEEDBACK_SQL } from "../lib/weekly-volume.js";
+import { getWeeklyVolume, REVIEW_DONE_SQL } from "../lib/weekly-volume.js";
 import { getGroupRecentResults, getGroupUpcomingStarts } from "../lib/race-results.js";
 import {
   addWorkoutComment,
@@ -223,6 +223,18 @@ export async function trainerRoutes(app: FastifyInstance) {
   });
 
 
+  app.post("/api/trainer/review-queue/:id/skip", { preHandler: requireAuth }, async (request, reply) => {
+    requireRole(request, ["trainer"]);
+    const workoutId = Number((request.params as { id: string }).id);
+    if (!(await trainerOwnsWorkout(request.user.id, workoutId))) return reply.code(404).send({ message: "Тренировка не найдена" });
+    await pool.query(
+      `insert into review_skips (workout_id, coach_id) values ($1, $2)
+       on conflict (workout_id, coach_id) do update set skipped_at = now()`,
+      [workoutId, request.user.id]
+    );
+    return { ok: true };
+  });
+
   app.get("/api/trainer/review-queue", { preHandler: requireAuth }, async (request) => {
     requireRole(request, ["trainer"]);
     const [pending, replied] = await Promise.all([
@@ -234,7 +246,7 @@ export async function trainerRoutes(app: FastifyInstance) {
           join users u on u.id = w.user_id
           where u.role = 'athlete' and u.coach_id = $1
             and w.start_date >= date_trunc('week', now())
-            and not ${HAS_COACH_FEEDBACK_SQL}
+            and not ${REVIEW_DONE_SQL}
         `,
         [request.user.id]
       ),
@@ -250,6 +262,8 @@ export async function trainerRoutes(app: FastifyInstance) {
           where u.role = 'athlete' and u.coach_id = $1
             and last.author_id = w.user_id
             and last.created_at >= now() - interval '14 days'
+            -- пропущено после этого ответа — не возвращаем
+            and not exists (select 1 from review_skips rs where rs.workout_id = w.id and rs.coach_id = $1 and rs.skipped_at >= last.created_at)
         `,
         [request.user.id]
       )
@@ -380,7 +394,7 @@ export async function trainerRoutes(app: FastifyInstance) {
             coalesce(wc.corrected_average_speed, w.average_speed) as average_speed,
             u.full_name as athlete_name,
             u.avatar_url as athlete_avatar_url,
-            ${HAS_COACH_FEEDBACK_SQL} as has_feedback,
+            ${REVIEW_DONE_SQL} as has_feedback,
             (w.start_date >= date_trunc('week', now())) as is_this_week
           from workouts w
           join users u on u.id = w.user_id
@@ -454,7 +468,7 @@ export async function trainerRoutes(app: FastifyInstance) {
           join users u on u.id = w.user_id
           where u.role = 'athlete' and u.coach_id = $1
             and w.start_date >= date_trunc('week', now())
-            and not ${HAS_COACH_FEEDBACK_SQL}
+            and not ${REVIEW_DONE_SQL}
         `,
         [request.user.id]
       )

@@ -45,8 +45,8 @@ function whenLabel(iso: string) {
 export function TrainerReviewPage() {
   const showToast = useToast();
   // очередь фиксируем на время разбора: отправленные уходят, порядок не прыгает
-  // круги свёрнуты: главный график уже показывает отрезки
-  const [lapsOpen, setLapsOpen] = useState(false);
+  // круги развёрнуты сразу — тренер смотрит их всегда
+  const [lapsOpen, setLapsOpen] = useState(true);
   const [queue, setQueue] = useState<number[] | null>(null);
   // ответы спортсменов в обсуждении: на них тренер отвечает в то же обсуждение
   const [replies, setReplies] = useState<Map<number, string>>(new Map());
@@ -77,7 +77,7 @@ export function TrainerReviewPage() {
   const athleteReply = currentId ? (replies.get(currentId) ?? null) : null;
 
   useEffect(() => {
-    setLapsOpen(false);
+    setLapsOpen(true);
     setComment(athleteReply ? "" : (workout?.workout.coach_comment ?? ""));
   }, [workout?.workout.id]);
 
@@ -131,7 +131,7 @@ export function TrainerReviewPage() {
           </b>
           <p className="ds-sub">
             {queue.length
-              ? `Комментарии к ${queue.length} ${queue.length === 1 ? "пробежке" : "пробежкам"} отправлены.`
+              ? "Очередь пройдена: прокомментированные и пропущенные пробежки больше не ждут."
               : "Все пробежки этой недели уже с комментарием."}
           </p>
           <Link
@@ -173,7 +173,15 @@ export function TrainerReviewPage() {
             type="button"
             className="ds-btn ds-btn-3"
             style={{ height: 36 }}
-            onClick={() => setIndex((value) => value + 1)}
+            onClick={() => {
+              // пропуск запоминаем на сервере — пробежка уходит из очереди, счётчика и «Ждут комментария»
+              if (currentId) {
+                void api(`/api/trainer/review-queue/${currentId}/skip`, { method: "POST" })
+                  .then(() => forgetApiCache("/api/trainer"))
+                  .catch(() => undefined);
+              }
+              setIndex((value) => value + 1);
+            }}
           >
             Пропустить
           </button>
@@ -275,7 +283,7 @@ export function TrainerReviewPage() {
               aria-label="Сообщение спортсмена"
             >
               <span className="ds-pill ds-pill-accent">
-                {firstName} ответил(а)
+                Ответ на ваш комментарий
               </span>
               <p>«{athleteReply}»</p>
               {workout.workout.coach_comment?.trim() ? (
@@ -296,7 +304,7 @@ export function TrainerReviewPage() {
             >
               {paceSummary ? (
                 <p>
-                  <b>Темп</b> {paceSummary}
+                  <b>Темп</b> {paceSummary.replace(/^Темп /, "")}
                 </p>
               ) : null}
               {hrSummary ? (

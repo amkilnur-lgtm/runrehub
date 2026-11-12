@@ -4929,3 +4929,8 @@ button.back-link::before { content: "‹ "; }
 .fc2-head .fc2-big { margin-top: 2px; }
 .fc2-run { padding-top: 10px; }
 .fc2-stats { margin-top: 0; }
+/* Разбор: заголовок графика вместо вывода-абзаца, сетка-ориентир со шкалой справа */
+.rv-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.rv-title b { font-size: 15px; font-weight: 800; }
+.rv-title span { font-size: 12.5px; color: var(--ink-muted); font-weight: 700; }
+.rv-grid { stroke: var(--border); stroke-dasharray: 2 3; }

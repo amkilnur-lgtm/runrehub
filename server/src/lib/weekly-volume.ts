@@ -93,3 +93,9 @@ export const HAS_COACH_FEEDBACK_SQL = `(
   nullif(btrim(w.coach_comment), '') is not null
   or exists (select 1 from workout_comments c where c.workout_id = w.id and c.author_id = u.coach_id)
 )`;
+
+// Разбор закрыт: есть обратная связь тренера или он нажал «Пропустить» (review_skips)
+export const REVIEW_DONE_SQL = `(
+  ${HAS_COACH_FEEDBACK_SQL}
+  or exists (select 1 from review_skips rs where rs.workout_id = w.id and rs.coach_id = u.coach_id)
+)`;
