@@ -11,7 +11,11 @@ export function telegramWebhookSecret() {
   return crypto.createHash("sha256").update(config.TELEGRAM_BOT_TOKEN).digest("hex").slice(0, 40);
 }
 
-type InlineKeyboard = Array<Array<{ text: string; callback_data: string }>>;
+type InlineButton =
+  | { text: string; callback_data: string }
+  | { text: string; web_app: { url: string } }
+  | { text: string; url: string };
+type InlineKeyboard = Array<Array<InlineButton>>;
 
 export async function sendTelegramMessageWithButtons(
   chatId: string,
@@ -114,6 +118,18 @@ export async function sendTelegramMessage(chatId: string, text: string) {
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`TELEGRAM_SEND_FAILED: ${body.slice(0, 500)}`);
+  }
+}
+
+// Сообщение с кнопкой, открывающей страницу сразу в мини-аппе (web_app-кнопки работают
+// только в личке с ботом). Кто бы ни нажал — вход по его Telegram, раздел по его роли.
+// Если Telegram кнопку не принял — шлём тот же текст с обычной ссылкой.
+export async function sendTelegramAppLink(chatId: string, text: string, path: string, label = "Открыть в приложении") {
+  const url = `${config.APP_URL.replace(/\/$/, "")}${path}`;
+  try {
+    await sendTelegramMessageWithButtons(chatId, text, [[{ text: label, web_app: { url } }]]);
+  } catch {
+    await sendTelegramMessage(chatId, `${text}\n<a href="${escapeTelegramHtml(url)}">${escapeTelegramHtml(label)}</a>`);
   }
 }
 

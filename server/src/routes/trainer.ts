@@ -9,7 +9,7 @@ import { birthdaySchema } from "./auth.js";
 import { getAthleteTrends } from "../lib/athlete-trends.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { buildStoryCardPng } from "../lib/telegram-notifications.js";
-import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramAppLink } from "../lib/telegram.js";
 import { config } from "../config.js";
 import { signStoryLink } from "../lib/story-links.js";
 import { pool } from "../lib/db.js";
@@ -132,10 +132,11 @@ async function notifyAthleteAboutCoachMessage(workoutId: number, text: string) {
   const row = rows[0];
   if (!row?.telegram_chat_id || row.telegram_notifications_enabled === false) return;
   const quote = text.length > 300 ? `${text.slice(0, 300)}…` : text;
-  const url = `${config.APP_URL.replace(/\/$/, "")}/athlete/workouts/${workoutId}`;
-  await sendTelegramMessage(
+  await sendTelegramAppLink(
     row.telegram_chat_id,
-    `💬 <b>${escapeTelegramHtml(row.coach_name ?? "Тренер")}</b> — о пробежке «${escapeTelegramHtml(row.name)}»:\n«${escapeTelegramHtml(quote)}»\n<a href="${url}">Открыть</a>`
+    `💬 <b>${escapeTelegramHtml(row.coach_name ?? "Тренер")}</b> — о пробежке «${escapeTelegramHtml(row.name)}»:\n«${escapeTelegramHtml(quote)}»`,
+    `/athlete/workouts/${workoutId}`,
+    "Открыть пробежку"
   );
 }
 

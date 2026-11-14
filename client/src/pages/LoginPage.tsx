@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import { pathForRole } from "../components/RequireAuth";
+import type { AppRole } from "../types";
 
 import { useAuth } from "../components/AuthProvider";
 import { isTelegramMiniApp } from "../telegram";
@@ -12,12 +15,13 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const navigate = useNavigate();
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const goHome = (role: AppRole) => navigate(from ? pathForRole(from, role) : `/${role}`, { replace: true });
 
   useEffect(() => {
-    if (user?.role === "admin") navigate("/admin");
-    if (user?.role === "trainer") navigate("/trainer");
-    if (user?.role === "athlete") navigate("/athlete");
-  }, [navigate, user]);
+    if (user) goHome(user.role);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -26,9 +30,7 @@ export function LoginPage() {
 
     try {
       const nextUser = await login(username, password);
-      if (nextUser.role === "admin") navigate("/admin");
-      if (nextUser.role === "trainer") navigate("/trainer");
-      if (nextUser.role === "athlete") navigate("/athlete");
+      goHome(nextUser.role);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Ошибка входа");
     } finally {

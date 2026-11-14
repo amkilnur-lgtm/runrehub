@@ -9,7 +9,7 @@ import { signStoryLink } from "../lib/story-links.js";
 import { getFitnessSummaries } from "../lib/fitness.js";
 import { getWorkoutFeeling, saveWorkoutFeeling, workoutFeelingSchema } from "../lib/workout-feeling.js";
 import { pool } from "../lib/db.js";
-import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramAppLink } from "../lib/telegram.js";
 import { config } from "../config.js";
 import { getTeammateProfile } from "../lib/teammate-profile.js";
 import { getClub, getClubEvents } from "../lib/club.js";
@@ -209,11 +209,10 @@ async function notifyCoachAboutComment(workoutId: number, authorId: number, body
   if (!row?.telegram_chat_id || !row.telegram_notifications_enabled) return;
   const km = (Number(row.distance_meters) / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
   const quote = body.length > 300 ? `${body.slice(0, 300)}…` : body;
-  const url = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${workoutId}`;
   const text =
     `💬 <b>${escapeTelegramHtml(row.full_name)}</b> написал(а) к пробежке «${escapeTelegramHtml(row.name)}» · ${km} км\n` +
-    `«${escapeTelegramHtml(quote)}»\n<a href="${url}">Открыть пробежку</a>`;
-  await sendTelegramMessage(row.telegram_chat_id, text);
+    `«${escapeTelegramHtml(quote)}»`;
+  await sendTelegramAppLink(row.telegram_chat_id, text, `/trainer/workouts/${workoutId}`, "Открыть пробежку");
 }
 
 export async function athleteRoutes(app: FastifyInstance) {
