@@ -1,5 +1,5 @@
 import { pool } from "./db.js";
-import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "./telegram.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramAppLink } from "./telegram.js";
 import { getWeeklyVolume } from "./weekly-volume.js";
 
 // «Клуб»: состав группы и дни рождения. День рождения — только день и месяц;
@@ -100,9 +100,11 @@ export async function notifyCoachesAboutBirthdays(now = new Date()) {
     [tomorrow.getDate(), tomorrow.getMonth() + 1]
   );
   for (const row of rows) {
-    await sendTelegramMessage(
+    await sendTelegramAppLink(
       row.telegram_chat_id,
-      `🎂 Завтра день рождения у <b>${escapeTelegramHtml(row.full_name)}</b> — ${formatBirthday(tomorrow.getDate(), tomorrow.getMonth() + 1)}`
+      `🎂 Завтра день рождения у <b>${escapeTelegramHtml(row.full_name)}</b> — ${formatBirthday(tomorrow.getDate(), tomorrow.getMonth() + 1)}`,
+      `/trainer/athletes/${row.id}`,
+      "Открыть спортсмена"
     );
     await pool.query(`update users set birthday_notified_on = current_date where id = $1`, [row.id]);
   }

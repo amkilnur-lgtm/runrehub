@@ -15,6 +15,7 @@ import {
   formatTelegramWorkoutCaption,
   formatTelegramWorkoutMessage,
   isTelegramConfigured,
+  sendTelegramAppLink,
   sendTelegramMessage,
   sendTelegramPhoto
 } from "./telegram.js";
@@ -405,8 +406,10 @@ async function sendPeriodReport(
   chatId: string,
   kind: "weekly" | "monthly",
   report: PeriodReportData,
-  periodStart: string | Date
+  periodStart: string | Date,
+  athleteId: number | null
 ) {
+  const button = athleteId ? { text: "Открыть спортсмена", path: `/trainer/athletes/${athleteId}` } : undefined;
   const title = kind === "weekly" ? formatCardWeekTitle(periodStart) : formatCardMonthTitle(periodStart);
   const png = await renderOrNull(`${kind}_report`, () =>
     renderPeriodCard({
@@ -425,7 +428,7 @@ async function sendPeriodReport(
 
   if (png) {
     const periodLabel = kind === "weekly" ? `итоги недели, ${title}` : `итоги месяца, ${title.toLowerCase()}`;
-    await sendTelegramPhoto(chatId, png, formatTelegramPeriodCaption(report.athleteName, periodLabel));
+    await sendTelegramPhoto(chatId, png, formatTelegramPeriodCaption(report.athleteName, periodLabel), button);
     return;
   }
 
@@ -439,12 +442,12 @@ async function sendPeriodReport(
     workoutCount: report.workoutCount,
     zonePercentages: report.zonePercentages
   };
-  await sendTelegramMessage(
-    chatId,
+  const text =
     kind === "weekly"
       ? formatTelegramWeeklyReportMessage({ ...input, weekStart: periodStart })
-      : formatTelegramMonthlyReportMessage({ ...input, monthStart: periodStart })
-  );
+      : formatTelegramMonthlyReportMessage({ ...input, monthStart: periodStart });
+  if (button) await sendTelegramAppLink(chatId, text, button.path, button.text);
+  else await sendTelegramMessage(chatId, text);
 }
 
 // Беговой каденс: часть часов пишет «на одну ногу» (~85), приводим к шагам в минуту
@@ -950,7 +953,7 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           continue;
         }
 
-        await sendPeriodReport(job.chat_id, "weekly", report, job.report_week_start);
+        await sendPeriodReport(job.chat_id, "weekly", report, job.report_week_start, job.athlete_user_id);
       } else if (job.kind === "monthly_report") {
         if (!job.athlete_user_id || !job.report_month_start) {
           throw new Error("TELEGRAM_MONTHLY_REPORT_CONTEXT_MISSING");
@@ -976,7 +979,7 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           continue;
         }
 
-        await sendPeriodReport(job.chat_id, "monthly", report, job.report_month_start);
+        await sendPeriodReport(job.chat_id, "monthly", report, job.report_month_start, job.athlete_user_id);
       } else {
         if (!job.workout_id) {
           throw new Error("TELEGRAM_WORKOUT_CONTEXT_MISSING");
@@ -999,10 +1002,11 @@ export async function processPendingTelegramNotifications(logger?: FastifyBaseLo
           await sendTelegramPhoto(
             job.chat_id,
             png,
-            formatTelegramWorkoutCaption({ athleteName: job.athlete_name, workoutId })
+            formatTelegramWorkoutCaption({ athleteName: job.athlete_name, workoutId }),
+            { text: "Посмотреть тренировку", path: `/trainer/workouts/${workoutId}` }
           );
         } else {
-          await sendTelegramMessage(job.chat_id, message);
+          await sendTelegramAppLink(job.chat_id, message, `/trainer/workouts/${workoutId}`, "Посмотреть тренировку");
         }
       }
 
@@ -1065,13 +1069,14 @@ export async function sendTelegramTestMessage(chatId: string, trainerName: strin
     throw new Error("TELEGRAM_NOT_CONFIGURED");
   }
 
-  await sendTelegramMessage(
+  await sendTelegramAppLink(
     chatId,
     [
       `Тестовое уведомление для тренера <b>${escapeTelegramHtml(trainerName)}</b>.`,
-      "Если это сообщение пришло, интеграция Telegram настроена корректно.",
-      `<a href="${escapeTelegramHtml(config.APP_URL.replace(/\/$/, ""))}/admin">Открыть админку</a>`
-    ].join("\n")
+      "Если это сообщение пришло, интеграция Telegram настроена корректно."
+    ].join("\n"),
+    "/trainer",
+    "Открыть приложение"
   );
 }
 
@@ -1095,7 +1100,7 @@ export async function sendWeeklyTelegramTestMessages(trainerId: number, weekDate
   let sent = 0;
 
   for (const report of preview.reports) {
-    await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart);
+    await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart, report.athleteUserId);
     sent += 1;
   }
 
@@ -1127,7 +1132,7 @@ export async function sendMonthlyTelegramTestMessages(trainerId: number, monthDa
   let sent = 0;
 
   for (const report of preview.reports) {
-    await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart);
+    await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart, report.athleteUserId);
     sent += 1;
   }
 
@@ -1191,7 +1196,7 @@ export async function sendAthleteWeeklyTelegramReport(
     throw new Error("WEEKLY_REPORT_NOT_FOUND");
   }
 
-  await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart);
+  await sendPeriodReport(chatId, "weekly", report, preview.reportWeekStart, report.athleteUserId);
 
   return {
     athleteName: athlete.athlete_name,
@@ -1253,7 +1258,7 @@ export async function sendAthleteMonthlyTelegramReport(
     throw new Error("MONTHLY_REPORT_NOT_FOUND");
   }
 
-  await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart);
+  await sendPeriodReport(chatId, "monthly", report, preview.reportMonthStart, report.athleteUserId);
 
   return {
     athleteName: athlete.athlete_name,

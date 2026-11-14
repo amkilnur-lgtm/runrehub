@@ -13,7 +13,7 @@ import {
   type RaceResultRow
 } from "../lib/race-results.js";
 import { isAthleteInGroup } from "../lib/social.js";
-import { escapeTelegramHtml, isTelegramConfigured, sendTelegramMessage } from "../lib/telegram.js";
+import { escapeTelegramHtml, isTelegramConfigured, sendTelegramAppLink } from "../lib/telegram.js";
 
 // Кто что может: смотреть — сам спортсмен, одногруппники и его тренер;
 // менять — сам спортсмен и его тренер
@@ -76,7 +76,7 @@ async function notifyCoachAboutRecord(result: RaceResultRow) {
   const text =
     `🏅 <b>${escapeTelegramHtml(person.full_name)}</b> — личный рекорд на ${distance.label}: ` +
     `<b>${formatRaceTime(result.official_time_seconds)}</b>${improvement}\n${escapeTelegramHtml(result.name)}`;
-  await sendTelegramMessage(person.telegram_chat_id, text);
+  await sendTelegramAppLink(person.telegram_chat_id, text, `/trainer/athletes/${result.user_id}`, "Открыть спортсмена");
 }
 
 export async function resultsRoutes(app: FastifyInstance) {

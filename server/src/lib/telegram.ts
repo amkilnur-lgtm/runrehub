@@ -125,7 +125,7 @@ export async function sendTelegramMessage(chatId: string, text: string) {
 // только в личке с ботом). Кто бы ни нажал — вход по его Telegram, раздел по его роли.
 // Если Telegram кнопку не принял — шлём тот же текст с обычной ссылкой.
 export async function sendTelegramAppLink(chatId: string, text: string, path: string, label = "Открыть в приложении") {
-  const url = `${config.APP_URL.replace(/\/$/, "")}${path}`;
+  const url = appUrl(path);
   try {
     await sendTelegramMessageWithButtons(chatId, text, [[{ text: label, web_app: { url } }]]);
   } catch {
@@ -133,26 +133,41 @@ export async function sendTelegramAppLink(chatId: string, text: string, path: st
   }
 }
 
-// Картинка-карточка с подписью (HTML, до 1024 символов)
-export async function sendTelegramPhoto(chatId: string, png: Buffer, caption: string) {
+export type AppButton = { text: string; path: string };
+
+function appUrl(path: string) {
+  return `${config.APP_URL.replace(/\/$/, "")}${path}`;
+}
+
+// Картинка-карточка с подписью (HTML, до 1024 символов). С кнопкой — открывает мини-апп;
+// не принял кнопку (например, групповой чат) — та же картинка со ссылкой в подписи
+export async function sendTelegramPhoto(chatId: string, png: Buffer, caption: string, button?: AppButton) {
   if (!config.TELEGRAM_BOT_TOKEN) {
     throw new Error("TELEGRAM_NOT_CONFIGURED");
   }
 
-  const form = new FormData();
-  form.append("chat_id", chatId);
-  form.append("caption", caption);
-  form.append("parse_mode", "HTML");
-  form.append("photo", new Blob([new Uint8Array(png)], { type: "image/png" }), "card.png");
+  const send = async (text: string, markup?: unknown) => {
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", text);
+    form.append("parse_mode", "HTML");
+    if (markup) form.append("reply_markup", JSON.stringify(markup));
+    form.append("photo", new Blob([new Uint8Array(png)], { type: "image/png" }), "card.png");
+    const response = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+      method: "POST",
+      body: form
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`TELEGRAM_SEND_FAILED: ${body.slice(0, 500)}`);
+    }
+  };
 
-  const response = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
-    method: "POST",
-    body: form
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`TELEGRAM_SEND_FAILED: ${body.slice(0, 500)}`);
+  if (!button) return send(caption);
+  try {
+    await send(caption, { inline_keyboard: [[{ text: button.text, web_app: { url: appUrl(button.path) } }]] });
+  } catch {
+    await send(`${caption}\n<a href="${escapeTelegramHtml(appUrl(button.path))}">${escapeTelegramHtml(button.text)}</a>`);
   }
 }
 
@@ -245,24 +260,19 @@ export function formatTelegramWorkoutMessage(input: {
       ? `${Math.round(input.averageHeartrate)} уд/мин`
       : "—";
 
-  const workoutUrl = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${input.workoutId}`;
-
   // Пол спортсмена неизвестен — без «пробежал(а)»
   return [
     `<b>${athleteName}</b> · новая пробежка`,
     "",
     `Дистанция: <b>${distanceKm} км</b>`,
     `Средний темп: <b>${escapeTelegramHtml(paceText)}</b>`,
-    `Средний пульс: <b>${escapeTelegramHtml(heartRateText)}</b>`,
-    "",
-    `<a href="${escapeTelegramHtml(workoutUrl)}">Посмотреть тренировку</a>`
+    `Средний пульс: <b>${escapeTelegramHtml(heartRateText)}</b>`
   ].join("\n");
 }
 
-// Подпись под карточкой пробежки: цифры уже на картинке, остаются имя и ссылка
+// Подпись под карточкой пробежки: цифры уже на картинке, остаётся имя (ссылка — кнопкой)
 export function formatTelegramWorkoutCaption(input: { athleteName: string; workoutId: number }) {
-  const workoutUrl = `${config.APP_URL.replace(/\/$/, "")}/trainer/workouts/${input.workoutId}`;
-  return `<b>${escapeTelegramHtml(input.athleteName)}</b> · новая пробежка\n<a href="${escapeTelegramHtml(workoutUrl)}">Посмотреть тренировку</a>`;
+  return `<b>${escapeTelegramHtml(input.athleteName)}</b> · новая пробежка`;
 }
 
 export function formatTelegramWeeklyReportMessage(input: {
