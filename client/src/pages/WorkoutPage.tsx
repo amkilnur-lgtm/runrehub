@@ -1049,25 +1049,28 @@ export function WorkoutPage({ mode }: { mode: "trainer" | "athlete" }) {
           onCursor={setChartCursor}
         />
       </section>
-      <section className="ds-block ds-pad" aria-label="Пульс">
-        <StreamChart
-          title="Пульс"
-          model={heartRateChart}
-          color="var(--chart-hr)"
-          formatter={(value) => `${Math.round(value)}`}
-          summary={hrSummary}
-          unit=" уд/мин"
-          cursor={chartCursor}
-          onCursor={setChartCursor}
-          zones={[
-            { from: personalZones.bounds[0], to: personalZones.bounds[1], color: "var(--hrz-2-bg)" },
-            { from: personalZones.bounds[1], to: personalZones.bounds[2], color: "var(--hrz-3-bg)" },
-            { from: personalZones.bounds[2], to: personalZones.bounds[3], color: "var(--hrz-4-bg)" },
-            { from: personalZones.bounds[3], to: 240, color: "var(--hrz-5-bg)" }
-          ]}
-          footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
-        />
-      </section>
+      {/* без пульсометра (запись с телефона) — блока пульса нет совсем */}
+      {(data.streams?.heartrate ?? []).some((value) => value > 40) ? (
+        <section className="ds-block ds-pad" aria-label="Пульс">
+          <StreamChart
+            title="Пульс"
+            model={heartRateChart}
+            color="var(--chart-hr)"
+            formatter={(value) => `${Math.round(value)}`}
+            summary={hrSummary}
+            unit=" уд/мин"
+            cursor={chartCursor}
+            onCursor={setChartCursor}
+            zones={[
+              { from: personalZones.bounds[0], to: personalZones.bounds[1], color: "var(--hrz-2-bg)" },
+              { from: personalZones.bounds[1], to: personalZones.bounds[2], color: "var(--hrz-3-bg)" },
+              { from: personalZones.bounds[2], to: personalZones.bounds[3], color: "var(--hrz-4-bg)" },
+              { from: personalZones.bounds[3], to: 240, color: "var(--hrz-5-bg)" }
+            ]}
+            footer={hrZones ? <HrZonesBar zones={hrZones} /> : null}
+          />
+        </section>
+      ) : null}
 
       {/* общие комментарии клуба: поздравления, поддержка одногруппников */}
 
