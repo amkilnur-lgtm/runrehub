@@ -2,6 +2,8 @@ import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 
+// раньше роутера: адрес запуска мини-аппа (start_param) должен быть разобран до него
+import "./telegram";
 import { AppLayout } from "./components/AppLayout";
 import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import { AuthProvider } from "./components/AuthProvider";

@@ -126,8 +126,10 @@ export async function sendTelegramMessage(chatId: string, text: string) {
 // Если Telegram кнопку не принял — шлём тот же текст с обычной ссылкой.
 export async function sendTelegramAppLink(chatId: string, text: string, path: string, label = "Открыть в приложении") {
   const url = appUrl(path);
+  const button = appButton(chatId, { text: label, path });
   try {
-    await sendTelegramMessageWithButtons(chatId, text, [[{ text: label, web_app: { url } }]]);
+    if (!button) throw new Error("NO_APP_BUTTON");
+    await sendTelegramMessageWithButtons(chatId, text, [[button]]);
   } catch {
     await sendTelegramMessage(chatId, `${text}\n<a href="${escapeTelegramHtml(url)}">${escapeTelegramHtml(label)}</a>`);
   }
@@ -137,6 +139,20 @@ export type AppButton = { text: string; path: string };
 
 function appUrl(path: string) {
   return `${config.APP_URL.replace(/\/$/, "")}${path}`;
+}
+
+// Кнопка «открыть в мини-аппе». В личке с ботом — web_app-кнопка. В группе (chat_id < 0)
+// web_app запрещён — даём ссылку t.me/<бот>?startapp=… : Telegram открывает главный
+// мини-апп бота у того, кто нажал, а клиент по start_param переходит на нужную страницу.
+// "/trainer/workouts/12" → "trainer_workouts_12" (startapp: только A-Za-z0-9_-, до 64)
+function appButton(chatId: string, button: AppButton) {
+  if (!chatId.trim().startsWith("-")) {
+    return { text: button.text, web_app: { url: appUrl(button.path) } };
+  }
+  const bot = config.TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim();
+  const param = button.path.replace(/^\//, "").replaceAll("/", "_");
+  if (!bot || !/^[A-Za-z0-9_-]{1,64}$/.test(param)) return null;
+  return { text: button.text, url: `https://t.me/${bot}?startapp=${param}` };
 }
 
 // Картинка-карточка с подписью (HTML, до 1024 символов). С кнопкой — открывает мини-апп;
@@ -164,8 +180,10 @@ export async function sendTelegramPhoto(chatId: string, png: Buffer, caption: st
   };
 
   if (!button) return send(caption);
+  const markup = appButton(chatId, button);
   try {
-    await send(caption, { inline_keyboard: [[{ text: button.text, web_app: { url: appUrl(button.path) } }]] });
+    if (!markup) throw new Error("NO_APP_BUTTON");
+    await send(caption, { inline_keyboard: [[markup]] });
   } catch {
     await send(`${caption}\n<a href="${escapeTelegramHtml(appUrl(button.path))}">${escapeTelegramHtml(button.text)}</a>`);
   }

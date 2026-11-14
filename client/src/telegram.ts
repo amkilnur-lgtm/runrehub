@@ -40,6 +40,22 @@ function readInitData(): string | null {
 export const telegramInitData = readInitData();
 export const isTelegramMiniApp = Boolean(telegramInitData);
 
+// Запуск по ссылке t.me/<бот>?startapp=trainer_workouts_12 (кнопки бота в группе):
+// Telegram открывает главную мини-аппа, а нужная страница — в start_param. Переходим
+// до создания роутера; чужой раздел дальше сам заменит RequireRole.
+// Параметр есть только в свежем адресе запуска — после перезагрузки повторно не сработает.
+(function openStartPage() {
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+  const params = hash ? new URLSearchParams(hash) : null;
+  const start =
+    params?.get("tgWebAppStartParam") ??
+    new URLSearchParams(params?.get("tgWebAppData") ?? "").get("start_param");
+  if (!start || !/^(trainer|athlete)(_[a-z0-9]+)*$/.test(start)) return;
+  // главная мини-аппа может быть настроена как "/" или как раздел роли
+  if (!/^\/((trainer|athlete|admin)\/?)?$/.test(window.location.pathname)) return;
+  window.history.replaceState(null, "", `/${start.replaceAll("_", "/")}${window.location.hash}`);
+})();
+
 // Скрипт Telegram нужен только внутри Mini App (раскрыть на весь экран, убрать заставку),
 // поэтому в обычном браузере его не грузим вовсе
 if (isTelegramMiniApp) {
