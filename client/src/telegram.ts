@@ -13,6 +13,8 @@ type TelegramWebApp = {
   HapticFeedback?: { impactOccurred: (style: "light" | "medium") => void };
   // Bot API 7.7+: свайп вниз по странице больше не сворачивает мини-апп
   disableVerticalSwipes?: () => void;
+  // Bot API 6.9+: разрешить боту писать в личку (иначе ответы тренера не дойдут)
+  requestWriteAccess?: (callback?: (allowed: boolean) => void) => void;
 };
 
 export function getTelegramWebApp(): TelegramWebApp | null {
@@ -69,6 +71,20 @@ if (isTelegramMiniApp) {
     // иначе свайп вниз у верха страницы тянет и закрывает мини-апп вместо прокрутки;
     // закрыть по-прежнему можно свайпом за шапку Telegram или кнопкой «Закрыть»
     if (webApp?.isVersionAtLeast?.("7.7")) webApp.disableVerticalSwipes?.();
+    // Спрашиваем один раз: кто уже писал боту, тому Telegram окно не покажет
+    try {
+      if (webApp?.isVersionAtLeast?.("6.9") && !localStorage.getItem("rr-tg-write")) {
+        webApp.requestWriteAccess?.((allowed) => {
+          try {
+            localStorage.setItem("rr-tg-write", allowed ? "yes" : "no");
+          } catch {
+            // без хранилища спросим в следующий раз
+          }
+        });
+      }
+    } catch {
+      // старый клиент Telegram — без запроса
+    }
   };
   document.head.appendChild(script);
 }

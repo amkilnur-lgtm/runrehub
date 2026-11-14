@@ -124,16 +124,18 @@ type TrainerDashboardStatsRow = {
 
 async function notifyAthleteAboutCoachMessage(workoutId: number, text: string) {
   if (!isTelegramConfigured()) return;
+  // Личный чат спортсмена с ботом = его Telegram id (запоминается при входе в мини-апп).
+  // telegram_chat_id / флаг уведомлений — настройки тренера из админки, спортсменам их не ставят
   const { rows } = await pool.query(
-    `select w.name, a.telegram_chat_id, a.telegram_notifications_enabled, c.full_name as coach_name
+    `select w.name, coalesce(a.telegram_chat_id, a.telegram_user_id::text) as chat_id, c.full_name as coach_name
      from workouts w join users a on a.id = w.user_id join users c on c.id = a.coach_id where w.id = $1`,
     [workoutId]
   );
   const row = rows[0];
-  if (!row?.telegram_chat_id || row.telegram_notifications_enabled === false) return;
+  if (!row?.chat_id) return;
   const quote = text.length > 300 ? `${text.slice(0, 300)}…` : text;
   await sendTelegramAppLink(
-    row.telegram_chat_id,
+    row.chat_id,
     `💬 <b>${escapeTelegramHtml(row.coach_name ?? "Тренер")}</b> — о пробежке «${escapeTelegramHtml(row.name)}»:\n«${escapeTelegramHtml(quote)}»`,
     `/athlete/workouts/${workoutId}`,
     "Открыть пробежку"
