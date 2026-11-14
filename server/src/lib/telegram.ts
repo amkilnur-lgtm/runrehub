@@ -126,7 +126,7 @@ export async function sendTelegramMessage(chatId: string, text: string) {
 // Если Telegram кнопку не принял — шлём тот же текст с обычной ссылкой.
 export async function sendTelegramAppLink(chatId: string, text: string, path: string, label = "Открыть в приложении") {
   const url = appUrl(path);
-  const button = appButton(chatId, { text: label, path });
+  const button = await appButton(chatId, { text: label, path });
   try {
     if (!button) throw new Error("NO_APP_BUTTON");
     await sendTelegramMessageWithButtons(chatId, text, [[button]]);
@@ -145,11 +145,27 @@ function appUrl(path: string) {
 // web_app запрещён — даём ссылку t.me/<бот>?startapp=… : Telegram открывает главный
 // мини-апп бота у того, кто нажал, а клиент по start_param переходит на нужную страницу.
 // "/trainer/workouts/12" → "trainer_workouts_12" (startapp: только A-Za-z0-9_-, до 64)
-function appButton(chatId: string, button: AppButton) {
+// Имя бота: из настройки, иначе один раз спрашиваем у Telegram (getMe)
+let botUsernameCache: string | null = null;
+async function botUsername() {
+  const fromConfig = config.TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim();
+  if (fromConfig) return fromConfig;
+  if (botUsernameCache || !config.TELEGRAM_BOT_TOKEN) return botUsernameCache;
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/getMe`);
+    const data = (await response.json()) as { result?: { username?: string } };
+    botUsernameCache = data.result?.username ?? null;
+  } catch {
+    // нет связи — в этот раз обычная ссылка
+  }
+  return botUsernameCache;
+}
+
+async function appButton(chatId: string, button: AppButton) {
   if (!chatId.trim().startsWith("-")) {
     return { text: button.text, web_app: { url: appUrl(button.path) } };
   }
-  const bot = config.TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim();
+  const bot = await botUsername();
   const param = button.path.replace(/^\//, "").replaceAll("/", "_");
   if (!bot || !/^[A-Za-z0-9_-]{1,64}$/.test(param)) return null;
   return { text: button.text, url: `https://t.me/${bot}?startapp=${param}` };
@@ -180,7 +196,7 @@ export async function sendTelegramPhoto(chatId: string, png: Buffer, caption: st
   };
 
   if (!button) return send(caption);
-  const markup = appButton(chatId, button);
+  const markup = await appButton(chatId, button);
   try {
     if (!markup) throw new Error("NO_APP_BUTTON");
     await send(caption, { inline_keyboard: [[markup]] });
